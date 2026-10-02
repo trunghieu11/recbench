@@ -1,9 +1,12 @@
-"""H&M fashion purchases. Full tier uses the last 7 days of the public file as test."""
+"""H&M fashion purchases. The last 7 days of the public file (2020-09-16..22) are the test window.
+
+Article images are used only if the Kaggle image archive was unpacked under raw/hm/images;
+nothing is generated when it is missing.
+"""
 
 from __future__ import annotations
 
 import zipfile
-import hashlib
 from pathlib import Path
 
 import pandas as pd
@@ -14,56 +17,17 @@ from recbench.protocol import DatasetSpec
 from recbench.registry import register_dataset
 
 
-def attach_slice_images(split_dir: Path, raw_dir: Path, tier: str) -> None:
-    """Point split items at real JPEGs, or at tiny generated images for the smoke slice."""
-    import pyarrow.parquet as pq
-
-    items_path = split_dir / "items.parquet"
-    if not items_path.exists():
-        return
-    items = pq.read_table(items_path).to_pandas()
-    smoke_dir = raw_dir / "images_smoke"
-    paths = []
-    any_real = False
-    for item_id, current in zip(items["item_id"].astype(str), items["image_path"]):
-        current_s = "" if current is None or (isinstance(current, float)) else str(current)
-        if current_s and current_s != "None" and Path(current_s).is_file():
-            paths.append(current_s)
-            any_real = True
-            continue
-        if tier == "full":
-            paths.append("")
-            continue
-        dest = smoke_dir / f"{item_id}.ppm"
-        if not dest.exists():
-            _ppm(dest, item_id)
-        paths.append(str(dest))
-    if tier == "full" and not any_real:
-        items["image_path"] = pd.NA
-    else:
-        items["image_path"] = paths
-    items.to_parquet(items_path, index=False)
-
-
-def _ppm(path: Path, key: str) -> None:
-    """8x8 image derived from the article id, used when the Kaggle archive is not on disk."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    digest = int(hashlib.md5(key.encode()).hexdigest()[:6], 16)
-    red, green, blue = (digest >> 16) & 255, (digest >> 8) & 255, digest & 255
-    header = b"P6\n8 8\n255\n"
-    pixel = bytes((red, green, blue))
-    path.write_bytes(header + pixel * 64)
-
-
 @register_dataset
 class HMFashion:
+    CLEAN_VERSION = "2"
     spec = DatasetSpec(
         name="hm",
         domain="ecommerce",
         feedback={"implicit"},
         has_images=True,
-        official_split="hm_last_7_days",
-        description="H&M purchases, article text, customer attributes, and article images.",
+        split_rule="last_days",
+        test_days=7,
+        description="H&M purchases, article text, customer attributes, and (optional) article images.",
     )
 
     def download(self, raw_dir: Path) -> None:
@@ -104,9 +68,10 @@ class HMFashion:
         image_paths = []
         for article_id in articles["article_id"].astype(str):
             padded = article_id.zfill(10)
-            folder = padded[:3]
-            real = raw_dir / "images" / folder / padded / f"{padded}.jpg"
-            image_paths.append(str(real) if real.is_file() else "")
+            # Kaggle layout: images/<first 3 digits>/<10-digit id>.jpg
+            candidates = [raw_dir / "images" / padded[:3] / f"{padded}.jpg", raw_dir / "images" / f"{padded}.jpg"]
+            real = next((path for path in candidates if path.is_file()), None)
+            image_paths.append(str(real) if real else "")
         items = pd.DataFrame(
             {
                 "item_id": articles["article_id"].astype(str),

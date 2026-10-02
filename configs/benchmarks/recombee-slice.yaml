@@ -1,0 +1,20 @@
+# Recombee vs. local methods on the SAME small slice (fits Recombee's free plan).
+# Needs RECBENCH_RECOMBEE_DB / _TOKEN / _REGION (and _ALLOW_RESET=1 for a dedicated database).
+# Request math (each sub-request counted): ~10K items + ~36K pre-test events + 1K eval users + polling < 90K.
+#   python -m recbench.pipeline.prepare --config configs/benchmarks/recombee-slice.yaml
+#   python -m recbench.runner --config configs/benchmarks/recombee-slice.yaml
+tier: slice
+hardware: configs/hardware/local-cpu.yaml
+seed: 42
+resume: true
+continue_on_error: true
+timeout_minutes: 120
+managed_services: true
+export_bundles: false
+eval:
+  max_eval_users: 1000
+datasets: [movielens-25m]
+methods: [random, most_popular, itemknn, ease, ials, sasrec, recombee]
+method_params:
+  recombee:
+    recombee_max_requests: 90000

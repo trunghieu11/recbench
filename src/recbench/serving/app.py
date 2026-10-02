@@ -1,181 +1,136 @@
-"""HTTP API and the results dashboard. Latency is measured by calling this process over HTTP."""
+"""HTTP API: serve precomputed recommendation bundles, plus a small results dashboard.
+
+Run locally:
+    uvicorn recbench.serving.app:app --port 8080
+    curl -X POST localhost:8080/recommend -H 'content-type: application/json' \\
+         -d '{"dataset": "movielens-25m", "method": "ease", "user_id": "123", "k": 10}'
+
+Environment:
+    RECBENCH_BUNDLES        folder holding <dataset>/<tier>/<method>/ bundles (default: data/bundles)
+    RECBENCH_TIER           tier to serve (default: smoke)
+    RECBENCH_SERVE_METHODS  optional comma-separated allow-list of methods
+
+The API imports only numpy, pandas, and pyarrow, so the container needs no torch.
+The dashboard pages additionally need MLflow (installed with the "bench" extra).
+"""
 
 from __future__ import annotations
 
 import os
+from functools import lru_cache
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import RedirectResponse
-from pydantic import BaseModel
+from fastapi.responses import HTMLResponse, RedirectResponse
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+from pydantic import BaseModel, Field
 
+from recbench import __version__
 from recbench.protocol import PROTOCOL_NOTE
-from recbench.registry import ensure_loaded
-from recbench.store import SplitStore
+from recbench.serving.bundle import Bundle
 
-app = FastAPI(title="recbench")
+app = FastAPI(title="recbench", version=__version__, description="Recommendations from precomputed bundles.")
 _TEMPLATES = Environment(
     loader=FileSystemLoader(Path(__file__).resolve().parents[1] / "dashboard" / "templates"),
     autoescape=select_autoescape(["html"]),
 )
-_LOADED: dict[tuple[str, str], object] = {}
-
-TASK_METRIC = {
-    "topn": "ndcg_at_10",
-    "sequential": "ndcg_at_10",
-    "session": "ndcg_at_10",
-    "ctr": "auc",
-    "rating": "rmse",
-}
 
 
 class RecommendRequest(BaseModel):
     user_id: str
-    k: int = 10
-    dataset: str | None = None
+    dataset: str
+    method: str
+    k: int = Field(10, ge=1, le=100)
 
 
-def _data_root() -> Path:
-    return Path(os.environ.get("DATA_DIR", Path.cwd() / "data"))
+def bundle_root() -> Path:
+    default = Path(os.environ.get("DATA_DIR", Path.cwd() / "data")) / "bundles"
+    return Path(os.environ.get("RECBENCH_BUNDLES", default))
 
 
-def _allowed() -> set[str] | None:
-    raw = os.environ.get("RECBENCH_SERVE_METHODS")
-    if not raw:
-        return None
-    return {part for part in raw.split(",") if part}
+def tier() -> str:
+    return os.environ.get("RECBENCH_TIER", "smoke")
 
 
-def _load(method_name: str, dataset: str):
-    key = (method_name, dataset)
-    if key in _LOADED:
-        return _LOADED[key]
-    tier = os.environ.get("RECBENCH_TIER", "smoke")
-    preset = os.environ.get("RECBENCH_PRESET", "cpu")
-    root = _data_root()
-    ckpt = root / "artifacts" / dataset / tier / preset / f"{method_name}.pt"
-    split = root / "splits" / dataset / tier
-    if not ckpt.exists() or not (split / "meta.json").exists():
-        raise HTTPException(status_code=404, detail=f"No checkpoint for {method_name} on {dataset}")
-    reg = ensure_loaded()
-    allowed = _allowed()
-    if allowed is not None and method_name not in allowed:
-        raise HTTPException(status_code=404, detail=f"{method_name} is not loaded on this service")
-    method = reg.create_method(method_name)
-    method.load(str(ckpt))
-    store = SplitStore(split, dataset, tier)
-    method._bind(store)
-    _LOADED[key] = method
-    return method
+def _allowed(method: str) -> bool:
+    raw = os.environ.get("RECBENCH_SERVE_METHODS", "")
+    return not raw or method in {m.strip() for m in raw.split(",") if m.strip()}
+
+
+@lru_cache(maxsize=64)
+def load_bundle(dataset: str, tier_name: str, method: str) -> Bundle:
+    folder = bundle_root() / dataset / tier_name / method
+    if not (folder / "manifest.json").exists():
+        raise FileNotFoundError(folder)
+    return Bundle(folder)
+
+
+def available() -> list[dict]:
+    root = bundle_root()
+    found = []
+    for manifest in sorted(root.glob("*/*/*/manifest.json")):
+        dataset, tier_name, method = manifest.parts[-4:-1]
+        if tier_name == tier() and _allowed(method):
+            found.append({"dataset": dataset, "tier": tier_name, "method": method})
+    return found
 
 
 @app.get("/health")
-def health() -> dict[str, bool]:
-    return {"ok": True}
+def health() -> dict:
+    return {"ok": True, "version": __version__, "bundles": len(available())}
+
+
+@app.get("/methods")
+def methods() -> list[dict]:
+    return available()
 
 
 @app.post("/recommend")
-def recommend(method: str, body: RecommendRequest) -> dict:
-    dataset = body.dataset or os.environ.get("RECBENCH_DATASET", "")
-    if not dataset:
-        raise HTTPException(status_code=400, detail="dataset is required")
-    model = _load(method, dataset)
-    rows = model.recommend(body.user_id, k=body.k)
-    return {"method": method, "dataset": dataset, "recommendations": rows}
+def recommend(body: RecommendRequest) -> dict:
+    if not _allowed(body.method):
+        raise HTTPException(status_code=404, detail=f"{body.method} is not served here")
+    try:
+        bundle = load_bundle(body.dataset, tier(), body.method)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"No bundle for {body.method} on {body.dataset} ({tier()})") from None
+    return {"dataset": body.dataset, "method": body.method, **bundle.recommend(body.user_id, body.k)}
 
 
 @app.get("/")
 def root():
-    return RedirectResponse("/dashboard/topn")
+    return RedirectResponse("/dashboard")
 
 
-@app.get("/dashboard/wiring")
-def wiring():
-    rows = _mlflow_rows(rankable=False)
-    html = _TEMPLATES.get_template("wiring.html").render(
-        title="Smoke wiring",
-        protocol=PROTOCOL_NOTE,
-        rows=rows,
-    )
-    return HTML(html)
-
-
-@app.get("/dashboard/{task}")
-def leaderboard(task: str):
-    if task not in TASK_METRIC:
-        raise HTTPException(status_code=404, detail="unknown task")
-    metric = TASK_METRIC[task]
-    rows = _rank_rows(task, metric)
+@app.get("/dashboard", response_class=HTMLResponse)
+def dashboard(tier_name: str | None = None):
+    try:
+        from recbench.results import TASK_BOARDS, latest_status, leaderboard, load_runs
+    except ImportError:
+        raise HTTPException(status_code=404, detail="The dashboard needs MLflow (pip install 'recbench[bench]')") from None
+    chosen = tier_name or tier()
+    frame = load_runs(chosen)
+    boards = []
+    if not frame.empty:
+        for dataset in sorted(frame["tags.dataset"].unique()):
+            for task, (metric, title) in TASK_BOARDS.items():
+                board = leaderboard(frame, dataset, metric)
+                if board.empty:
+                    continue
+                rows = [
+                    {
+                        "rank": int(r["rank"]),
+                        "method": r["tags.method"],
+                        "value": r[f"metrics.{metric}"],
+                        "low": r.get(f"metrics.{metric}_ci_low"),
+                        "high": r.get(f"metrics.{metric}_ci_high"),
+                        "tied": bool(r["tied_with_best"]) if r["tied_with_best"] == r["tied_with_best"] else None,
+                    }
+                    for _, r in board.iterrows()
+                ]
+                boards.append({"dataset": dataset, "task": task, "title": title, "metric": metric, "rows": rows})
+    status = latest_status(chosen)
+    problems = [] if status.empty else status[status["status"] != "finished"].to_dict(orient="records")
     html = _TEMPLATES.get_template("leaderboard.html").render(
-        title=f"Full tier — {task}",
-        protocol=PROTOCOL_NOTE,
-        task=task,
-        metric=metric,
-        tasks=list(TASK_METRIC),
-        rows=rows,
+        title=f"recbench results — {chosen} tier", protocol=PROTOCOL_NOTE, boards=boards, problems=problems
     )
-    return HTML(html)
-
-
-def HTML(content: str):
-    from fastapi.responses import HTMLResponse
-
-    return HTMLResponse(content)
-
-
-def _mlflow_frame():
-    import mlflow
-
-    mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", "file:./runs/mlflow"))
-    experiment = mlflow.get_experiment_by_name("recbench")
-    if experiment is None:
-        return []
-    frame = mlflow.search_runs(experiment_ids=[experiment.experiment_id])
-    if frame.empty:
-        return []
-    return frame.to_dict(orient="records")
-
-
-def _mlflow_rows(rankable: bool) -> list[dict]:
-    rows = []
-    for record in _mlflow_frame():
-        if str(record.get("tags.tier")) == "full":
-            continue
-        rows.append(
-            {
-                "dataset": record.get("tags.dataset"),
-                "method": record.get("tags.method"),
-                "status": record.get("tags.status"),
-            }
-        )
-    return rows
-
-
-def _rank_rows(task: str, metric: str) -> list[dict]:
-    column = f"metrics.{metric}"
-    rows = []
-    for record in _mlflow_frame():
-        if str(record.get("tags.tier")) != "full":
-            continue
-        if str(record.get("tags.rankable", "")).lower() != "true":
-            continue
-        if str(record.get("tags.status")) != "finished":
-            continue
-        if record.get(column) in (None, ""):
-            continue
-        sanity = record.get("metrics.sanity_popularity_recall_at_10")
-        rows.append(
-            {
-                "dataset": record.get("tags.dataset"),
-                "method": record.get("tags.method"),
-                "value": f"{float(record[column]):.4f}",
-                "preset": record.get("tags.preset"),
-                "steps": record.get("tags.max_steps"),
-                "sanity": "" if sanity in (None, "") else f"{float(sanity):.4f}",
-                "_sort": float(record[column]),
-            }
-        )
-    reverse = metric not in {"rmse", "mae", "logloss"}
-    rows.sort(key=lambda row: row["_sort"], reverse=reverse)
-    return rows
+    return HTMLResponse(html)

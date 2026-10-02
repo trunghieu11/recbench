@@ -1,184 +1,189 @@
-"""Build the static dictionary from YAML records and the live registry."""
+"""Generate the fact pages under docs/generated/ from dictionary/catalog.yaml, the registries, and results.
+
+    python -m recbench.dictionary.build              # facts + per-method results
+    python -m recbench.report.build --tier smoke --out reports/smoke-latest --docs   # leaderboards
+
+Hand-written pages in docs/ embed these files with snippets, e.g.
+    --8<-- "generated/methods/ease.md"
+so every number in the docs comes from code, never from copy-paste. Links inside
+a fragment are written relative to the page that embeds it:
+methods/*.md and capability.md -> docs/dictionary/algorithms/, datasets/*.md ->
+docs/dictionary/datasets/, metrics.md -> docs/dictionary/metrics/.
+The build fails if a registered method, metric, or dataset has no catalog entry.
+"""
 
 from __future__ import annotations
 
 import argparse
+import json
+import os
 from pathlib import Path
 from typing import Any
 
 import yaml
 
-from recbench.protocol import PROTOCOL_NOTE
+from recbench.protocol import Task
 from recbench.registry import ensure_loaded
 
-OMITTED = """
-# Methods left off the runner
-
-These stay out of the leaderboard. Popularity is the exception: its Recall@10 is logged on the same candidate file and tagged so it is not ranked.
-
-- Item-kNN
-- Matrix factorization
-- Content-based filtering
-- LightFM
-- DeepFM
-- LightGCN
-- SASRec
-- A generic two-tower without images
-- A cross-encoder-only reranker
-
-Adding one later is a class, a `@register_method` decorator, and a block in `dictionary/catalog.yaml`.
-"""
-
-HOWTO = """
-# Add a metric, a method, or a dataset
-
-## Metric
-
-```python
-from recbench.protocol import Metric, MetricSpec, Task
-from recbench.registry import register_metric
-
-@register_metric
-class Example(Metric):
-    spec = MetricSpec("example_at_10", {Task.topn}, description="What the number means.")
-
-    def compute(self, scores, store, context):
-        return 0.0
-```
-
-## Method
-
-```python
-from recbench.protocol import MethodSpec, Task
-from recbench.registry import register_method
-from recbench.methods._common import TorchMethod
-
-@register_method
-class Example(TorchMethod):
-    spec = MethodSpec(name="example", tasks={Task.topn}, feedback={"implicit"})
-```
-
-Then add an `example:` block under `methods` in `dictionary/catalog.yaml` with the complexity rubric and a prose paragraph.
-
-## Dataset
-
-Subclass nothing. Implement `download(raw_dir)` and `to_clean(raw_dir, clean_dir)` and decorate the class with `@register_dataset`. The clean tables must match the feature contract: interactions, items, users. Add a `datasets` block in the catalog.
-"""
+TASK_ORDER = [t.value for t in Task]
+DIRECTION = {
+    "implementation": "higher = more work",
+    "tuning": "higher = more work",
+    "data_hunger": "higher = needs more data",
+    "controllability": "higher = easier to steer",
+    "explainability": "higher = clearer reasons",
+}
 
 
-def _load_catalog(root: Path) -> dict[str, Any]:
-    path = root / "dictionary" / "catalog.yaml"
-    with path.open() as handle:
+class CatalogError(Exception):
+    pass
+
+
+def load_catalog(root: Path) -> dict[str, Any]:
+    with (root / "dictionary" / "catalog.yaml").open() as handle:
         return yaml.safe_load(handle)
 
 
-def _mean_complexity(block: dict[str, Any]) -> float | None:
-    scores = block.get("complexity") or {}
-    if not scores:
-        return None
-    values = [float(value) for value in scores.values()]
-    return sum(values) / len(values)
+def _table(header: list[str], rows: list[list[str]]) -> str:
+    lines = ["| " + " | ".join(header) + " |", "|" + "|".join("---" for _ in header) + "|"]
+    lines += ["| " + " | ".join(str(c) for c in row) + " |" for row in rows]
+    return "\n".join(lines) + "\n"
 
 
-def build(root: Path | None = None) -> Path:
-    root = root or Path.cwd()
-    catalog = _load_catalog(root)
+def _yes(flag: bool) -> str:
+    return "yes" if flag else "no"
+
+
+def method_facts(name: str, entry: dict[str, Any], spec: Any, ladder: dict[int, str]) -> str:
+    paper = entry.get("paper")
+    paper_text = f"[{paper['title']}]({paper['url']}) ({paper['venue']})" if paper else "—"
+    code = f"[{entry['code']}]({entry['code']})" if entry.get("code") else "in-repo"
+    rows = [
+        ["Family", entry["family"]],
+        ["Ladder rung", f"{entry['rung']} — {ladder[entry['rung']]}"],
+        ["Paper", paper_text],
+        ["Reference code", code],
+        ["What recbench runs", spec.upstream],
+        ["Fidelity", entry["fidelity"]],
+        ["Tasks", ", ".join(t for t in TASK_ORDER if Task(t) in spec.tasks)],
+        ["Uses the order of the history", _yes(spec.uses_history)],
+        ["Can recommend brand-new items", _yes(spec.scores_cold_items)],
+        ["Needs item text/categories", _yes(spec.requires_side_features)],
+        ["Needs images", _yes(spec.requires_images)],
+        ["Ranked on the leaderboard", _yes(spec.ranked)],
+        ["Needs PyTorch", _yes(spec.needs_torch)],
+        ["Cost band", spec.cost_band],
+    ]
+    rubric_rows = [[dim, f"{score} / 5", DIRECTION[dim], why] for dim, (score, why) in entry["rubric"].items()]
+    return (
+        f"<!-- generated by recbench.dictionary.build from dictionary/catalog.yaml; do not edit -->\n\n"
+        + _table(["Fact", "Value"], rows)
+        + "\n**Qualitative rubric** ([how the scores are defined](../metrics/qualitative-rubric.md))\n\n"
+        + _table(["Dimension", "Score", "Direction", "Why"], rubric_rows)
+    )
+
+
+def method_results(name: str, frames: dict[str, Any]) -> str:
+    rows = []
+    for tier, frame in frames.items():
+        if frame is None or frame.empty:
+            continue
+        mine = frame[frame["tags.method"] == name]
+        for _, r in mine.sort_values("tags.dataset").iterrows():
+            def m(key: str, digits: int = 4) -> str:
+                value = r.get(f"metrics.{key}")
+                return "–" if value is None or value != value else f"{value:.{digits}f}"
+
+            ci = ""
+            if r.get("metrics.ndcg_at_10_ci_low") == r.get("metrics.ndcg_at_10_ci_low"):
+                ci = f" [{m('ndcg_at_10_ci_low')}, {m('ndcg_at_10_ci_high')}]"
+            rows.append([tier, r["tags.dataset"], m("ndcg_at_10") + ci, m("next_ndcg_at_10"), m("coverage_at_10", 3), m("train_seconds", 1)])
+    if not rows:
+        return "<!-- generated -->\n\n_No finished runs yet._\n"
+    return "<!-- generated -->\n\n" + _table(["Tier", "Dataset", "NDCG@10 [95% CI]", "Next NDCG@10", "Coverage@10", "Train s"], rows)
+
+
+def dataset_facts(name: str, entry: dict[str, Any], spec: Any, data_dir: Path) -> str:
+    rows = [
+        ["Domain", entry["domain"]],
+        ["Source", f"[{entry['source']}]({entry['source']})"],
+        ["Cite as", entry["citation"]],
+        ["License", entry["license"]],
+        ["Commercial use", entry["commercial_use"]],
+        ["Feedback", entry["feedback"]],
+        ["Side information", entry["side_info"]],
+        ["Split rule", "last 7 days = test" if spec.split_rule == "last_days" else "last 10% of events (by time) = test"],
+        ["Repeat policies", ", ".join(spec.repeat_policies)],
+        ["Known pitfalls", entry["pitfalls"]],
+    ]
+    text = "<!-- generated by recbench.dictionary.build; do not edit -->\n\n" + _table(["Fact", "Value"], rows)
+    stats = []
+    for meta_path in sorted((data_dir / "splits" / name).glob("*/meta.json")):
+        meta = json.loads(meta_path.read_text())
+        stats.append([meta["tier"], f"{meta['n_users']:,}", f"{meta['n_items']:,}", f"{meta['n_pretest']:,}", f"{meta['n_test']:,}",
+                      f"{meta['n_eval_warm']:,}", f"{meta['n_cold_test_users']:,}", f"{meta['repeat_share']:.1%}", meta["test_start"]])
+    if stats:
+        text += "\n**Splits on this machine**\n\n" + _table(
+            ["Tier", "Users", "Items", "Pre-test events", "Test events", "Warm eval users", "Cold test users", "Repeat share", "Test starts (UTC)"], stats
+        )
+    return text
+
+
+def build(root: Path | None = None, data_dir: Path | None = None, with_results: bool = True) -> Path:
+    root = (root or Path.cwd()).resolve()
+    data_dir = data_dir or Path(os.environ.get("DATA_DIR", root / "data"))
+    catalog = load_catalog(root)
     reg = ensure_loaded()
-    docs = root / "site" / "docs"
-    docs.mkdir(parents=True, exist_ok=True)
-    (docs / "index.md").write_text(
-        "# Recommendation dictionary\n\n"
-        f"{PROTOCOL_NOTE}\n\n"
-        "Method rank comes from the full GPU tier, one task at a time. "
-        "The laptop smoke run is a wiring test.\n\n"
-        "See [methods](methods.md), [datasets](datasets.md), [metrics](metrics.md), "
-        "[decision](decision.md), and [how to extend](how-to-extend.md).\n"
+    missing = sorted(set(reg.methods) - set(catalog["methods"]))
+    missing += sorted(set(reg.datasets) - set(catalog["datasets"]))
+    if missing:
+        raise CatalogError(f"No catalog entry for: {missing}. Add them to dictionary/catalog.yaml.")
+    out = root / "docs" / "generated"
+    (out / "methods").mkdir(parents=True, exist_ok=True)
+    (out / "datasets").mkdir(parents=True, exist_ok=True)
+    ladder = {int(k): v for k, v in catalog["ladder"].items()}
+
+    frames: dict[str, Any] = {}
+    if with_results:
+        try:
+            from recbench.results import load_runs
+
+            frames = {tier: load_runs(tier) for tier in ("smoke", "full")}
+        except Exception:  # noqa: BLE001 - docs still build without MLflow results
+            frames = {}
+
+    capability = []
+    for name in sorted(reg.methods, key=lambda n: (catalog["methods"][n]["rung"], n)):
+        spec, entry = reg.methods[name].spec, catalog["methods"][name]
+        (out / "methods" / f"{name}.md").write_text(method_facts(name, entry, spec, ladder))
+        (out / "methods" / f"{name}-results.md").write_text(method_results(name, frames))
+        capability.append([
+            f"[{entry['title']}]({name.replace('_', '-')}.md)", str(entry["rung"]), entry["family"],
+            ", ".join(t for t in TASK_ORDER if Task(t) in spec.tasks), _yes(spec.uses_history), _yes(spec.scores_cold_items),
+            _yes(spec.requires_side_features), entry["fidelity"], _yes(spec.ranked),
+        ])
+    (out / "capability.md").write_text(
+        "<!-- generated -->\n\n"
+        + _table(["Method", "Rung", "Family", "Tasks", "Uses order", "New items", "Needs content", "Fidelity", "Ranked"], capability)
     )
-    (docs / "omitted.md").write_text(OMITTED)
-    (docs / "how-to-extend.md").write_text(HOWTO)
-    method_lines = ["# Methods\n", PROTOCOL_NOTE, ""]
-    decision = ["# Decision page\n", "Filter by cost, images, and task. Smoke runs are not a ranking.\n"]
-    for name, block in (catalog.get("methods") or {}).items():
-        page = docs / "methods" / f"{name}.md"
-        page.parent.mkdir(parents=True, exist_ok=True)
-        mean = _mean_complexity(block)
-        tasks = ", ".join(block.get("tasks") or [])
-        body = [
-            f"# {block.get('title', name)}",
-            "",
-            PROTOCOL_NOTE,
-            "",
-            block.get("summary", ""),
-            "",
-            f"- Tasks: {tasks}",
-            f"- Cost band: {block.get('cost_band', '')}",
-            f"- Images required: {block.get('requires_images', False)}",
-            f"- Complexity mean: {mean:.2f}" if mean is not None else "- Complexity mean: n/a",
-            f"- Explainability rubric: {block.get('explainability_rubric', '')}",
-            f"- Upstream: {block.get('upstream', '')}",
-            "",
-            block.get("prose", ""),
-            "",
-        ]
-        page.write_text("\n".join(body))
-        method_lines.append(f"- [{block.get('title', name)}](methods/{name}.md) — {block.get('summary', '')}")
-        decision.append(
-            f"- **{name}** cost={block.get('cost_band')} images={block.get('requires_images')} tasks={tasks}"
-        )
-    (docs / "methods.md").write_text("\n".join(method_lines) + "\n")
-    (docs / "decision.md").write_text("\n".join(decision) + "\n")
-    dataset_lines = ["# Datasets\n", PROTOCOL_NOTE, ""]
-    for name, block in (catalog.get("datasets") or {}).items():
-        page = docs / "datasets" / f"{name}.md"
-        page.parent.mkdir(parents=True, exist_ok=True)
-        page.write_text(
-            f"# {block.get('title', name)}\n\n{PROTOCOL_NOTE}\n\n"
-            f"Domain: {block.get('domain', '')}\n\n{block.get('summary', '')}\n\n{block.get('prose', '')}\n"
-        )
-        dataset_lines.append(f"- [{block.get('title', name)}](datasets/{name}.md) — {block.get('summary', '')}")
-    (docs / "datasets.md").write_text("\n".join(dataset_lines) + "\n")
-    metric_lines = ["# Metrics\n", PROTOCOL_NOTE, ""]
-    matrix = ["# Capability matrix\n", PROTOCOL_NOTE, ""]
-    task_names = ["topn", "rating", "ctr", "sequential", "session", "similar_items"]
-    for method_name, cls in sorted(reg.methods.items()):
+    metric_rows = []
+    for name, cls in sorted(reg.metrics.items(), key=lambda kv: (kv[1].spec.kind, kv[0])):
         spec = cls.spec
-        flags = ", ".join(task for task in task_names if any(t.value == task for t in spec.tasks))
-        matrix.append(f"- {method_name}: {flags}; images={spec.requires_images}; managed={spec.managed}")
-    (docs / "capability.md").write_text("\n".join(matrix) + "\n")
-    for metric_cls in reg.metrics.values():
-        spec = metric_cls.spec
-        tasks = ", ".join(task.value for task in spec.tasks)
-        leaderboard = "ranked" if spec.leaderboard else "not ranked"
-        metric_lines.append(f"- **{spec.name}** ({tasks}, {leaderboard}): {spec.description}")
-    (docs / "metrics.md").write_text("\n".join(metric_lines) + "\n")
-    mkdocs = root / "site" / "mkdocs.yml"
-    mkdocs.write_text(
-        "site_name: Recommendation dictionary\n"
-        "docs_dir: docs\n"
-        "theme:\n"
-        "  name: material\n"
-        "nav:\n"
-        "  - Home: index.md\n"
-        "  - Methods: methods.md\n"
-        "  - Datasets: datasets.md\n"
-        "  - Metrics: metrics.md\n"
-        "  - Capability: capability.md\n"
-        "  - Decision: decision.md\n"
-        "  - Omitted: omitted.md\n"
-        "  - Extend: how-to-extend.md\n"
-    )
-    return docs
+        metric_rows.append([f"`{name}`", spec.kind, "↑ higher is better" if spec.higher_is_better else "↓ lower is better",
+                            ", ".join(sorted(t.value for t in spec.tasks)), spec.description])
+    (out / "metrics.md").write_text("<!-- generated -->\n\n" + _table(["Metric", "Kind", "Direction", "Tasks", "Meaning"], metric_rows))
+    for name, cls in sorted(reg.datasets.items()):
+        (out / "datasets" / f"{name}.md").write_text(dataset_facts(name, catalog["datasets"][name], cls.spec, data_dir))
+    services = [[s["title"], s["status"], s["why_not_benchmarked"], f"[link]({s['url']})"] for s in catalog["services"].values()]
+    (out / "services.md").write_text("<!-- generated -->\n\n" + _table(["Service", "Status (2026-10-02)", "Why not benchmarked live", "Docs"], services))
+    return out
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Write the dictionary site.")
-    parser.add_argument("--tracking-uri", default="")
+    parser = argparse.ArgumentParser(description="Generate docs/generated/ from the catalog and results.")
+    parser.add_argument("--no-results", action="store_true")
     args = parser.parse_args()
-    if args.tracking_uri:
-        import os
-
-        os.environ["MLFLOW_TRACKING_URI"] = args.tracking_uri
-    print(build(Path.cwd()))
+    print(build(with_results=not args.no_results))
 
 
 if __name__ == "__main__":

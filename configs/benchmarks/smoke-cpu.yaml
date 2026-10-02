@@ -1,22 +1,32 @@
+# Smoke tier on the laptop: a user-sampled slice (~50K events) of every dataset.
+# Purpose: check that the whole pipeline works end to end. Rankings are indicative only.
 tier: smoke
 hardware: configs/hardware/local-cpu.yaml
+seed: 42
 resume: true
 continue_on_error: true
+timeout_minutes: 30
 managed_services: false
-datasets:
-  - movielens-25m
-  - retailrocket
-  - hm
-  - lastfm
-  - steam
+export_bundles: true
+eval:
+  max_eval_users: 2000   # same seeded users for every method; keeps pointwise rankers (DIN) fast on a CPU
+datasets: [movielens-25m, retailrocket, hm, lastfm, steam]
 methods:
+  - random
+  - most_popular
+  - itemknn
+  - ease
+  - bpr_mf
+  - ials
+  - lightgcn
   - xsimgcl
+  - sasrec
   - bert4rec
   - s3rec
-  - dcnv2
-  - din
-  - multimodal_tower
-  - tiger
   - hstu
-  - generative_llm
-metrics: all
+  # din: full-catalog ranking scores every (user, item) pair through an attention network; on a laptop CPU
+  # that took over 90 minutes for one dataset. It runs in the GPU tier, or here with --methods din.
+  - dcnv2
+  - text_hash_tower
+  - multimodal_tower
+  - tiger_lite

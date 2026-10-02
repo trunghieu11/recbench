@@ -1,4 +1,8 @@
-"""Retailrocket session clickstream. Implicit events plus item category properties."""
+"""Retailrocket e-commerce clickstream: views, add-to-carts, and transactions (implicit feedback).
+
+Item properties are hashed in the public dump; only the category id is usable.
+Category values are taken from the first property snapshot, which may postdate some events.
+"""
 
 from __future__ import annotations
 
@@ -17,12 +21,13 @@ EVENT_VALUE = {"view": 1.0, "addtocart": 2.0, "transaction": 3.0}
 
 @register_dataset
 class Retailrocket:
+    CLEAN_VERSION = "2"
     spec = DatasetSpec(
         name="retailrocket",
         domain="ecommerce",
         feedback={"implicit"},
-        official_split="quantile",
-        description="Retailrocket views, carts, and transactions with item properties.",
+        split_rule="quantile",
+        description="Retailrocket views, carts, and transactions with item category ids.",
     )
 
     def download(self, raw_dir: Path) -> None:
@@ -58,7 +63,7 @@ class Retailrocket:
         items = pd.DataFrame(
             {
                 "item_id": item_ids.astype(str),
-                "text": item_ids.map(lambda i: f"item {i}").astype(str),
+                "text": "",  # the public dump has no item names or descriptions
                 "category": item_ids.map(lambda i: str(category.get(str(i), "")) if len(category) else "").astype(str),
                 "image_path": pd.NA,
             }

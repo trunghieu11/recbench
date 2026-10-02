@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
-# Smoke-tier time-to-endpoint timer. Uses a local raw fixture unless DATA_DIR already has a split.
+# Measure raw data -> working API on a synthetic log (no downloads). Prints JSON timings.
+#   ./scripts/time_to_endpoint.sh            # EASE
+#   METHOD=sasrec ./scripts/time_to_endpoint.sh
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
-if [[ -d "$ROOT/.venv" ]]; then
-  # shellcheck disable=SC1091
-  source "$ROOT/.venv/bin/activate"
-fi
-python -m recbench.ttm --data-dir "${DATA_DIR:-$ROOT/runs/ttm}" --steps "${STEPS:-20}"
+[[ -d "$ROOT/.venv" ]] && source "$ROOT/.venv/bin/activate"
+PYTHONWARNINGS=ignore python -m recbench.ttm --data-dir "$ROOT/runs/ttm" --method "${METHOD:-ease}"

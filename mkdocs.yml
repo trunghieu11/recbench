@@ -1,0 +1,184 @@
+# Documentation site. Build:  mkdocs build --strict     Preview:  mkdocs serve
+# Uses only Material built-ins and PyMdown extensions, so Zensical (Material's successor,
+# which reads mkdocs.yml) can build it after Material for MkDocs reaches end of life (2026-11-05).
+site_name: RecBench
+site_description: A recommender-systems dictionary, learned by benchmarking 18 methods honestly.
+site_author: Hieu Nguyen
+copyright: Copyright &copy; 2026 Hieu Nguyen — MIT License
+docs_dir: docs
+site_dir: site
+# Broken links and anchors are only INFO messages by default; make them warnings so --strict fails on them.
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle: {icon: material/weather-night, name: Switch to dark mode}
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle: {icon: material/weather-sunny, name: Switch to light mode}
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - footnotes
+  - tables
+  - def_list
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.inlinehilite
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.snippets:
+      base_path: [docs]
+      check_paths: true
+
+extra_javascript:
+  - javascripts/katex.js
+  - https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js
+  - https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js
+extra_css:
+  - https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css
+  - stylesheets/extra.css
+
+# Fragments written by recbench.dictionary.build / report.build are embedded with snippets,
+# not published as pages of their own.
+exclude_docs: |
+  generated/
+
+nav:
+  - Home: index.md
+  - Start here:
+      - Learning path: start/learning-path.md
+      - 1. Install on your Mac: start/install.md
+      - 2. Your first smoke run: start/first-smoke-run.md
+      - 3. Reading the results: start/reading-results.md
+      - 4. Your first new method: start/your-first-method.md
+      - 5. The full tier on a GPU machine: start/full-tier-gpu.md
+      - 6. Deploy to Cloud Run: start/deploy-cloud-run.md
+  - How-to:
+      - Add a method: how-to/add-a-method.md
+      - Add a metric: how-to/add-a-metric.md
+      - Add a dataset (or your own data): how-to/add-a-dataset.md
+      - Benchmark Recombee: how-to/run-recombee.md
+      - Serve recommendations locally: how-to/serve-locally.md
+      - Load-test the API: how-to/load-test.md
+      - Troubleshooting: how-to/troubleshooting.md
+      - Costs and cleanup: how-to/costs-and-cleanup.md
+  - Dictionary:
+      - dictionary/index.md
+      - Concepts:
+          - Recommender systems 101: dictionary/concepts/recsys-101.md
+          - Explicit vs implicit feedback: dictionary/concepts/feedback-types.md
+          - The interaction matrix: dictionary/concepts/interaction-matrix.md
+          - Embeddings: dictionary/concepts/embeddings.md
+          - Collaborative, content-based, hybrid: dictionary/concepts/collaborative-content-hybrid.md
+          - Retrieval and ranking: dictionary/concepts/retrieval-and-ranking.md
+          - Negative sampling: dictionary/concepts/negative-sampling.md
+          - Loss functions: dictionary/concepts/loss-functions.md
+          - Sequential and session-based: dictionary/concepts/sequential-and-session.md
+          - Cold start: dictionary/concepts/cold-start.md
+          - Popularity bias: dictionary/concepts/popularity-bias.md
+          - Data leakage and time splits: dictionary/concepts/data-leakage-and-splits.md
+          - Evaluation protocols: dictionary/concepts/evaluation-protocols.md
+          - Offline vs online evaluation: dictionary/concepts/offline-vs-online.md
+          - Fair baselines and tuning: dictionary/concepts/fair-baselines-and-tuning.md
+          - Explainability: dictionary/concepts/explainability.md
+          - Serving and latency: dictionary/concepts/serving-and-latency.md
+          - LLMs and generative recommenders: dictionary/concepts/llm-and-generative-recsys.md
+          - Glossary: dictionary/concepts/glossary.md
+      - Algorithms:
+          - dictionary/algorithms/index.md
+          - Random: dictionary/algorithms/random.md
+          - MostPopular: dictionary/algorithms/most-popular.md
+          - ItemKNN: dictionary/algorithms/itemknn.md
+          - EASE: dictionary/algorithms/ease.md
+          - BPR-MF: dictionary/algorithms/bpr-mf.md
+          - iALS: dictionary/algorithms/ials.md
+          - LightGCN: dictionary/algorithms/lightgcn.md
+          - XSimGCL: dictionary/algorithms/xsimgcl.md
+          - SASRec: dictionary/algorithms/sasrec.md
+          - BERT4Rec: dictionary/algorithms/bert4rec.md
+          - S3-Rec: dictionary/algorithms/s3rec.md
+          - HSTU: dictionary/algorithms/hstu.md
+          - TIGER-lite: dictionary/algorithms/tiger-lite.md
+          - DIN: dictionary/algorithms/din.md
+          - DCN-V2: dictionary/algorithms/dcnv2.md
+          - Text hash tower: dictionary/algorithms/text-hash-tower.md
+          - Multimodal tower: dictionary/algorithms/multimodal-tower.md
+          - Recombee: dictionary/algorithms/recombee.md
+          - Other managed services: dictionary/algorithms/managed-services.md
+      - Metrics:
+          - dictionary/metrics/index.md
+          - Ranking accuracy: dictionary/metrics/ranking-accuracy.md
+          - Full ranking vs sampled: dictionary/metrics/sampled-vs-full.md
+          - CTR and rating metrics: dictionary/metrics/ctr-and-rating-metrics.md
+          - Coverage and popularity: dictionary/metrics/coverage-and-popularity.md
+          - Novelty, diversity, serendipity: dictionary/metrics/novelty-diversity-serendipity.md
+          - Calibration and fairness: dictionary/metrics/calibration-and-fairness.md
+          - Cold-start slices: dictionary/metrics/cold-start-slices.md
+          - Confidence intervals: dictionary/metrics/confidence-intervals.md
+          - Efficiency: dictionary/metrics/efficiency.md
+          - Cost: dictionary/metrics/cost.md
+          - Qualitative rubric: dictionary/metrics/qualitative-rubric.md
+          - Time to market: dictionary/metrics/time-to-market.md
+      - Datasets:
+          - dictionary/datasets/index.md
+          - MovieLens 25M: dictionary/datasets/movielens-25m.md
+          - RetailRocket: dictionary/datasets/retailrocket.md
+          - H&M: dictionary/datasets/hm.md
+          - Last.fm 1K: dictionary/datasets/lastfm.md
+          - Steam: dictionary/datasets/steam.md
+  - Codebase:
+      - Architecture: codebase/architecture.md
+      - Data pipeline and file formats: codebase/data-pipeline.md
+      - Training and evaluation flow: codebase/training-and-evaluation.md
+      - The Recommender API: codebase/recommender-api.md
+      - Registry and catalog: codebase/registry-and-catalog.md
+      - Configuration reference: codebase/configuration.md
+      - Serving and bundles: codebase/serving-and-bundles.md
+      - Reports and dashboard: codebase/reports-and-dashboard.md
+      - Testing: codebase/testing.md
+  - Cloud & MLOps:
+      - GCP basics: cloud/gcp-basics.md
+      - Docker: cloud/docker.md
+      - Cloud Run: cloud/cloud-run.md
+      - Cloud Storage and bundles: cloud/storage-and-bundles.md
+      - MLflow: cloud/mlflow.md
+      - Cost control: cloud/cost-control.md
+      - Security: cloud/security.md
+  - Results:
+      - Leaderboards: results/leaderboards.md
+      - How to read results: results/how-to-read-results.md
+      - Decision guide: results/decision-guide.md
+      - Known limitations: results/known-limitations.md
+      - Roadmap: results/roadmap.md
+  - Review log:
+      - 2026-10-02 review: review/2026-10-02-review.md

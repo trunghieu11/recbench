@@ -1,83 +1,127 @@
-"""TIGER residual quantization plus a score for every candidate id.
+"""TIGER-lite: a GRU next-item model plus TIGER-style residual-quantised "semantic IDs". Experimental, unranked.
 
-The author repository URLs that were tried returned 404, so this module follows
-the paper's RQ-VAE (Rajput et al., NeurIPS 2023) and scores candidate ids.
+What real TIGER does (Rajput et al., NeurIPS 2023): an RQ-VAE turns each item's
+content embedding into a short tuple of codes (a "semantic ID"); a Transformer
+encoder-decoder then *generates* the next item's code tuple token by token with
+beam search. No official code was released.
+
+What this module does: learns item embeddings and a GRU over the history
+(trained with next-item cross-entropy), and in parallel learns a 3-level
+residual codebook over those item embeddings. Scores are dot products, so the
+codes do not drive ranking; they are used to explain recommendations ("shares
+the semantic-ID prefix of items you liked"). The docs page explains the gap.
 """
 
 from __future__ import annotations
 
+from typing import Any
+
+import numpy as np
 import torch
+import torch.nn.functional as F
 from torch import nn
 
-from recbench.methods._common import TorchMethod, sampled_softmax
+from recbench.data import HistoryBatch, TrainView
+from recbench.methods._torch import EmbeddingRecommender, resolve_device, train_steps
+from recbench.methods.seq_trainer import next_item_loss, sequence_windows, to_tensor
 from recbench.protocol import Explanation, MethodSpec, Task
 from recbench.registry import register_method
 
 
-class _Net(nn.Module):
-    def __init__(self, n_items: int, dim: int, seq_len: int):
-        super().__init__()
-        self.item = nn.Embedding(n_items + 1, dim, padding_idx=0)
-        self.gru = nn.GRU(dim, dim, batch_first=True)
-        self.books = nn.Parameter(torch.randn(4, 16, dim) * 0.02)
-        self.n_items = n_items
-        self.seq_len = seq_len
+class ResidualQuantizer(nn.Module):
+    """levels x codes codebook. Code k at level l approximates what levels < l left unexplained."""
 
-    def quantize(self, vectors: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def __init__(self, dim: int, levels: int = 3, codes: int = 64):
+        super().__init__()
+        self.books = nn.Parameter(torch.randn(levels, codes, dim) * 0.1)
+
+    def forward(self, vectors: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         residual = vectors
         recon = torch.zeros_like(vectors)
         codes = []
-        for book in range(self.books.shape[0]):
-            table = self.books[book]
-            distance = torch.cdist(residual, table)
-            index = distance.argmin(dim=-1)
-            chosen = table[index]
+        for book in self.books:
+            index = torch.cdist(residual, book).argmin(dim=-1)
+            chosen = book[index]
             recon = recon + chosen
-            residual = residual - chosen
+            residual = residual - chosen.detach()
             codes.append(index)
         return recon, torch.stack(codes, dim=-1)
 
-    def encode(self, history: torch.Tensor) -> torch.Tensor:
-        emb = self.item(history)
-        out, _ = self.gru(emb)
-        lengths = (history != 0).sum(dim=1).clamp(min=1) - 1
-        return out[torch.arange(out.shape[0], device=history.device), lengths]
 
-    def sequence_loss(self, history: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
-        hidden = self.encode(history)
-        ce = sampled_softmax(hidden, self.item.weight, target, self.n_items)
-        recon, _ = self.quantize(self.item(target))
-        rq = torch.nn.functional.mse_loss(recon, self.item(target).detach())
-        return ce + 0.1 * rq
+class TigerLiteNet(nn.Module):
+    def __init__(self, n_items: int, dim: int):
+        super().__init__()
+        self.item = nn.Embedding(n_items + 1, dim, padding_idx=0)
+        self.gru = nn.GRU(dim, dim, batch_first=True)
+        self.rq = ResidualQuantizer(dim)
 
-    def score(self, history: torch.Tensor, items: torch.Tensor) -> torch.Tensor:
-        hidden = self.encode(history)
-        return (hidden * self.item(items)).sum(-1)
+    def forward(self, seq: torch.Tensor) -> torch.Tensor:
+        out, _ = self.gru(self.item(seq))
+        return out
 
 
 @register_method
-class TIGER(TorchMethod):
+class TigerLite(EmbeddingRecommender):
     spec = MethodSpec(
-        name="tiger",
+        name="tiger_lite",
         tasks={Task.topn, Task.sequential},
-        feedback={"implicit", "explicit"},
+        uses_history=True,
+        needs_torch=True,
+        ranked=False,
+        fidelity="simplified",
+        upstream="in-repo GRU + residual codebook inspired by TIGER (no official code); experimental",
         cost_band="medium",
-        upstream="TIGER RQ-VAE (Rajput et al., NeurIPS 2023). Author git URLs returned 404.",
     )
-    loss = "seq"
 
-    def build_model(self, n_users: int, n_items: int, cfg):
-        return _Net(n_items, cfg.dim, cfg.seq_len)
+    def fit(self, data: TrainView, cfg: dict[str, Any]) -> None:
+        self.bind(data)
+        self.device = resolve_device(cfg)
+        self.seq_len = int(cfg.get("seq_len", 50))
+        self.net = TigerLiteNet(self.n_items, int(cfg.get("dim", 64))).to(self.device)
+        windows = sequence_windows(data, self.seq_len, int(cfg.get("batch_size", 128)), int(cfg.get("seed", 42)))
 
-    def loss_batch(self, model, batch, cfg) -> torch.Tensor:
-        return model.sequence_loss(batch["history"], batch["items"])
+        def loss(batch):
+            hidden = self.net(to_tensor(batch["inputs"], self.device))
+            targets = to_tensor(batch["targets"], self.device)
+            ce = next_item_loss(hidden, self.net.item.weight, targets)
+            vectors = self.net.item(targets[targets > 0]).detach()
+            recon, _ = self.net.rq(vectors)
+            return ce + 0.1 * F.mse_loss(recon, vectors)
 
-    def score_batch(self, model, users, items, history) -> torch.Tensor:
-        return model.score(history, items)
+        self.fit_info = train_steps(self.net, windows, loss, cfg)
+        with torch.no_grad():
+            _, codes = self.net.rq(self.net.item.weight)
+        self.codes = codes.cpu().numpy()
 
-    def _explain(self, user_id: str, item_id: str, cold: bool = False) -> Explanation:
-        return Explanation(
-            "local",
-            f"Semantic codes for {item_id} are the nearest residual-quantized path for {user_id}.",
-            [{"semantic_id_item": item_id}],
-        )
+    @torch.no_grad()
+    def user_vectors(self, users: np.ndarray, hist: HistoryBatch) -> torch.Tensor:
+        return self.net(to_tensor(hist.items[:, -self.seq_len :], self.device))[:, -1]
+
+    def item_matrix(self) -> torch.Tensor:
+        return self.net.item.weight
+
+    def explain(self, users, items, hist):
+        out = []
+        for b, row in enumerate(items):
+            history = np.unique(hist.items[b][hist.items[b] > 0])
+            exps = []
+            for item in row:
+                if item <= 0 or len(history) == 0:
+                    exps.append(Explanation("none", "No history to explain from."))
+                    continue
+                target = self.codes[item]
+                prefix = np.array([np.argmin(np.append(self.codes[h] == target, False)) for h in history])
+                best = history[np.argsort(-prefix)[:2]]
+                best = [int(h) for h in best if prefix[list(history).index(h)] > 0]
+                if not best:
+                    exps.append(Explanation("none", f"Semantic ID {tuple(target)} shares no prefix with your history."))
+                    continue
+                exps.append(
+                    Explanation(
+                        "personal",
+                        f"Semantic ID {tuple(int(c) for c in target)} shares a code prefix with {', '.join(self.item_ids[h] for h in best)}.",
+                        [{"history_item": str(self.item_ids[h]), "semantic_id": [int(c) for c in self.codes[h]]} for h in best],
+                    )
+                )
+            out.append(exps)
+        return out

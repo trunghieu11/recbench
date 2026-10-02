@@ -1,0 +1,3 @@
+/* Wide tables scroll inside their own box instead of stretching the page. */
+.md-typeset__table { overflow-x: auto; }
+.md-typeset table:not([class]) { font-size: .72rem; }

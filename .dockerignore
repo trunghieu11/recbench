@@ -1,9 +1,14 @@
 .venv
+.git
 data
 runs
 reports
 site
-.git
+docs
+third_party
+tests
 **/__pycache__
 **/*.pyc
 .pytest_cache
+.env
+.env.*

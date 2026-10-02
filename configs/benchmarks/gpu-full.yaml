@@ -1,22 +1,28 @@
+# Full tier on the GPU machine: complete datasets, at most 10K warm eval users per dataset.
 tier: full
 hardware: configs/hardware/gpu.yaml
+seed: 42
 resume: true
 continue_on_error: true
+timeout_minutes: 480
 managed_services: false
-datasets:
-  - movielens-25m
-  - retailrocket
-  - hm
-  - lastfm
-  - steam
+export_bundles: true
+datasets: [movielens-25m, retailrocket, hm, lastfm, steam]
 methods:
+  - random
+  - most_popular
+  - itemknn
+  - ease
+  - bpr_mf
+  - ials
+  - lightgcn
   - xsimgcl
+  - sasrec
   - bert4rec
   - s3rec
-  - dcnv2
-  - din
-  - multimodal_tower
-  - tiger
   - hstu
-  - generative_llm
-metrics: all
+  - din
+  - dcnv2
+  - text_hash_tower
+  - multimodal_tower
+  - tiger_lite

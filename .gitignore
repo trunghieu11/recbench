@@ -1,16 +1,27 @@
+# Python
 .venv/
-third_party/
 __pycache__/
 *.py[cod]
 *.egg-info/
 .pytest_cache/
 .mypy_cache/
+.ruff_cache/
+dist/
+build/
+
+# Large or machine-specific outputs (re-creatable)
 data/
 runs/
 reports/
-site/
+bundles/
 mlruns/
 *.pt
+third_party/
+
+# MkDocs build output (the sources live in docs/, which IS tracked)
+site/
+
+# Secrets and OS files
+.env
+.env.*
 .DS_Store
-dist/
-build/

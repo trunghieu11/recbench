@@ -1,186 +1,377 @@
+# Single source of truth for facts shown in the docs (docs/generated/ is built from this file).
+#
+# rubric: five 1-5 scores, each with a one-line reason. Directions:
+#   implementation, tuning, data_hunger  -> higher = MORE work / MORE data needed (worse)
+#   controllability, explainability      -> higher = BETTER
+# Anchors for every level are defined in docs/dictionary/metrics/qualitative-rubric.md.
+# fidelity: faithful = follows the paper/canonical code; simplified = same core idea, smaller or
+# partial (the method page explains the gap); placeholder = stands in for a family not implemented.
+
+ladder:
+  0: Baselines
+  1: Neighbourhood and linear models
+  2: Matrix factorisation
+  3: Graph neural networks
+  4: Sequential models
+  5: CTR-style rankers
+  6: Content and multimodal towers
+  7: Managed services
+
 methods:
+  random:
+    title: Random
+    family: Baseline
+    rung: 0
+    year: null
+    paper: null
+    code: null
+    fidelity: faithful
+    summary: Scores every item at random. The floor every other method must beat.
+    rubric:
+      implementation: [1, "Three lines of numpy."]
+      tuning: [1, "Nothing to tune."]
+      data_hunger: [1, "Needs no data at all."]
+      controllability: [1, "Nothing meaningful to steer."]
+      explainability: [1, "There is no reason behind a random pick."]
+
+  most_popular:
+    title: MostPopular
+    family: Baseline
+    rung: 0
+    year: null
+    paper: null
+    code: null
+    fidelity: faithful
+    summary: Recommends the items with the most interactions in the last few weeks to everyone.
+    rubric:
+      implementation: [1, "A count and a sort."]
+      tuning: [1, "One knob: the recency window (28 days by default)."]
+      data_hunger: [1, "Works from the first day of traffic."]
+      controllability: [4, "Easy to filter or boost; the list is fully transparent."]
+      explainability: [3, "Honest reason ('popular now'), but not personal."]
+
+  itemknn:
+    title: ItemKNN
+    family: Neighbourhood collaborative filtering
+    rung: 1
+    year: 2001
+    paper: {title: "Item-based Collaborative Filtering Recommendation Algorithms", venue: "WWW 2001", url: "https://dl.acm.org/doi/10.1145/371920.372071"}
+    code: null
+    fidelity: faithful
+    summary: Recommends items that co-occur with what the user already interacted with (cosine similarity between item columns).
+    rubric:
+      implementation: [2, "A sparse matrix product plus top-k pruning."]
+      tuning: [2, "Number of neighbours and a shrinkage term."]
+      data_hunger: [2, "Needs enough co-occurrences per item; fine on small data."]
+      controllability: [4, "Similarity lists can be inspected and edited directly."]
+      explainability: [5, "Exact: 'because you interacted with X and Y'."]
+
+  ease:
+    title: EASE^R
+    family: Linear autoencoder (item-item)
+    rung: 1
+    year: 2019
+    paper: {title: "Embarrassingly Shallow Autoencoders for Sparse Data", venue: "WWW 2019", url: "https://arxiv.org/abs/1905.03375"}
+    code: "https://github.com/hasteck/EASE_WWW19"
+    fidelity: faithful
+    summary: Learns one item-to-item weight matrix in closed form (a single matrix inverse). Often the strongest simple baseline.
+    rubric:
+      implementation: [2, "About 20 lines, but the item x item matrix must fit in memory (catalog cap)."]
+      tuning: [1, "One hyperparameter, lambda."]
+      data_hunger: [2, "Works on small data; memory, not data, is the limit."]
+      controllability: [4, "Weights are an inspectable item x item table."]
+      explainability: [5, "Exact additive contributions of history items."]
+
+  bpr_mf:
+    title: BPR-MF
+    family: Matrix factorisation (pairwise loss)
+    rung: 2
+    year: 2009
+    paper: {title: "BPR: Bayesian Personalized Ranking from Implicit Feedback", venue: "UAI 2009", url: "https://arxiv.org/abs/1205.2618"}
+    code: "https://github.com/benfred/implicit"
+    fidelity: faithful
+    summary: Learns user and item vectors so that items a user interacted with score higher than random items.
+    rubric:
+      implementation: [2, "One library call (implicit)."]
+      tuning: [3, "Factors, learning rate, regularisation, iterations."]
+      data_hunger: [3, "Needs several interactions per user and item."]
+      controllability: [2, "Latent factors are hard to steer directly."]
+      explainability: [2, "Post-hoc only: similar items in the latent space."]
+
+  ials:
+    title: iALS
+    family: Matrix factorisation (weighted least squares)
+    rung: 2
+    year: 2008
+    paper: {title: "Collaborative Filtering for Implicit Feedback Datasets", venue: "ICDM 2008", url: "http://yifanhu.net/PUB/cf.pdf"}
+    code: "https://github.com/benfred/implicit"
+    fidelity: faithful
+    summary: Treats every user-item pair as 'interacted or not' with a confidence weight and solves for vectors by alternating least squares.
+    rubric:
+      implementation: [2, "One library call (implicit)."]
+      tuning: [3, "Factors, regularisation, confidence alpha, iterations."]
+      data_hunger: [3, "Needs several interactions per user and item."]
+      controllability: [2, "Latent factors are hard to steer directly."]
+      explainability: [2, "Post-hoc only: similar items in the latent space."]
+
+  lightgcn:
+    title: LightGCN
+    family: Graph collaborative filtering
+    rung: 3
+    year: 2020
+    paper: {title: "LightGCN: Simplifying and Powering Graph Convolution Network for Recommendation", venue: "SIGIR 2020", url: "https://arxiv.org/abs/2002.02126"}
+    code: "https://github.com/Coder-Yu/SELFRec"
+    fidelity: faithful
+    summary: Smooths user and item embeddings over the user-item graph (neighbours of neighbours) and trains with BPR.
+    rubric:
+      implementation: [3, "Graph construction plus a training loop (SELFRec encoder)."]
+      tuning: [3, "Layers, embedding size, regularisation, steps."]
+      data_hunger: [3, "Benefits from a dense enough graph."]
+      controllability: [2, "Embeddings are hard to steer directly."]
+      explainability: [2, "Post-hoc: similar items in the embedding space."]
+
   xsimgcl:
     title: XSimGCL
-    summary: Contrastive graph collaborative filtering with noisy embedding views.
-    tasks: [topn, similar_items]
-    requires_images: false
-    cost_band: medium
-    complexity: {implementation: 3, tuning: 3, control: 3, data_hunger: 3, debugging: 3}
-    explainability_rubric: 2
-    upstream: Coder-Yu/SELFRec@5b022942
-    prose: |
-      XSimGCL keeps a user and item embedding, trains with BPR, and adds a noise-contrastive
-      term between two noisy views. Similar items are neighbors in the item embedding.
-      The in-repo trainer applies that objective on sampled edges so the shared candidate
-      file can be scored directly.
+    family: Graph contrastive learning
+    rung: 3
+    year: 2023
+    paper: {title: "XSimGCL: Towards Extremely Simple Graph Contrastive Learning for Recommendation", venue: "IEEE TKDE 2023", url: "https://arxiv.org/abs/2209.02544"}
+    code: "https://github.com/Coder-Yu/SELFRec"
+    fidelity: faithful
+    summary: LightGCN plus a contrastive loss between two noise-perturbed views, which spreads embeddings more evenly (less popularity bias).
+    rubric:
+      implementation: [3, "Graph encoder plus a contrastive loss (SELFRec encoder)."]
+      tuning: [4, "Noise eps, contrastive weight lambda, temperature tau, contrast layer, plus graph settings."]
+      data_hunger: [3, "Benefits from a dense enough graph; needs enough steps to converge."]
+      controllability: [2, "Embeddings are hard to steer directly."]
+      explainability: [2, "Post-hoc: similar items in the embedding space."]
+
+  sasrec:
+    title: SASRec
+    family: Sequential (causal self-attention)
+    rung: 4
+    year: 2018
+    paper: {title: "Self-Attentive Sequential Recommendation", venue: "ICDM 2018", url: "https://arxiv.org/abs/1808.09781"}
+    code: "https://github.com/kang205/SASRec"
+    fidelity: faithful
+    summary: A small Transformer reads the user's recent items in order and predicts the next one. Trained here with full cross-entropy, the stronger modern recipe.
+    rubric:
+      implementation: [3, "A Transformer plus a sequence sampler (in-repo, ~100 lines)."]
+      tuning: [3, "Layers, heads, dimension, dropout, sequence length, steps."]
+      data_hunger: [4, "Needs many ordered sequences to learn transitions."]
+      controllability: [2, "Hard to steer without post-filtering."]
+      explainability: [2, "Post-hoc: history items similar to the recommendation."]
+
   bert4rec:
     title: BERT4Rec
-    summary: Bidirectional transformer over the cutoff-truncated item sequence.
-    tasks: [topn, sequential, session]
-    requires_images: false
-    cost_band: medium
-    complexity: {implementation: 4, tuning: 4, control: 3, data_hunger: 4, debugging: 3}
-    explainability_rubric: 3
-    upstream: RecBole 1.2 BERT4Rec
-    prose: |
-      BERT4Rec encodes the items the user touched before the cutoff and scores candidate
-      ids with the last position. Local explanations point at that sequence.
+    family: Sequential (bidirectional masked modelling)
+    rung: 4
+    year: 2019
+    paper: {title: "BERT4Rec: Sequential Recommendation with Bidirectional Encoder Representations from Transformer", venue: "CIKM 2019", url: "https://arxiv.org/abs/1904.06690"}
+    code: "https://github.com/RUCAIBox/RecBole"
+    fidelity: faithful
+    summary: Like BERT for text, it hides random items in the sequence and learns to fill them in; at inference it fills in a [mask] placed after the last item.
+    rubric:
+      implementation: [3, "RecBole model plus an id-mapping adapter."]
+      tuning: [4, "Mask ratio, layers, heads, dropout, length; known to need long training."]
+      data_hunger: [4, "Needs many ordered sequences."]
+      controllability: [2, "Hard to steer without post-filtering."]
+      explainability: [2, "Post-hoc: history items similar to the recommendation."]
+
   s3rec:
     title: S3-Rec
-    summary: Self-supervised sequential model with an attribute-alignment loss.
-    tasks: [topn, sequential, session]
-    requires_images: false
-    cost_band: medium
-    complexity: {implementation: 4, tuning: 4, control: 3, data_hunger: 4, debugging: 3}
-    explainability_rubric: 3
-    upstream: RecBole 1.2 S3Rec
-    prose: |
-      S3-Rec uses the same sequence encoder as BERT4Rec and adds a loss that pulls the
-      sequence state toward the target item embedding, standing in for the paper's
-      attribute objectives. It reads category and text columns when they exist.
-  dcnv2:
-    title: DCN-V2
-    summary: Cross network plus a deep tower for CTR and rating.
-    tasks: [topn, ctr, rating]
-    requires_images: false
-    cost_band: medium
-    complexity: {implementation: 3, tuning: 3, control: 4, data_hunger: 3, debugging: 3}
-    explainability_rubric: 4
-    upstream: FuxiCTR 2.3 CrossNetV2
-    prose: |
-      DCN-V2 crosses user and item embeddings and trains with binary cross-entropy on the
-      shared candidate file, so AUC uses the same negatives as every other CTR model.
-      The local reason names the crossed user-item features.
-  din:
-    title: DIN
-    summary: Target attention over the user's behavior sequence.
-    tasks: [topn, ctr, rating, sequential]
-    requires_images: false
-    cost_band: medium
-    complexity: {implementation: 4, tuning: 3, control: 3, data_hunger: 4, debugging: 3}
-    explainability_rubric: 4
-    upstream: RecBole 1.2 DIN
-    prose: |
-      DIN scores a candidate by attending over the cutoff-truncated history. The attention
-      weights are the local explanation. It trains on the shared candidate labels.
-  multimodal_tower:
-    title: Multimodal two-tower
-    summary: User tower against text and image features. H&M only, unless image_path is filled.
-    tasks: [topn, similar_items]
-    requires_images: true
-    cost_band: medium
-    complexity: {implementation: 4, tuning: 3, control: 3, data_hunger: 4, debugging: 3}
-    explainability_rubric: 3
-    upstream: in-repo two-tower
-    prose: |
-      The item tower mixes a hashed text vector with the mean color of the article image.
-      On the smoke tier, H&M articles in the slice get a tiny generated image when the
-      Kaggle image archive is not on disk. Other datasets stay unsupported.
-  tiger:
-    title: TIGER
-    summary: Residual-quantized item codes and a score for every candidate id.
-    tasks: [topn, sequential]
-    requires_images: false
-    cost_band: medium
-    complexity: {implementation: 5, tuning: 4, control: 2, data_hunger: 4, debugging: 4}
-    explainability_rubric: 3
-    upstream: TIGER RQ-VAE, author repository unavailable
-    prose: |
-      TIGER quantizes item embeddings with a small residual codebook and scores candidates
-      from a GRU over the cutoff-truncated history. The semantic-id path is the local reason.
-      Smoke fits the codebook on the smoke catalog only.
+    family: Sequential (self-supervised pre-training)
+    rung: 4
+    year: 2020
+    paper: {title: "S3-Rec: Self-Supervised Learning for Sequential Recommendation with Mutual Information Maximization", venue: "CIKM 2020", url: "https://arxiv.org/abs/2008.07873"}
+    code: "https://github.com/RUCAIBox/RecBole"
+    fidelity: faithful
+    summary: Pre-trains a sequence encoder with four self-supervised tasks that tie items to their attributes, then fine-tunes it for next-item prediction.
+    rubric:
+      implementation: [4, "Two training stages and item attributes through RecBole."]
+      tuning: [4, "Four auxiliary loss weights plus Transformer settings and a stage split."]
+      data_hunger: [4, "Needs sequences and meaningful item attributes."]
+      controllability: [2, "Hard to steer without post-filtering."]
+      explainability: [2, "Post-hoc: history items similar to the recommendation."]
+
   hstu:
     title: HSTU
-    summary: Generative sequential transducer at a configurable width.
-    tasks: [topn, sequential, session]
-    requires_images: false
-    cost_band: medium
-    complexity: {implementation: 5, tuning: 5, control: 2, data_hunger: 5, debugging: 4}
-    explainability_rubric: 3
-    upstream: facebookresearch/generative-recommenders@ea7b85f
-    prose: |
-      This is the HSTU block (SiLU attention, gated values), not Meta's production-scale
-      model. Depth, width, and sequence length come from the CPU, 24 GB, or 48 GB preset,
-      and training stops at that preset's step budget.
-  generative_llm:
-    title: Generative LLM
-    summary: Text scorer that ranks candidate ids. GPU preset names a 7B QLoRA backbone.
-    tasks: [topn, sequential, rating]
-    requires_images: false
-    cost_band: medium
-    complexity: {implementation: 5, tuning: 5, control: 2, data_hunger: 4, debugging: 4}
-    explainability_rubric: 5
-    upstream: P5 / TALLRec
-    prose: |
-      Smoke runs a hashed text tower so every candidate id gets a score and a short reason.
-      The GPU config records Qwen2.5-7B-Instruct with 4-bit QLoRA. A text-only model that
-      cannot score the candidate file would be left out of the sort; this one can score.
-  personalize:
-    title: Amazon Personalize
-    summary: Managed campaign. One budgeted smoke, off the full-tier board.
-    tasks: [topn]
-    requires_images: false
-    cost_band: high
-    managed: true
-    complexity: {implementation: 2, tuning: 2, control: 2, data_hunger: 2, debugging: 2}
-    explainability_rubric: 1
-    upstream: Amazon Personalize
-    prose: |
-      Needs AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and RECBENCH_PERSONALIZE_CAMPAIGN_ARN.
-      Without those, the run is skipped. Results are not sorted with the full-tier GPU runs.
+    family: Generative sequential transducer
+    rung: 4
+    year: 2024
+    paper: {title: "Actions Speak Louder than Words: Trillion-Parameter Sequential Transducers for Generative Recommendations", venue: "ICML 2024", url: "https://arxiv.org/abs/2402.17152"}
+    code: "https://github.com/meta-recsys/generative-recommenders"
+    fidelity: simplified
+    summary: Meta's sequence architecture with pointwise (SiLU) attention, a gating vector U, and learned position/time-gap biases. Small single-GPU version here.
+    rubric:
+      implementation: [4, "Custom attention, relative position and time biases (in-repo, verified against Meta's op)."]
+      tuning: [4, "Layers, dimension, sequence length, time buckets, steps; designed for huge data."]
+      data_hunger: [5, "Shines at very large scale; small data under-uses it."]
+      controllability: [2, "Hard to steer without post-filtering."]
+      explainability: [2, "Post-hoc: history items similar to the recommendation."]
+
+  tiger_lite:
+    title: TIGER-lite
+    family: Generative retrieval (semantic IDs), simplified
+    rung: 4
+    year: 2023
+    paper: {title: "Recommender Systems with Generative Retrieval", venue: "NeurIPS 2023", url: "https://arxiv.org/abs/2305.05065"}
+    code: null
+    fidelity: simplified
+    summary: Experimental and unranked. A GRU next-item model plus TIGER-style residual-quantised semantic IDs, used only for explanations; it does not generate IDs like real TIGER.
+    rubric:
+      implementation: [4, "Sequence model plus a residual codebook."]
+      tuning: [4, "Codebook levels and size, loss weight, GRU settings."]
+      data_hunger: [4, "Needs many sequences."]
+      controllability: [2, "Hard to steer without post-filtering."]
+      explainability: [3, "Shared semantic-ID prefixes give a coarse 'same family of items' reason."]
+
+  din:
+    title: DIN
+    family: CTR ranker with target attention
+    rung: 5
+    year: 2018
+    paper: {title: "Deep Interest Network for Click-Through Rate Prediction", venue: "KDD 2018", url: "https://arxiv.org/abs/1706.06978"}
+    code: "https://github.com/RUCAIBox/RecBole"
+    fidelity: faithful
+    summary: For each candidate item, attends over the user's history to build a candidate-specific interest vector, then predicts click probability.
+    rubric:
+      implementation: [3, "RecBole model plus pairwise scoring over the catalog."]
+      tuning: [3, "Embedding size, MLP sizes, negatives per positive."]
+      data_hunger: [4, "Needs many labelled (user, item, outcome) examples."]
+      controllability: [3, "Business features can be added as inputs."]
+      explainability: [3, "Attention weights over history are a natural reason (not yet exposed by recbench)."]
+
+  dcnv2:
+    title: DCN-V2
+    family: CTR ranker with feature crosses
+    rung: 5
+    year: 2021
+    paper: {title: "DCN V2: Improved Deep & Cross Network and Practical Lessons for Web-scale Learning to Rank Systems", venue: "WWW 2021", url: "https://arxiv.org/abs/2008.13535"}
+    code: "https://github.com/reczoo/FuxiCTR"
+    fidelity: faithful
+    summary: Combines a cross network (explicit feature interactions) with a deep MLP over user id, item id, and category features; outputs a click probability.
+    rubric:
+      implementation: [3, "Feature pipeline plus a pairwise scorer over the catalog."]
+      tuning: [3, "Cross layers, MLP sizes, negatives, regularisation."]
+      data_hunger: [4, "Needs many labelled examples; shines with rich features."]
+      controllability: [3, "Business features can be added as inputs."]
+      explainability: [2, "Post-hoc: similar items in the id-embedding space."]
+
+  text_hash_tower:
+    title: Text hash tower
+    family: Content-based two-tower (stand-in for LLM text encoders)
+    rung: 6
+    year: null
+    paper: null
+    code: null
+    fidelity: simplified
+    summary: Builds item vectors from item text and categories (hashed words), so brand-new items can be recommended. A tiny stand-in for LLM-based text understanding.
+    rubric:
+      implementation: [2, "Hashing plus two small linear towers."]
+      tuning: [2, "Hash size, dimension, steps."]
+      data_hunger: [2, "Content carries signal even for rare items."]
+      controllability: [3, "Content features can be filtered and weighted."]
+      explainability: [3, "Cites history items with similar content vectors."]
+
+  multimodal_tower:
+    title: Multimodal tower
+    family: Content-based two-tower with images
+    rung: 6
+    year: null
+    paper: null
+    code: null
+    fidelity: simplified
+    summary: Text features plus simple colour features from real item images and an item-id residual. Runs only when images are on disk (H&M with the image archive).
+    rubric:
+      implementation: [3, "Image loading plus a two-tower model."]
+      tuning: [3, "Hash size, dimension, image features, steps."]
+      data_hunger: [3, "Needs images; benefits from many interactions for the id residual."]
+      controllability: [3, "Content features can be filtered and weighted."]
+      explainability: [3, "Cites history items with similar content vectors."]
+
   recombee:
     title: Recombee
-    summary: Third-party recommendation API. One budgeted smoke.
-    tasks: [topn]
-    requires_images: false
-    cost_band: high
-    managed: true
-    complexity: {implementation: 2, tuning: 2, control: 2, data_hunger: 2, debugging: 2}
-    explainability_rubric: 1
-    upstream: Recombee
-    prose: |
-      Needs RECBENCH_RECOMBEE_DATABASE_ID and RECBENCH_RECOMBEE_TOKEN. A free-tier call is
-      enough for one smoke. Full-tier configs leave managed services off.
-  vertex_commerce:
-    title: Vertex AI Search for commerce
-    summary: Optional adapter. A live call is not required for v1.
-    tasks: [topn]
-    requires_images: false
-    cost_band: high
-    managed: true
-    complexity: {implementation: 3, tuning: 3, control: 2, data_hunger: 3, debugging: 3}
-    explainability_rubric: 1
-    upstream: Vertex AI Search for commerce
-    prose: |
-      The dictionary page and the adapter exist. A live smoke runs only when
-      RECBENCH_VERTEX_PROJECT and RECBENCH_VERTEX_PLACEMENT are already set. v1 does not wait on it.
+    family: Managed recommendation service (SaaS)
+    rung: 7
+    year: null
+    paper: null
+    code: "https://github.com/recombee/python-api-client"
+    fidelity: faithful
+    summary: A hosted recommendation API. recbench uploads the pre-test interactions to a dedicated database and asks it for top-K lists for eval users.
+    rubric:
+      implementation: [2, "SDK calls for upload and recommendation requests."]
+      tuning: [1, "Managed; scenario settings in the admin UI."]
+      data_hunger: [2, "Has built-in fallbacks for sparse data."]
+      controllability: [4, "Filters and boosters in its query language (ReQL)."]
+      explainability: [1, "Black box: no reasons returned."]
+
+# Services documented in the dictionary but not benchmarked live (budget, access, or retirement).
+services:
+  amazon_personalize:
+    title: Amazon Personalize
+    status: "Available (not on AWS's maintenance list as of 2026-10-02)."
+    why_not_benchmarked: "Real-time campaigns bill per provisioned hour, which risks the <$50/month budget; requests need AWS SigV4 signing (boto3)."
+    url: "https://aws.amazon.com/personalize/"
+  vertex_ai_search_commerce:
+    title: Vertex AI Search for commerce (AI Commerce Search)
+    status: "Available; retail catalogs only."
+    why_not_benchmarked: "Requires a product catalog and user-event import plus model training time; prediction is billed per request."
+    url: "https://cloud.google.com/retail/docs/overview"
+  azure_personalizer:
+    title: Azure AI Personalizer
+    status: "Retired on 2026-10-01; no new resources since 2023-09-20."
+    why_not_benchmarked: "Retired. It was a contextual bandit (choose one action per context), not a collaborative-filtering recommender."
+    url: "https://learn.microsoft.com/en-us/azure/ai-services/personalizer/"
 
 datasets:
   movielens-25m:
-    title: MovieLens-25M
-    domain: video
-    summary: Explicit movie ratings, titles, and genres.
-    prose: GroupLens MovieLens 25M. The split is an 80/10/10 global time cut.
+    title: MovieLens 25M
+    domain: Movies
+    source: "https://grouplens.org/datasets/movielens/25m/"
+    citation: "Harper & Konstan, The MovieLens Datasets: History and Context, ACM TiiS 2015"
+    license: "GroupLens usage terms: research use; no redistribution; commercial use needs permission."
+    commercial_use: "No (without permission)"
+    feedback: "Explicit 0.5-5 star ratings, used as implicit 'watched' events."
+    side_info: "Titles, multi-valued genres."
+    pitfalls: "Timestamps are when a rating was entered (often in bulk), not when the movie was watched, so sequence order is weak."
   retailrocket:
-    title: Retailrocket
-    domain: ecommerce
-    summary: Session clickstream of views, carts, and transactions.
-    prose: Retailrocket events. Sessions are assigned with a 30-minute gap. Amazon Reviews is not in this benchmark.
+    title: RetailRocket
+    domain: E-commerce
+    source: "https://www.kaggle.com/datasets/retailrocket/ecommerce-dataset"
+    citation: "Retailrocket recommender system dataset (Kaggle, 2016)"
+    license: "CC BY-NC-SA 4.0"
+    commercial_use: "No"
+    feedback: "Implicit views, add-to-carts, and transactions."
+    side_info: "Category ids only (other properties are hashed)."
+    pitfalls: "Most visitors appear once (very sparse, many cold users); bots are not filtered; category values come from a later snapshot."
   hm:
     title: H&M Personalized Fashion Recommendations
-    domain: ecommerce
-    summary: Fashion purchases, article text, customer attributes, and images.
-    prose: |
-      Full tier holds out the last 7 days of the public transactions file (2020-09-16 through
-      2020-09-22). Smoke and standard tiers use the quantile split on the capped slice and
-      write a tiny image per article in that slice when the Kaggle image archive is absent.
+    domain: Fashion e-commerce
+    source: "https://www.kaggle.com/competitions/h-and-m-personalized-fashion-recommendations"
+    citation: "H&M Group, Kaggle competition (2022)"
+    license: "Kaggle competition rules: non-commercial and academic use."
+    commercial_use: "No"
+    feedback: "Implicit purchases (day-level timestamps)."
+    side_info: "Article names, descriptions, product types, customer attributes, optional article images (~30 GB)."
+    pitfalls: "Timestamps are dates only (many ties); repeat purchases of basics; the test window is the last 7 days."
   lastfm:
     title: Last.fm 1K
-    domain: music
-    summary: Listening events. Item text is the artist name.
-    prose: Celma's Last.fm 1K dump. HetRec is not joined, because the artist ids do not match.
+    domain: Music
+    source: "http://ocelma.net/MusicRecommendationDataset/lastfm-1K.html"
+    citation: "Celma, Music Recommendation and Discovery in the Long Tail, Springer 2010"
+    license: "Non-commercial use (Last.fm terms); see the dataset page."
+    commercial_use: "No"
+    feedback: "Implicit listening events (one row per play)."
+    side_info: "Artist names only (no genres)."
+    pitfalls: "Highly repetitive (many plays of the same artists), so results are reported with and without repeats; only ~1K users with very long histories."
   steam:
     title: Steam
-    domain: games
-    summary: UCSD McAuley Steam playtime and review text.
-    prose: If the download URL fails, prepare records Steam as unavailable and the other datasets still train.
+    domain: Video games
+    source: "https://cseweb.ucsd.edu/~jmcauley/datasets.html#steam_data"
+    citation: "Kang & McAuley, Self-Attentive Sequential Recommendation, ICDM 2018 (data from the McAuley Lab)"
+    license: "Provided for research purposes by the McAuley Lab (UCSD)."
+    commercial_use: "No"
+    feedback: "Implicit: a written review counts as an interaction."
+    side_info: "Game titles, tags, genres (games metadata file)."
+    pitfalls: "Day-level timestamps; reviews are a biased sample of play; item text must not come from reviews (they can postdate the cutoff)."

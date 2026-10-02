@@ -1,27 +1,5 @@
-"""Register every method."""
+"""Importing this package registers every method (see recbench.registry)."""
 
-from recbench.methods import (
-    bert4rec,
-    dcnv2,
-    din,
-    generative_llm,
-    hstu,
-    managed,
-    multimodal,
-    s3rec,
-    tiger,
-    xsimgcl,
-)
+from recbench.methods import baselines, content, dcnv2, graph, hstu, implicit_mf, recbole_models, recombee, sasrec, tiger
 
-__all__ = [
-    "bert4rec",
-    "dcnv2",
-    "din",
-    "generative_llm",
-    "hstu",
-    "managed",
-    "multimodal",
-    "s3rec",
-    "tiger",
-    "xsimgcl",
-]
+__all__ = ["baselines", "content", "dcnv2", "graph", "hstu", "implicit_mf", "recbole_models", "recombee", "sasrec", "tiger"]

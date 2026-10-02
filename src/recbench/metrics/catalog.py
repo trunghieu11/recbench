@@ -1,367 +1,308 @@
-"""Metrics on the shared candidate file. Ranking is per task; smoke runs do not sort these."""
+"""Metric definitions (protocol v2).
+
+Every metric reads a MetricContext built by recbench.evaluation:
+- ctx.topk[u, r]: the item at rank r+1 for eval user u (0 = empty slot), full-catalog ranking.
+- ctx.relevant[u]: the user's relevant test items under the active repeat policy.
+- ctx.next_item[u]: the first relevant test item (next-item task).
+
+Per-user metrics return one value per user (the evaluator averages them and adds
+bootstrap confidence intervals); list-level metrics return a single number.
+The worked examples in docs/dictionary/metrics use these exact functions.
+"""
 
 from __future__ import annotations
 
-from typing import Any
-
 import numpy as np
-import pandas as pd
-import pyarrow.parquet as pq
 
-from recbench.protocol import Metric, MetricSpec, Task
+from recbench.protocol import K_VALUES, Metric, MetricSpec, Task
 from recbench.registry import register_metric
 
-
-def _ranked(scores: pd.DataFrame) -> pd.DataFrame:
-    frame = scores.sort_values(["user_idx", "score", "item_idx"], ascending=[True, False, True], kind="mergesort")
-    frame = frame.copy()
-    frame["rank"] = frame.groupby("user_idx").cumcount() + 1
-    return frame
+RANKING_TASKS = {Task.topn, Task.sequential, Task.session, Task.similar_items}
+TOPN = {Task.topn}
 
 
-def _positive_ranks(scores: pd.DataFrame, mask: pd.Series | None = None) -> pd.Series:
-    ranked = _ranked(scores)
-    hits = ranked[ranked["label"] == 1]
-    if mask is not None:
-        hits = hits[mask.reindex(hits.index).fillna(False)]
-    return hits["rank"]
+def _discount(k: int) -> np.ndarray:
+    return 1.0 / np.log2(np.arange(2, k + 2))
 
 
-def _recall_at(scores: pd.DataFrame, k: int, user_mask: pd.Series | None = None) -> float | None:
-    ranked = _ranked(scores)
-    hits = ranked[ranked["label"] == 1]
-    if user_mask is not None:
-        allowed = set(scores.loc[user_mask, "user_idx"].unique())
-        hits = hits[hits["user_idx"].isin(allowed)]
-    if hits.empty:
+def hitrate(hits: np.ndarray, k: int) -> np.ndarray:
+    """1 if any of the top-k items is relevant."""
+    return hits[:, :k].any(axis=1).astype(np.float64)
+
+
+def precision(hits: np.ndarray, k: int) -> np.ndarray:
+    """Share of the k recommended slots that are relevant."""
+    return hits[:, :k].sum(axis=1) / k
+
+
+def recall(hits: np.ndarray, n_rel: np.ndarray, k: int) -> np.ndarray:
+    """Relevant items found in the top-k, divided by min(k, number of relevant items)."""
+    return hits[:, :k].sum(axis=1) / np.maximum(np.minimum(n_rel, k), 1)
+
+
+def ndcg(hits: np.ndarray, n_rel: np.ndarray, k: int) -> np.ndarray:
+    """DCG of the top-k list divided by the best achievable DCG (IDCG) for this user."""
+    disc = _discount(k)
+    dcg = (hits[:, :k] * disc).sum(axis=1)
+    ideal_cum = np.concatenate([[0.0], np.cumsum(disc)])
+    idcg = ideal_cum[np.minimum(n_rel, k)]
+    return np.divide(dcg, idcg, out=np.zeros_like(dcg), where=idcg > 0)
+
+
+def average_precision(hits: np.ndarray, n_rel: np.ndarray, k: int) -> np.ndarray:
+    """Mean of precision@r over the ranks r <= k that hold a relevant item, normalised by min(k, |rel|)."""
+    h = hits[:, :k].astype(np.float64)
+    precision_at_r = np.cumsum(h, axis=1) / np.arange(1, k + 1)
+    return (precision_at_r * h).sum(axis=1) / np.maximum(np.minimum(n_rel, k), 1)
+
+
+def reciprocal_rank(hits: np.ndarray) -> np.ndarray:
+    """1 / rank of the first relevant item, 0 when none is in the list."""
+    any_hit = hits.any(axis=1)
+    first = hits.argmax(axis=1) + 1
+    return np.where(any_hit, 1.0 / first, 0.0)
+
+
+def gini(counts: np.ndarray) -> float | None:
+    """0 = every item recommended equally often, 1 = one item gets all exposure."""
+    values = np.sort(np.asarray(counts, dtype=np.float64))
+    total = values.sum()
+    if total == 0 or len(values) == 0:
         return None
-    return float((hits["rank"] <= k).mean())
-
-
-def _top(scores: pd.DataFrame, k: int) -> pd.DataFrame:
-    ranked = _ranked(scores)
-    return ranked[ranked["rank"] <= k]
-
-
-@register_metric
-class NDCG(Metric):
-    spec = MetricSpec("ndcg_at_10", {Task.topn, Task.sequential, Task.session}, description="NDCG@10 on the shared candidate file.")
-
-    def compute(self, scores, store, context) -> float | None:
-        hits = _ranked(scores)
-        hits = hits[hits["label"] == 1]
-        if hits.empty:
-            return None
-        gain = np.where(hits["rank"] <= 10, 1.0 / np.log2(hits["rank"] + 1), 0.0)
-        return float(np.mean(gain))
-
-
-@register_metric
-class Recall(Metric):
-    spec = MetricSpec("recall_at_10", {Task.topn, Task.sequential, Task.session}, description="Recall@10 with one held-out item.")
-
-    def compute(self, scores, store, context) -> float | None:
-        return _recall_at(scores, 10)
-
-
-@register_metric
-class MAP(Metric):
-    spec = MetricSpec("map_at_10", {Task.topn, Task.sequential, Task.session}, description="MAP@10 for a single positive.")
-
-    def compute(self, scores, store, context) -> float | None:
-        hits = _ranked(scores)
-        hits = hits[hits["label"] == 1]
-        if hits.empty:
-            return None
-        ap = np.where(hits["rank"] <= 10, 1.0 / hits["rank"], 0.0)
-        return float(np.mean(ap))
-
-
-@register_metric
-class MRR(Metric):
-    spec = MetricSpec("mrr", {Task.topn, Task.sequential, Task.session}, description="Mean reciprocal rank of the held-out item.")
-
-    def compute(self, scores, store, context) -> float | None:
-        hits = _ranked(scores)
-        hits = hits[hits["label"] == 1]
-        if hits.empty:
-            return None
-        return float(np.mean(1.0 / hits["rank"]))
-
-
-@register_metric
-class HitRate(Metric):
-    spec = MetricSpec("hitrate_at_10", {Task.topn, Task.sequential, Task.session}, description="Hit rate@10.")
-
-    def compute(self, scores, store, context) -> float | None:
-        return _recall_at(scores, 10)
-
-
-@register_metric
-class PopularityRecall(Metric):
-    spec = MetricSpec(
-        "sanity_popularity_recall_at_10",
-        {Task.topn},
-        leaderboard=False,
-        description="Popularity Recall@10 on the same candidate file. Not ranked.",
-    )
-
-    def compute(self, scores, store, context) -> float | None:
-        counts = context.get("item_counts")
-        if counts is None:
-            return None
-        frame = scores.copy()
-        frame["score"] = frame["item_idx"].map(lambda i: counts.get(int(i), 0)).astype(float)
-        return _recall_at(frame, 10)
-
-
-@register_metric
-class RMSE(Metric):
-    spec = MetricSpec("rmse", {Task.rating}, description="RMSE on explicit test rows when the method has a rating head.")
-
-    def compute(self, scores, store, context) -> float | None:
-        pred = context.get("rating_pred")
-        truth = context.get("rating_truth")
-        if pred is None or truth is None or len(pred) == 0:
-            return None
-        return float(np.sqrt(np.mean((np.asarray(pred) - np.asarray(truth)) ** 2)))
-
-
-@register_metric
-class MAE(Metric):
-    spec = MetricSpec("mae", {Task.rating}, description="MAE on explicit test rows.")
-
-    def compute(self, scores, store, context) -> float | None:
-        pred = context.get("rating_pred")
-        truth = context.get("rating_truth")
-        if pred is None or truth is None or len(pred) == 0:
-            return None
-        return float(np.mean(np.abs(np.asarray(pred) - np.asarray(truth))))
-
-
-@register_metric
-class AUC(Metric):
-    spec = MetricSpec("auc", {Task.ctr}, description="AUC on the shared candidate labels.")
-
-    def compute(self, scores, store, context) -> float | None:
-        labels = scores["label"].to_numpy()
-        pred = 1 / (1 + np.exp(-scores["score"].to_numpy()))
-        order = np.argsort(pred, kind="mergesort")
-        ranks = np.empty(len(pred), dtype=np.float64)
-        ranks[order] = np.arange(1, len(pred) + 1)
-        n_pos = int((labels == 1).sum())
-        n_neg = int((labels == 0).sum())
-        if n_pos == 0 or n_neg == 0:
-            return None
-        sum_pos = float(ranks[labels == 1].sum())
-        return (sum_pos - n_pos * (n_pos + 1) / 2) / (n_pos * n_neg)
-
-
-@register_metric
-class LogLoss(Metric):
-    spec = MetricSpec("logloss", {Task.ctr}, description="Log loss on the shared candidate labels.")
-
-    def compute(self, scores, store, context) -> float | None:
-        labels = scores["label"].to_numpy().astype(float)
-        pred = 1 / (1 + np.exp(-np.clip(scores["score"].to_numpy(), -20, 20)))
-        pred = np.clip(pred, 1e-6, 1 - 1e-6)
-        return float(-np.mean(labels * np.log(pred) + (1 - labels) * np.log(1 - pred)))
-
-
-@register_metric
-class Coverage(Metric):
-    spec = MetricSpec("coverage_at_10", {Task.topn}, description="Fraction of the catalog that appears in any top-10.")
-
-    def compute(self, scores, store, context) -> float | None:
-        n_items = int(store.meta["n_items"])
-        if n_items == 0:
-            return None
-        top = _top(scores, 10)
-        return float(top["item_idx"].nunique() / n_items)
-
-
-@register_metric
-class Diversity(Metric):
-    spec = MetricSpec("intra_list_diversity", {Task.topn}, description="Average pairwise category distance inside each top-10.")
-
-    def compute(self, scores, store, context) -> float | None:
-        cats = store.item_categories()
-        top = _top(scores, 10)
-        distances = []
-        for _, group in top.groupby("user_idx"):
-            labels = [set(str(cats.get(int(i), "")).split("|")) for i in group["item_idx"]]
-            if len(labels) < 2:
-                continue
-            acc = []
-            for i in range(len(labels)):
-                for j in range(i + 1, len(labels)):
-                    union = labels[i] | labels[j]
-                    inter = labels[i] & labels[j]
-                    acc.append(1 - (len(inter) / len(union) if union else 0))
-            if acc:
-                distances.append(float(np.mean(acc)))
-        if not distances:
-            return None
-        return float(np.mean(distances))
-
-
-@register_metric
-class Novelty(Metric):
-    spec = MetricSpec("novelty", {Task.topn}, description="Mean self-information of top-10 items.")
-
-    def compute(self, scores, store, context) -> float | None:
-        counts = context.get("item_counts") or {}
-        total = sum(counts.values()) or 1
-        top = _top(scores, 10)
-        info = []
-        for item in top["item_idx"]:
-            prob = (counts.get(int(item), 0) + 1) / (total + 1)
-            info.append(-np.log2(prob))
-        if not info:
-            return None
-        return float(np.mean(info))
-
-
-@register_metric
-class Serendipity(Metric):
-    spec = MetricSpec("serendipity", {Task.topn}, description="Hits that are outside the user profile and outside the global top 5 percent.")
-
-    def compute(self, scores, store, context) -> float | None:
-        counts = context.get("item_counts") or {}
-        if not counts:
-            return None
-        threshold = np.quantile(list(counts.values()), 0.95)
-        popular = {item for item, count in counts.items() if count >= threshold}
-        cats = store.item_categories()
-        ranked = _ranked(scores)
-        hits = ranked[(ranked["label"] == 1) & (ranked["rank"] <= 10)]
-        if hits.empty:
-            return 0.0
-        profiles = context.get("user_categories") or {}
-        flags = []
-        for user, item in zip(hits["user_idx"], hits["item_idx"]):
-            profile = profiles.get(int(user), set())
-            category = str(cats.get(int(item), ""))
-            unexpected = category not in profile and int(item) not in popular
-            flags.append(unexpected)
-        return float(np.mean(flags))
-
-
-@register_metric
-class ExposureGini(Metric):
-    spec = MetricSpec("exposure_gini", {Task.topn}, description="Gini of how often each catalog item is recommended.")
-
-    def compute(self, scores, store, context) -> float | None:
-        n_items = int(store.meta["n_items"])
-        counts = np.zeros(n_items + 1, dtype=np.float64)
-        top = _top(scores, 10)
-        for item in top["item_idx"]:
-            counts[int(item)] += 1
-        values = np.sort(counts[1:])
-        if values.sum() == 0:
-            return None
-        n = len(values)
-        index = np.arange(1, n + 1)
-        return float((2 * (index * values).sum()) / (n * values.sum()) - (n + 1) / n)
-
-
-@register_metric
-class MeanPopularity(Metric):
-    spec = MetricSpec("mean_popularity_percentile", {Task.topn}, description="Mean train-popularity percentile of top-10 items.")
-
-    def compute(self, scores, store, context) -> float | None:
-        counts = context.get("item_counts") or {}
-        if not counts:
-            return None
-        ordered = np.array(sorted(counts.values()))
-        top = _top(scores, 10)
-        percentiles = []
-        for item in top["item_idx"]:
-            count = counts.get(int(item), 0)
-            percentiles.append(float(np.searchsorted(ordered, count, side="right") / max(len(ordered), 1)))
-        return float(np.mean(percentiles)) if percentiles else None
-
-
-@register_metric
-class GroupExposure(Metric):
-    spec = MetricSpec(
-        "group_exposure_gap",
-        {Task.topn},
-        description="Absolute gap in mean recommendation popularity between user groups. No-ops without group labels.",
-    )
-
-    def compute(self, scores, store, context) -> float | None:
-        users = pq.read_table(store.users_path, columns=["user_idx", "group_label"]).to_pandas()
-        labeled = users.dropna(subset=["group_label"])
-        if labeled.empty:
-            return None
-        top = _top(scores, 10)
-        merged = top.merge(labeled, on="user_idx", how="inner")
-        if merged["group_label"].nunique() < 2:
-            return None
-        means = merged.groupby("group_label")["score"].mean()
-        return float(means.max() - means.min())
-
-
-@register_metric
-class UserColdRecall(Metric):
-    spec = MetricSpec("user_cold_recall_at_10", {Task.topn}, description="Recall@10 for users whose first event is in the test window.")
-
-    def compute(self, scores, store, context) -> float | None:
-        cold_users = scores.loc[scores["is_cold_user"].astype(bool), "user_idx"]
-        if cold_users.empty:
-            return None
-        mask = scores["user_idx"].isin(set(cold_users))
-        return _recall_at(scores, 10, mask)
-
-
-@register_metric
-class ItemColdRecall(Metric):
-    spec = MetricSpec("item_cold_recall_at_10", {Task.topn}, description="Recall@10 when the held-out item is cold.")
-
-    def compute(self, scores, store, context) -> float | None:
-        positives = scores[(scores["label"] == 1) & scores["is_cold_item"].astype(bool)]
-        if positives.empty:
-            return None
-        mask = scores["user_idx"].isin(set(positives["user_idx"]))
-        return _recall_at(scores, 10, mask)
-
-
-def _context_metric(name: str, description: str, key: str):
-    @register_metric
-    class _Metric(Metric):
-        spec = MetricSpec(name, {Task.topn}, description=description)
-
-        def compute(self, scores, store, context) -> float | None:
-            value = context.get(key)
-            return None if value is None else float(value)
-
-    _Metric.__name__ = name
-    return _Metric
-
-
-TrainWall = _context_metric("train_wall_seconds", "Training wall time on the active hardware profile.", "train_wall_s")
-PeakRSS = _context_metric("peak_rss_mb", "Peak resident memory during the run.", "peak_rss_mb")
-BatchInfer = _context_metric("batch_infer_seconds", "Wall time to score a fixed 1000-user slice.", "batch_infer_s")
-ServedP50 = _context_metric("served_p50_ms", "Served latency p50 against the HTTP endpoint.", "served_p50_ms")
-ServedP95 = _context_metric("served_p95_ms", "Served latency p95 against the HTTP endpoint.", "served_p95_ms")
-Throughput = _context_metric("served_rps", "Served requests per second.", "served_rps")
-ExplainCov = _context_metric(
-    "local_explanation_coverage",
-    "Share of sampled recommendations with a non-empty local reason.",
-    "explanation_coverage",
+    n = len(values)
+    index = np.arange(1, n + 1)
+    return float((2 * (index * values).sum()) / (n * total) - (n + 1) / n)
+
+
+def _accuracy(name: str, k: int, fn, description: str, tasks=TOPN):
+    class _M(Metric):
+        spec = MetricSpec(name, set(tasks), kind="accuracy", per_user=True, description=description)
+
+        def compute(self, ctx):
+            return fn(ctx, k)
+
+    _M.__name__ = name
+    return register_metric(_M)
+
+
+for _k in K_VALUES:
+    _accuracy(f"hitrate_at_{_k}", _k, lambda c, k: hitrate(c.hits, k), f"Share of users with at least one relevant item in the top {_k}.")
+    _accuracy(f"recall_at_{_k}", _k, lambda c, k: recall(c.hits, c.n_rel, k), f"Relevant items found in the top {_k} / min({_k}, #relevant).")
+    _accuracy(f"ndcg_at_{_k}", _k, lambda c, k: ndcg(c.hits, c.n_rel, k), f"Position-aware ranking quality of the top {_k} (1 = perfect order).")
+_accuracy("precision_at_10", 10, lambda c, k: precision(c.hits, k), "Share of the 10 recommended slots that are relevant.")
+_accuracy("map_at_10", 10, lambda c, k: average_precision(c.hits, c.n_rel, k), "Mean average precision of the top 10.")
+_accuracy("mrr_at_50", 50, lambda c, k: reciprocal_rank(c.hits[:, :k]), "1 / rank of the first relevant item within the top 50.")
+_accuracy(
+    "next_hitrate_at_10",
+    10,
+    lambda c, k: (c.next_rank <= k).astype(np.float64),
+    "Next-item task: the very next item the user interacted with is in the top 10.",
+    tasks=RANKING_TASKS,
+)
+_accuracy(
+    "next_ndcg_at_10",
+    10,
+    lambda c, k: np.where(c.next_rank <= k, 1.0 / np.log2(c.next_rank + 1), 0.0),
+    "Next-item task: NDCG@10 with the next item as the only relevant item.",
+    tasks=RANKING_TASKS,
 )
 
 
-def item_counts(store: Any) -> dict[int, int]:
-    frame = pq.read_table(store.train_path, columns=["item_idx"]).to_pandas()
-    return {int(k): int(v) for k, v in frame["item_idx"].value_counts().to_dict().items()}
+def _list_metric(name: str, fn, description: str, *, kind="beyond", higher=True, per_user=False, tasks=TOPN):
+    class _M(Metric):
+        spec = MetricSpec(name, set(tasks), kind=kind, higher_is_better=higher, per_user=per_user, description=description)
+
+        def compute(self, ctx):
+            return fn(ctx)
+
+    _M.__name__ = name
+    return register_metric(_M)
 
 
-def user_categories(store: Any) -> dict[int, set[str]]:
-    train = pq.read_table(store.train_path, columns=["user_idx", "item_idx"]).to_pandas()
-    cats = store.item_categories()
-    profiles: dict[int, set[str]] = {}
-    for user, item in zip(train["user_idx"], train["item_idx"]):
-        profiles.setdefault(int(user), set()).add(str(cats.get(int(item), "")))
-    return profiles
+def _top10(ctx) -> np.ndarray:
+    return ctx.topk[:, :10]
+
+
+def _coverage(ctx):
+    items = _top10(ctx)
+    return float(len(np.unique(items[items > 0])) / max(ctx.n_items, 1))
+
+
+def _gini(ctx):
+    items = _top10(ctx)
+    counts = np.bincount(items[items > 0].ravel(), minlength=ctx.n_items + 1)[1:]
+    return gini(counts)
+
+
+def _pop_percentile(ctx):
+    items = _top10(ctx)
+    flat = items[items > 0]
+    if len(flat) == 0:
+        return None
+    ordered = np.sort(ctx.item_pop[1:])
+    return float(np.mean(np.searchsorted(ordered, ctx.item_pop[flat], side="right") / len(ordered)))
+
+
+def _long_tail(ctx):
+    items = _top10(ctx)
+    flat = items[items > 0]
+    if len(flat) == 0:
+        return None
+    return float(np.mean(~ctx.head_items[flat]))
+
+
+def _novelty(ctx):
+    items = _top10(ctx)
+    flat = items[items > 0]
+    if len(flat) == 0:
+        return None
+    prob = (ctx.item_pop[flat] + 1) / (ctx.item_pop.sum() + ctx.n_items)
+    return float(np.mean(-np.log2(prob)))
+
+
+def _ild(ctx):
+    if not ctx.has_categories:
+        return None
+    values = []
+    for row in _top10(ctx):
+        cats = [ctx.item_categories[i] for i in row if i > 0 and ctx.item_categories[i]]
+        if len(cats) < 2:
+            continue
+        dist = [1 - len(a & b) / len(a | b) for x, a in enumerate(cats) for b in cats[x + 1 :]]
+        values.append(np.mean(dist))
+    return float(np.mean(values)) if values else None
+
+
+def _serendipity(ctx):
+    out = np.zeros(len(ctx.users))
+    for u, row in enumerate(_top10(ctx)):
+        rel = ctx.relevant_sets[u]
+        profile = ctx.user_profile(u)
+        good = 0
+        for item in row:
+            if item <= 0 or item not in rel or ctx.head_items_5pct[item]:
+                continue
+            cats = ctx.item_categories[item]
+            if ctx.has_categories and cats and cats & set(profile):
+                continue
+            good += 1
+        out[u] = good / 10
+    return out
+
+
+def _calibration(ctx):
+    if not ctx.has_categories:
+        return None
+    alpha = 0.01
+    values = []
+    for u, row in enumerate(_top10(ctx)):
+        p = ctx.user_profile(u)
+        if not p:
+            continue
+        q: dict[str, float] = {}
+        n = 0
+        for item in row:
+            cats = ctx.item_categories[item] if item > 0 else frozenset()
+            if not cats:
+                continue
+            n += 1
+            for cat in cats:
+                q[cat] = q.get(cat, 0.0) + 1.0 / len(cats)
+        if n == 0:
+            continue
+        q = {cat: weight / n for cat, weight in q.items()}
+        kl = 0.0
+        for cat, p_c in p.items():
+            q_c = (1 - alpha) * q.get(cat, 0.0) + alpha * p_c
+            kl += p_c * np.log2(p_c / q_c)
+        values.append(kl)
+    return float(np.mean(values)) if values else None
+
+
+def _group_gap(ctx):
+    per_user = ndcg(ctx.hits, ctx.n_rel, 10)
+    means = [per_user[ctx.user_groups == group].mean() for group in ("light", "medium", "heavy") if (ctx.user_groups == group).any()]
+    if len(means) < 2:
+        return None
+    return float(max(means) - min(means))
+
+
+def _item_cold_recall(ctx):
+    values = []
+    for u, row in enumerate(_top10(ctx)):
+        cold_rel = [i for i in ctx.relevant[u] if ctx.cold_items[i]]
+        if not cold_rel:
+            continue
+        found = len(set(row.tolist()) & set(cold_rel))
+        values.append(found / min(10, len(cold_rel)))
+    return float(np.mean(values)) if values else None
+
+
+_list_metric("coverage_at_10", _coverage, "Share of the catalog that appears in at least one top-10 list.")
+_list_metric("gini_at_10", _gini, "Inequality of exposure across catalog items in top-10 lists (0 = equal).", higher=False)
+_list_metric("popularity_percentile_at_10", _pop_percentile, "Average popularity percentile of recommended items (1 = most popular).", higher=False)
+_list_metric("long_tail_share_at_10", _long_tail, "Share of recommended items outside the 20% most popular items.")
+_list_metric("novelty_at_10", _novelty, "Mean self-information -log2 p(item) of recommended items (higher = less obvious).")
+_list_metric("ild_at_10", _ild, "Intra-list diversity: mean pairwise category (Jaccard) distance inside a top-10.")
+_list_metric("serendipity_at_10", _serendipity, "Relevant AND unexpected (not top-5% popular, new category for the user) share of a top-10.", per_user=True)
+_list_metric("calibration_kl_at_10", _calibration, "KL divergence between the user's category mix and the list's mix (Steck 2018).", higher=False)
+_list_metric("user_group_ndcg_gap_at_10", _group_gap, "Max - min mean NDCG@10 across light/medium/heavy user groups.", kind="beyond", higher=False)
+_list_metric("item_cold_recall_at_10", _item_cold_recall, "Recall@10 counting only relevant items with no pre-test history.", kind="slice")
+
+
+def _sampled(name: str, fn, description: str, *, kind="sampled", higher=True, tasks=RANKING_TASKS, needs_probability=False):
+    class _M(Metric):
+        spec = MetricSpec(name, set(tasks), kind=kind, higher_is_better=higher, per_user=True, description=description)
+
+        def compute(self, ctx):
+            if ctx.sampled_rank is None:
+                return None
+            if needs_probability and not ctx.method_spec.outputs_probability:
+                return None
+            return fn(ctx)
+
+    _M.__name__ = name
+    return register_metric(_M)
+
+
+_sampled("sampled_hitrate_at_10", lambda c: (c.sampled_rank <= 10).astype(np.float64), "Next item ranked in the top 10 among itself + 100 random unseen items.")
+_sampled(
+    "sampled_ndcg_at_10",
+    lambda c: np.where(c.sampled_rank <= 10, 1.0 / np.log2(c.sampled_rank + 1), 0.0),
+    "NDCG@10 of the next item among itself + 100 random unseen items.",
+)
+_sampled("sampled_auc", lambda c: c.sampled_auc, "Per-user AUC (GAUC) of the next item vs 100 random unseen items.", kind="diagnostic", tasks={Task.ctr, Task.topn})
+_sampled(
+    "sampled_logloss",
+    lambda c: c.sampled_logloss,
+    "Log loss on the sampled candidates; only for models that output probabilities.",
+    kind="diagnostic",
+    higher=False,
+    tasks={Task.ctr},
+    needs_probability=True,
+)
+
+
+def _context_metric(name: str, key: str, description: str, *, kind="efficiency", higher=False):
+    class _M(Metric):
+        spec = MetricSpec(name, set(RANKING_TASKS) | {Task.ctr}, kind=kind, higher_is_better=higher, description=description)
+
+        def compute(self, ctx):
+            value = ctx.extra.get(key)
+            return None if value is None else float(value)
+
+    _M.__name__ = name
+    return register_metric(_M)
+
+
+_context_metric("train_seconds", "train_seconds", "Wall time of fit() on the active hardware.")
+_context_metric("score_seconds_per_1k_users", "score_seconds_per_1k_users", "Batch scoring time for 1,000 users against the whole catalog.")
+_context_metric("peak_rss_mb", "peak_rss_mb", "Peak resident memory of the run's process.")
+_context_metric("peak_gpu_mb", "peak_gpu_mb", "Peak GPU memory allocated by torch (0 on CPU).")
+_context_metric(
+    "personal_explanation_rate",
+    "personal_explanation_rate",
+    "Share of sampled recommendations whose explanation cites one of the user's own history items.",
+    kind="explainability",
+    higher=True,
+)

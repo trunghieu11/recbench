@@ -1,23 +1,25 @@
 {% extends "base.html" %}
 {% block body %}
-<p>Full tier only. One task at a time. Smoke runs are not sorted here.</p>
-<p>
-  {% for task in tasks %}
-    <a href="/dashboard/{{ task }}">{{ task }}</a>
-  {% endfor %}
-</p>
-<h2>{{ task }}</h2>
-<table>
-  <tr><th>Dataset</th><th>Method</th><th>{{ metric }}</th><th>Preset</th><th>Steps</th><th>Sanity Recall@10</th></tr>
-  {% for row in rows %}
-  <tr>
-    <td>{{ row.dataset }}</td>
-    <td>{{ row.method }}</td>
-    <td>{{ row.value }}</td>
-    <td>{{ row.preset }}</td>
-    <td>{{ row.steps }}</td>
-    <td>{{ row.sanity }} (not ranked)</td>
+<p class="note">Sorted within one dataset and one task. <span class="tied">Highlighted</span> methods have a 95% bootstrap
+confidence interval that overlaps the best method's: treat them as statistically tied.</p>
+{% if not boards %}<p>No finished protocol-v2 runs yet. Run <code>python -m recbench.runner --config configs/benchmarks/smoke-cpu.yaml</code>.</p>{% endif %}
+{% for board in boards %}
+<h2>{{ board.dataset }} — {{ board.title }}</h2>
+<div class="scroll"><table>
+  <tr><th>#</th><th>Method</th><th>{{ board.metric }}</th><th>95% CI</th></tr>
+  {% for row in board.rows %}
+  <tr{% if row.tied %} class="tied"{% endif %}>
+    <td>{{ row.rank }}</td><td>{{ row.method }}</td><td>{{ "%.4f"|format(row.value) }}</td>
+    <td>{% if row.low == row.low and row.low is not none %}{{ "%.4f"|format(row.low) }} – {{ "%.4f"|format(row.high) }}{% else %}–{% endif %}</td>
   </tr>
   {% endfor %}
-</table>
+</table></div>
+{% endfor %}
+{% if problems %}
+<h2>Not finished</h2>
+<div class="scroll"><table>
+  <tr><th>Dataset</th><th>Method</th><th>Status</th><th>Reason</th></tr>
+  {% for p in problems %}<tr><td>{{ p.dataset }}</td><td>{{ p.method }}</td><td>{{ p.status }}</td><td>{{ p.reason }}</td></tr>{% endfor %}
+</table></div>
+{% endif %}
 {% endblock %}

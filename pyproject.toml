@@ -1,32 +1,46 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "recbench"
-version = "0.1.0"
-description = "Registry-driven recommendation benchmark and dictionary."
+version = "0.2.0"
+description = "Registry-driven recommendation benchmark and recommender-systems dictionary."
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.11"
+# The core is what the serving image needs: no torch, no MLflow, no DuckDB.
 dependencies = [
   "numpy>=1.26",
   "pandas>=2.2",
   "pyarrow>=15",
-  "duckdb>=1.1",
   "pyyaml>=6",
-  "mlflow>=2.14,<3",
-  "fastapi>=0.115",
-  "uvicorn>=0.30",
-  "jinja2>=3.1",
-  "httpx>=0.27",
-  "kaggle>=1.6",
 ]
 
 [project.optional-dependencies]
-cpu = ["torch>=2.2", "recbole>=1.2.0", "fuxictr>=2.3.0", "kmeans-pytorch", "numba", "scipy"]
-gpu = ["torch>=2.2", "recbole>=1.2.0", "fuxictr>=2.3.0", "kmeans-pytorch", "numba", "scipy"]
-dev = ["pytest>=8", "torch>=2.2", "recbole>=1.2.0", "fuxictr>=2.3.0", "kmeans-pytorch", "numba", "scipy"]
-dictionary = ["mkdocs-material>=9"]
+# HTTP API that serves precomputed recommendation bundles.
+serve = ["fastapi>=0.115", "uvicorn>=0.30", "jinja2>=3.1"]
+# Data pipeline, evaluation, tracking, and the non-neural baselines.
+bench = [
+  "recbench[serve]",
+  "duckdb>=1.1",
+  "mlflow>=2.14,<3",
+  "httpx>=0.27",
+  "kaggle>=1.6",
+  "scipy>=1.11",
+  "psutil>=5.9",
+  "implicit==0.7.3",
+  "Pillow>=10",
+]
+# Neural methods. cpu and gpu are the same set; torch picks the device at run time.
+cpu = ["recbench[bench]", "torch>=2.2", "recbole>=1.2.0,<1.3", "fuxictr>=2.3.0"]
+gpu = ["recbench[bench]", "torch>=2.2", "recbole>=1.2.0,<1.3", "fuxictr>=2.3.0"]
+# Managed recommendation services.
+managed = ["recombee-api-client==6.3.1"]
+# Documentation site. Material for MkDocs 9.x does not support MkDocs 2.
+docs = ["mkdocs>=1.6,<2", "mkdocs-material>=9.7,<10"]
+dev = ["recbench[cpu,managed,docs]", "pytest>=8"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -37,3 +51,7 @@ recbench = ["dashboard/templates/*.html"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+markers = [
+  "live: calls a real external service; needs credentials (deselected unless RECBENCH_LIVE=1)",
+  "slow: takes more than a few seconds",
+]

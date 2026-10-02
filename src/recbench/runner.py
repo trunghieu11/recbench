@@ -1,238 +1,294 @@
-"""Fit methods, score the shared candidate file, and log to MLflow."""
+"""Fit and evaluate (dataset x method) pairs and log everything to MLflow.
+
+Each pair runs in its own child process by default, so that:
+- peak memory is measured per method (not accumulated across methods),
+- one crashing or hanging method cannot take down the whole benchmark (timeout),
+- GPU memory is released between methods.
+
+Usage:
+    python -m recbench.runner --config configs/benchmarks/smoke-cpu.yaml
+    python -m recbench.runner --config ... --datasets movielens-25m --methods ease,itemknn
+"""
 
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import resource
+import subprocess
 import sys
+import tempfile
 import time
 import traceback
 from pathlib import Path
 from typing import Any
 
-import mlflow
-import pyarrow.parquet as pq
+import numpy as np
 
-from recbench.config import load_yaml, resolve_run_config
-from recbench.metrics.catalog import item_counts, user_categories
-from recbench.protocol import PROTOCOL_NOTE, Task, Unsupported
+from recbench.config import config_hash, load_yaml, method_config, resolve_run_config
+from recbench.data import SplitError, TrainView
+from recbench.protocol import PROTOCOL_NOTE, PROTOCOL_VERSION, Unsupported
 from recbench.registry import ensure_loaded
-from recbench.store import SplitStore
+
+EXPERIMENT = "recbench"
 
 
-def _rss_mb() -> float:
-    usage = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-    if sys.platform == "darwin":
-        return usage / (1024 * 1024)
-    return usage / 1024
+def repo_root() -> Path:
+    return Path(os.environ.get("RECBENCH_ROOT", Path.cwd())).resolve()
 
 
-def _tracking_uri() -> str:
-    return os.environ.get("MLFLOW_TRACKING_URI", "file:./runs/mlflow")
+def tracking_uri() -> str:
+    """MLflow store: $MLFLOW_TRACKING_URI, else an absolute file store under runs/mlflow."""
+    uri = os.environ.get("MLFLOW_TRACKING_URI")
+    if uri:
+        if uri.startswith("file:") and not uri.startswith("file:///"):
+            return (repo_root() / uri[len("file:") :]).resolve().as_uri()
+        return uri
+    return (repo_root() / "runs" / "mlflow").resolve().as_uri()
 
 
-def _finished(dataset: str, method: str, tier: str, preset: str, max_steps: int) -> bool:
-    experiment = mlflow.get_experiment_by_name("recbench")
+def data_root() -> Path:
+    return Path(os.environ.get("DATA_DIR", repo_root() / "data")).resolve()
+
+
+def _mlflow():
+    import mlflow
+
+    mlflow.set_tracking_uri(tracking_uri())
+    mlflow.set_experiment(EXPERIMENT)
+    return mlflow
+
+
+def already_finished(dataset: str, method: str, run_hash: str) -> bool:
+    mlflow = _mlflow()
+    experiment = mlflow.get_experiment_by_name(EXPERIMENT)
     if experiment is None:
         return False
     frame = mlflow.search_runs(
         experiment_ids=[experiment.experiment_id],
         filter_string=(
-            f"tags.dataset = '{dataset}' and tags.method = '{method}' and tags.tier = '{tier}' "
-            f"and tags.preset = '{preset}' and tags.max_steps = '{max_steps}' and tags.status = 'finished'"
+            f"tags.dataset = '{dataset}' and tags.method = '{method}' "
+            f"and tags.config_hash = '{run_hash}' and tags.status = 'finished'"
         ),
+        max_results=1,
     )
     return not frame.empty
 
 
-def run_pair(store: SplitStore, method_name: str, resolved: dict[str, Any], resume: bool) -> str:
+def _peak_rss_mb() -> float:
+    usage = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    return usage / (1024 * 1024) if sys.platform == "darwin" else usage / 1024
+
+
+def _peak_gpu_mb() -> float:
+    if "torch" not in sys.modules:
+        return 0.0
+    import torch
+
+    if torch.cuda.is_available():
+        return torch.cuda.max_memory_allocated() / (1024 * 1024)
+    return 0.0
+
+
+def _seed_everything(seed: int) -> None:
+    np.random.seed(seed)
+    if "torch" in sys.modules:
+        import torch
+
+        torch.manual_seed(seed)
+
+
+def run_single(split_dir: Path, method_name: str, resolved: dict[str, Any]) -> dict[str, Any]:
+    """Fit + evaluate one pair in THIS process and log it. Returns a status record."""
+    from recbench.evaluation import EvalSplit, Evaluator, save_result
+
     reg = ensure_loaded()
     method = reg.create_method(method_name)
-    tier = resolved["tier"]
-    preset = resolved["preset"]
-    rankable = tier == "full" and not method.spec.managed
-    if method.spec.managed and not resolved.get("managed_services", False):
-        return _log_status(store, method_name, resolved, "skipped", rankable=False, reason="managed services off")
-    if method.spec.requires_images and not store.images_available():
-        return _log_status(store, method_name, resolved, "unsupported", rankable=False, reason="no images")
-    if resume and _finished(store.dataset, method_name, tier, preset, resolved["max_steps"]):
-        return "skipped_existing"
-    mlflow.set_tracking_uri(_tracking_uri())
-    mlflow.set_experiment("recbench")
-    with mlflow.start_run(run_name=f"{store.dataset}-{method_name}-{tier}-{preset}"):
-        mlflow.set_tags(
-            {
-                "dataset": store.dataset,
-                "method": method_name,
-                "tier": tier,
-                "preset": preset,
-                "max_steps": str(resolved["max_steps"]),
-                "hardware": resolved["hardware_name"],
-                "status": "running",
-                "rankable": str(rankable).lower(),
-                "managed": str(method.spec.managed).lower(),
-                "protocol": PROTOCOL_NOTE,
-            }
-        )
-        mlflow.log_params(
-            {
-                "model_config": resolved["model_config"],
-                "dim": resolved["dim"],
-                "layers": resolved["layers"],
-                "seq_len": resolved["seq_len"],
-                "batch_size": resolved["batch_size"],
-                "n_negatives": store.meta.get("n_negatives", 100),
-                "split_mode": store.meta.get("split_mode", ""),
-            }
-        )
+    data = TrainView(split_dir)
+    cfg = method_config(resolved, method_name)
+    run_hash = config_hash(cfg, method_name, data.split_hash)
+    tags = {
+        "dataset": data.dataset,
+        "method": method_name,
+        "tier": data.tier,
+        "preset": str(resolved.get("preset")),
+        "hardware": str(resolved.get("hardware_name")),
+        "protocol_version": PROTOCOL_VERSION,
+        "config_hash": run_hash,
+        "split_hash": data.split_hash,
+        "managed": str(method.spec.managed).lower(),
+        "ranked": str(method.spec.ranked).lower(),
+        "fidelity": method.spec.fidelity,
+        "tasks": ",".join(sorted(t.value for t in method.spec.tasks)),
+        "protocol": PROTOCOL_NOTE,
+    }
+    skip = _skip_reason(method, data, resolved)
+    mlflow = _mlflow()
+    with mlflow.start_run(run_name=f"{data.dataset}-{method_name}-{data.tier}"):
+        mlflow.set_tags({**tags, "status": "running"})
+        mlflow.log_params({k: v for k, v in cfg.items() if isinstance(v, (int, float, str, bool))})
+        if skip:
+            mlflow.set_tags({"status": "unsupported", "reason": skip})
+            return {"status": "unsupported", "reason": skip}
         try:
-            started = time.perf_counter()
-            method.fit(store, resolved)
-            train_s = time.perf_counter() - started
-            candidates = pq.read_table(store.candidates_path).to_pandas()
-            users = candidates["user_idx"].drop_duplicates().head(1000)
-            subset = candidates[candidates["user_idx"].isin(set(users))]
-            infer_started = time.perf_counter()
-            scored_subset = method.score_candidates(store, subset) if method.spec.can_score_candidates else None
-            infer_s = time.perf_counter() - infer_started
-            if scored_subset is not None and len(users) < candidates["user_idx"].nunique():
-                scored = method.score_candidates(store, candidates)
-            else:
-                scored = scored_subset
-            context = _context(store, method, scored, train_s, infer_s)
-            metrics = _evaluate(method, scored, store, context)
-            mlflow.log_metrics({key: value for key, value in metrics.items() if value is not None})
-            artifact = store.root.parent.parent.parent / "artifacts" / store.dataset / tier / preset
-            artifact.mkdir(parents=True, exist_ok=True)
-            ckpt = artifact / f"{method_name}.pt"
-            try:
-                method.save(str(ckpt))
-                if ckpt.exists() and ckpt.stat().st_size > 0:
-                    mlflow.log_artifact(str(ckpt))
-            except NotImplementedError:
-                pass
+            _seed_everything(int(cfg.get("seed", 42)))
+            began = time.perf_counter()
+            method.fit(data, cfg)
+            train_seconds = time.perf_counter() - began
+            for key, value in (getattr(method, "fit_info", None) or {}).items():
+                mlflow.log_param(f"fit.{key}", value)
+            split = EvalSplit(split_dir)
+            result = Evaluator(split, data, cfg).run(method, extra={"train_seconds": train_seconds})
+            result.metrics["peak_rss_mb"] = _peak_rss_mb()
+            result.metrics["peak_gpu_mb"] = _peak_gpu_mb()
+            finish = getattr(method, "finish", None)
+            if callable(finish):  # managed services report live latency and request usage
+                result.metrics.update(finish())
+            mlflow.log_metrics({k: v for k, v in result.metrics.items() if np.isfinite(v)})
+            with tempfile.TemporaryDirectory() as tmp:
+                for path in save_result(result, Path(tmp)):
+                    mlflow.log_artifact(str(path))
+            if resolved.get("export_bundles") and method.spec.ranked and not method.spec.managed:
+                bundle = _export_bundle(method, data, split, cfg)
+                if bundle is not None:
+                    mlflow.set_tag("bundle", str(bundle))
             mlflow.set_tag("status", "finished")
-            return "finished"
+            return {"status": "finished", "metrics": {k: result.metrics[k] for k in ("ndcg_at_10", "recall_at_10") if k in result.metrics}}
         except Unsupported as exc:
-            mlflow.set_tag("status", "unsupported")
-            mlflow.set_tag("reason", str(exc))
-            return "unsupported"
-        except Exception as exc:  # noqa: BLE001
-            mlflow.set_tag("status", "failed")
+            mlflow.set_tags({"status": "unsupported", "reason": str(exc)[:500]})
+            return {"status": "unsupported", "reason": str(exc)}
+        except Exception as exc:  # noqa: BLE001 - logged with traceback, then re-raised if asked
+            mlflow.set_tags({"status": "failed", "reason": f"{type(exc).__name__}: {exc}"[:500]})
             mlflow.log_text(traceback.format_exc(), "error.txt")
-            mlflow.set_tag("reason", str(exc))
             if not resolved.get("continue_on_error", True):
                 raise
-            return "failed"
+            return {"status": "failed", "reason": f"{type(exc).__name__}: {exc}"}
 
 
-def _context(store, method, scored, train_s: float, infer_s: float) -> dict[str, Any]:
-    context: dict[str, Any] = {
-        "train_wall_s": train_s,
-        "batch_infer_s": infer_s,
-        "peak_rss_mb": _rss_mb(),
-        "item_counts": item_counts(store),
-        "user_categories": user_categories(store),
-    }
-    if scored is not None and Task.rating in method.spec.tasks:
-        test = pq.read_table(store.test_path).to_pandas()
-        explicit = test[test["feedback_type"] == "explicit"]
-        if not explicit.empty:
-            sample = explicit.head(2000)
-            try:
-                context["rating_pred"] = method.predict_rating(sample)
-                context["rating_truth"] = sample["value"].to_numpy()
-            except Unsupported:
-                pass
-    explanations = []
-    if scored is not None:
-        sample_users = scored["user_idx"].drop_duplicates().head(20)
-        idx_user = store.id_maps()[1]
-        idx_item = store.id_maps()[3]
-        for user in sample_users:
-            item = int(scored[scored["user_idx"] == user].iloc[0]["item_idx"])
-            local = method.explain_local(idx_user.get(int(user), str(user)), [idx_item.get(item, str(item))])
-            explanations.append(bool(local and local[0].text))
-    context["explanation_coverage"] = float(np_mean(explanations))
-    return context
+def _skip_reason(method, data: TrainView, resolved: dict[str, Any]) -> str | None:
+    spec = method.spec
+    if spec.managed and not resolved.get("managed_services", False):
+        return "managed services are off in this config"
+    if spec.requires_images and not any(path and Path(path).is_file() for path in data.item_image_path[1:200]):
+        return "no item images on disk"
+    if spec.requires_side_features and not (any(data.item_text[1:]) or any(data.item_category[1:])):
+        return "dataset has no item text or categories"
+    return None
 
 
-def np_mean(values: list[bool]) -> float:
-    if not values:
-        return 0.0
-    return sum(1 for value in values if value) / len(values)
+def _export_bundle(method, data: TrainView, split, cfg: dict[str, Any]) -> Path | None:
+    try:
+        from recbench.serving.bundle import export_bundle
+    except ImportError:
+        return None
+    out = data_root() / "bundles" / data.dataset / data.tier / method.spec.name
+    return export_bundle(method, data, out, k=int(cfg.get("bundle_k", 100)), max_users=int(cfg.get("bundle_users", 20_000)))
 
 
-def _evaluate(method, scored, store, context) -> dict[str, float]:
-    reg = ensure_loaded()
-    found: dict[str, float] = {}
-    if scored is None:
-        return found
-    for metric_cls in reg.metrics.values():
-        metric = metric_cls()
-        if metric.spec.name in {"rmse", "mae"} and Task.rating not in method.spec.tasks:
-            continue
-        try:
-            value = metric.compute(scored, store, context)
-        except Exception:
-            value = None
-        if value is not None:
-            found[metric.spec.name] = float(value)
-    return found
+def run_pair(split_dir: Path, method_name: str, resolved: dict[str, Any], *, isolate: bool = True) -> dict[str, Any]:
+    """Run one pair, by default in a child process with a timeout."""
+    data = TrainView(split_dir)
+    run_hash = config_hash(method_config(resolved, method_name), method_name, data.split_hash)
+    if resolved.get("resume", True) and already_finished(data.dataset, method_name, run_hash):
+        return {"status": "skipped_existing"}
+    if not isolate:
+        return run_single(split_dir, method_name, resolved)
+    with tempfile.TemporaryDirectory() as tmp:
+        cfg_path = Path(tmp) / "resolved.json"
+        out_path = Path(tmp) / "result.json"
+        cfg_path.write_text(json.dumps(resolved))
+        command = [sys.executable, "-m", "recbench.runner", "--single", str(split_dir), method_name, str(cfg_path), str(out_path)]
+        env = {**os.environ, "MLFLOW_TRACKING_URI": tracking_uri(), "RECBENCH_ROOT": str(repo_root())}
+        limit = float(resolved.get("timeout_minutes", 240)) * 60
+        proc = subprocess.Popen(command, env=env)
+        began = time.time()  # wall clock: keeps counting while a laptop sleeps (time.monotonic does not on macOS)
+        while proc.poll() is None:
+            if time.time() - began > limit:
+                proc.kill()
+                proc.wait()
+                _log_outcome(data, method_name, run_hash, "timeout", f"exceeded {resolved.get('timeout_minutes')} minutes (wall clock)")
+                return {"status": "timeout"}
+            time.sleep(1.0)
+        if out_path.exists():
+            return json.loads(out_path.read_text())
+        reason = f"child process exited with code {proc.returncode} before reporting a result"
+        _log_outcome(data, method_name, run_hash, "failed", reason)
+        return {"status": "failed", "reason": reason}
 
 
-def _log_status(store, method_name, resolved, status: str, rankable: bool, reason: str) -> str:
-    mlflow.set_tracking_uri(_tracking_uri())
-    mlflow.set_experiment("recbench")
-    with mlflow.start_run(run_name=f"{store.dataset}-{method_name}-{resolved['tier']}-{status}"):
+def _log_outcome(data: TrainView, method_name: str, run_hash: str, status: str, reason: str) -> None:
+    """Record a run that ended without the child logging it (timeout, crash, out-of-memory kill)."""
+    mlflow = _mlflow()
+    experiment = mlflow.get_experiment_by_name(EXPERIMENT)
+    # The child may have opened a run and died mid-way: close it instead of leaving it 'running'.
+    stale = mlflow.search_runs(
+        experiment_ids=[experiment.experiment_id],
+        filter_string=f"tags.config_hash = '{run_hash}' and tags.status = 'running'",
+    )
+    client = mlflow.MlflowClient()
+    for run_id in stale.get("run_id", []):
+        client.set_tag(run_id, "status", status)
+        client.set_tag(run_id, "reason", reason)
+        client.set_terminated(run_id, status="KILLED" if status == "timeout" else "FAILED")
+    if not stale.empty:
+        return
+    with mlflow.start_run(run_name=f"{data.dataset}-{method_name}-{data.tier}-{status}"):
         mlflow.set_tags(
             {
-                "dataset": store.dataset,
+                "dataset": data.dataset,
                 "method": method_name,
-                "tier": resolved["tier"],
-                "preset": resolved["preset"],
-                "max_steps": str(resolved["max_steps"]),
+                "tier": data.tier,
+                "config_hash": run_hash,
+                "protocol_version": PROTOCOL_VERSION,
                 "status": status,
-                "rankable": str(rankable).lower(),
                 "reason": reason,
             }
         )
-    return status
 
 
-def run_matrix(config_path: Path, datasets: list[str], methods: list[str], preset: str | None, repo_root: Path) -> None:
-    benchmark = load_yaml(config_path)
-    resolved = resolve_run_config(benchmark, preset=preset, repo_root=repo_root)
-    root = Path(os.environ.get("DATA_DIR", repo_root / "data"))
+def run_matrix(config_path: Path, datasets: list[str], methods: list[str], preset: str | None) -> list[dict[str, Any]]:
+    resolved = resolve_run_config(load_yaml(config_path), preset=preset, repo_root=repo_root())
     reg = ensure_loaded()
-    chosen_methods = methods or resolved["methods"]
-    for dataset in datasets:
-        split = root / "splits" / dataset / resolved["tier"]
-        if not (split / "meta.json").exists():
-            print(f"missing split for {dataset}, skipping")
+    results = []
+    for dataset in datasets or resolved["datasets"]:
+        split_dir = data_root() / "splits" / dataset / resolved["tier"]
+        try:
+            TrainView(split_dir)
+        except SplitError as exc:
+            print(f"{dataset}: {exc}; skipping")
             continue
-        store = SplitStore(split, dataset, resolved["tier"])
-        for method_name in chosen_methods:
+        for method_name in methods or resolved["methods"]:
             if method_name not in reg.methods:
-                print(f"unknown method {method_name}")
+                print(f"unknown method {method_name}; registered: {sorted(reg.methods)}")
                 continue
-            status = run_pair(store, method_name, resolved, resolved["resume"])
-            print(f"{dataset} {method_name}: {status}")
+            began = time.perf_counter()
+            outcome = run_pair(split_dir, method_name, resolved)
+            outcome.update({"dataset": dataset, "method": method_name, "seconds": round(time.perf_counter() - began, 1)})
+            print(json.dumps(outcome))
+            results.append(outcome)
+    return results
 
 
 def main() -> None:
+    if len(sys.argv) > 1 and sys.argv[1] == "--single":
+        split_dir, method_name, cfg_path, out_path = sys.argv[2:6]
+        resolved = json.loads(Path(cfg_path).read_text())
+        outcome = run_single(Path(split_dir), method_name, resolved)
+        Path(out_path).write_text(json.dumps(outcome, default=str))
+        return
     parser = argparse.ArgumentParser(description="Run the recommendation benchmark.")
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--datasets", type=str, default="")
     parser.add_argument("--methods", type=str, default="")
     parser.add_argument("--preset", type=str, default=None)
     args = parser.parse_args()
-    datasets = [part for part in args.datasets.split(",") if part]
-    methods = [part for part in args.methods.split(",") if part]
-    if not datasets:
-        datasets = list(load_yaml(args.config).get("datasets") or [])
-    run_matrix(args.config, datasets, methods, args.preset, Path.cwd())
+    run_matrix(
+        args.config,
+        [d for d in args.datasets.split(",") if d],
+        [m for m in args.methods.split(",") if m],
+        args.preset,
+    )
 
 
 if __name__ == "__main__":

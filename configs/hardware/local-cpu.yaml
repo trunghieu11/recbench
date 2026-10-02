@@ -1,4 +1,6 @@
+# Laptop profile (Apple Silicon / any CPU). Neural models use the small "cpu" preset.
 name: local-cpu
-requires_gpu: false
-model_config: smoke_cpu
-max_steps: 200
+device: cpu
+default_preset: cpu
+overrides:
+  ease_max_items: 20000

@@ -1,4 +1,9 @@
-"""MovieLens-25M. Explicit ratings, genres as categories, title as text."""
+"""MovieLens-25M. Explicit 0.5-5 star ratings used as implicit "this user watched it" events.
+
+Genres are multi-valued ("Action|Comedy"); "|" separates category tokens
+everywhere in recbench. Caveat: MovieLens timestamps record when a rating was
+entered, which is often long after the movie was watched.
+"""
 
 from __future__ import annotations
 
@@ -17,17 +22,17 @@ URL = "https://files.grouplens.org/datasets/movielens/ml-25m.zip"
 
 @register_dataset
 class MovieLens25M:
+    CLEAN_VERSION = "2"
     spec = DatasetSpec(
         name="movielens-25m",
         domain="video",
         feedback={"explicit"},
-        official_split="quantile",
-        description="MovieLens 25M ratings with genres and titles.",
+        split_rule="quantile",
+        description="MovieLens 25M ratings with titles and genres.",
     )
 
     def download(self, raw_dir: Path) -> None:
-        marker = raw_dir / "ml-25m" / "ratings.csv"
-        if marker.exists():
+        if (raw_dir / "ml-25m" / "ratings.csv").exists():
             return
         archive = raw_dir / "ml-25m.zip"
         fetch(URL, archive, timeout=1800)
@@ -42,17 +47,18 @@ class MovieLens25M:
             {
                 "user_id": ratings["userId"].astype(str),
                 "item_id": ratings["movieId"].astype(str),
-                "timestamp": pd.to_datetime(ratings["timestamp"], unit="s", utc=True).dt.tz_localize(None),
+                "timestamp": pd.to_datetime(ratings["timestamp"], unit="s"),
                 "session_id": "",
                 "feedback_type": "explicit",
                 "value": ratings["rating"].astype(float),
             }
         )
+        genres = movies["genres"].fillna("").astype(str).replace("(no genres listed)", "")
         items = pd.DataFrame(
             {
                 "item_id": movies["movieId"].astype(str),
                 "text": movies["title"].fillna("").astype(str),
-                "category": movies["genres"].fillna("").astype(str),
+                "category": genres,
                 "image_path": pd.NA,
             }
         )

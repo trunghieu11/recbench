@@ -1,3 +1,3 @@
-"""Package marker. Call ensure_loaded() before using the registries."""
+"""recbench: a recommendation benchmark and recommender-systems dictionary."""
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"

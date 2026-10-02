@@ -1,0 +1,41 @@
+services:
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.16.2
+    command: >
+      mlflow server --host 0.0.0.0 --port 5000
+      --backend-store-uri sqlite:///mlflow/mlflow.db
+      --default-artifact-root /mlflow/artifacts
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow:/mlflow
+  api:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      DATA_DIR: /data
+      RECBENCH_SERVE_METHODS: xsimgcl,bert4rec,dcnv2,din
+      RECBENCH_TIER: smoke
+      RECBENCH_PRESET: cpu
+    volumes:
+      - ./data:/data
+    depends_on:
+      - mlflow
+  benchmark:
+    profiles: ["bench"]
+    build: .
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      DATA_DIR: /data
+      CUDA_VISIBLE_DEVICES: ""
+    volumes:
+      - ./data:/data
+      - ./configs:/app/configs
+    command: python -m recbench.runner --config configs/benchmarks/smoke-cpu.yaml
+    depends_on:
+      - mlflow
+
+volumes:
+  mlflow:

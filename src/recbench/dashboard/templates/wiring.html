@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block body %}
+<p>Pass or fail only. This page does not rank methods.</p>
+<table>
+  <tr><th>Dataset</th><th>Method</th><th>Status</th></tr>
+  {% for row in rows %}
+  <tr><td>{{ row.dataset }}</td><td>{{ row.method }}</td><td>{{ row.status }}</td></tr>
+  {% endfor %}
+</table>
+{% endblock %}

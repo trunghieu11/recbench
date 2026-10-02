@@ -1,0 +1,186 @@
+methods:
+  xsimgcl:
+    title: XSimGCL
+    summary: Contrastive graph collaborative filtering with noisy embedding views.
+    tasks: [topn, similar_items]
+    requires_images: false
+    cost_band: medium
+    complexity: {implementation: 3, tuning: 3, control: 3, data_hunger: 3, debugging: 3}
+    explainability_rubric: 2
+    upstream: Coder-Yu/SELFRec@5b022942
+    prose: |
+      XSimGCL keeps a user and item embedding, trains with BPR, and adds a noise-contrastive
+      term between two noisy views. Similar items are neighbors in the item embedding.
+      The in-repo trainer applies that objective on sampled edges so the shared candidate
+      file can be scored directly.
+  bert4rec:
+    title: BERT4Rec
+    summary: Bidirectional transformer over the cutoff-truncated item sequence.
+    tasks: [topn, sequential, session]
+    requires_images: false
+    cost_band: medium
+    complexity: {implementation: 4, tuning: 4, control: 3, data_hunger: 4, debugging: 3}
+    explainability_rubric: 3
+    upstream: RecBole 1.2 BERT4Rec
+    prose: |
+      BERT4Rec encodes the items the user touched before the cutoff and scores candidate
+      ids with the last position. Local explanations point at that sequence.
+  s3rec:
+    title: S3-Rec
+    summary: Self-supervised sequential model with an attribute-alignment loss.
+    tasks: [topn, sequential, session]
+    requires_images: false
+    cost_band: medium
+    complexity: {implementation: 4, tuning: 4, control: 3, data_hunger: 4, debugging: 3}
+    explainability_rubric: 3
+    upstream: RecBole 1.2 S3Rec
+    prose: |
+      S3-Rec uses the same sequence encoder as BERT4Rec and adds a loss that pulls the
+      sequence state toward the target item embedding, standing in for the paper's
+      attribute objectives. It reads category and text columns when they exist.
+  dcnv2:
+    title: DCN-V2
+    summary: Cross network plus a deep tower for CTR and rating.
+    tasks: [topn, ctr, rating]
+    requires_images: false
+    cost_band: medium
+    complexity: {implementation: 3, tuning: 3, control: 4, data_hunger: 3, debugging: 3}
+    explainability_rubric: 4
+    upstream: FuxiCTR 2.3 CrossNetV2
+    prose: |
+      DCN-V2 crosses user and item embeddings and trains with binary cross-entropy on the
+      shared candidate file, so AUC uses the same negatives as every other CTR model.
+      The local reason names the crossed user-item features.
+  din:
+    title: DIN
+    summary: Target attention over the user's behavior sequence.
+    tasks: [topn, ctr, rating, sequential]
+    requires_images: false
+    cost_band: medium
+    complexity: {implementation: 4, tuning: 3, control: 3, data_hunger: 4, debugging: 3}
+    explainability_rubric: 4
+    upstream: RecBole 1.2 DIN
+    prose: |
+      DIN scores a candidate by attending over the cutoff-truncated history. The attention
+      weights are the local explanation. It trains on the shared candidate labels.
+  multimodal_tower:
+    title: Multimodal two-tower
+    summary: User tower against text and image features. H&M only, unless image_path is filled.
+    tasks: [topn, similar_items]
+    requires_images: true
+    cost_band: medium
+    complexity: {implementation: 4, tuning: 3, control: 3, data_hunger: 4, debugging: 3}
+    explainability_rubric: 3
+    upstream: in-repo two-tower
+    prose: |
+      The item tower mixes a hashed text vector with the mean color of the article image.
+      On the smoke tier, H&M articles in the slice get a tiny generated image when the
+      Kaggle image archive is not on disk. Other datasets stay unsupported.
+  tiger:
+    title: TIGER
+    summary: Residual-quantized item codes and a score for every candidate id.
+    tasks: [topn, sequential]
+    requires_images: false
+    cost_band: medium
+    complexity: {implementation: 5, tuning: 4, control: 2, data_hunger: 4, debugging: 4}
+    explainability_rubric: 3
+    upstream: TIGER RQ-VAE, author repository unavailable
+    prose: |
+      TIGER quantizes item embeddings with a small residual codebook and scores candidates
+      from a GRU over the cutoff-truncated history. The semantic-id path is the local reason.
+      Smoke fits the codebook on the smoke catalog only.
+  hstu:
+    title: HSTU
+    summary: Generative sequential transducer at a configurable width.
+    tasks: [topn, sequential, session]
+    requires_images: false
+    cost_band: medium
+    complexity: {implementation: 5, tuning: 5, control: 2, data_hunger: 5, debugging: 4}
+    explainability_rubric: 3
+    upstream: facebookresearch/generative-recommenders@ea7b85f
+    prose: |
+      This is the HSTU block (SiLU attention, gated values), not Meta's production-scale
+      model. Depth, width, and sequence length come from the CPU, 24 GB, or 48 GB preset,
+      and training stops at that preset's step budget.
+  generative_llm:
+    title: Generative LLM
+    summary: Text scorer that ranks candidate ids. GPU preset names a 7B QLoRA backbone.
+    tasks: [topn, sequential, rating]
+    requires_images: false
+    cost_band: medium
+    complexity: {implementation: 5, tuning: 5, control: 2, data_hunger: 4, debugging: 4}
+    explainability_rubric: 5
+    upstream: P5 / TALLRec
+    prose: |
+      Smoke runs a hashed text tower so every candidate id gets a score and a short reason.
+      The GPU config records Qwen2.5-7B-Instruct with 4-bit QLoRA. A text-only model that
+      cannot score the candidate file would be left out of the sort; this one can score.
+  personalize:
+    title: Amazon Personalize
+    summary: Managed campaign. One budgeted smoke, off the full-tier board.
+    tasks: [topn]
+    requires_images: false
+    cost_band: high
+    managed: true
+    complexity: {implementation: 2, tuning: 2, control: 2, data_hunger: 2, debugging: 2}
+    explainability_rubric: 1
+    upstream: Amazon Personalize
+    prose: |
+      Needs AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and RECBENCH_PERSONALIZE_CAMPAIGN_ARN.
+      Without those, the run is skipped. Results are not sorted with the full-tier GPU runs.
+  recombee:
+    title: Recombee
+    summary: Third-party recommendation API. One budgeted smoke.
+    tasks: [topn]
+    requires_images: false
+    cost_band: high
+    managed: true
+    complexity: {implementation: 2, tuning: 2, control: 2, data_hunger: 2, debugging: 2}
+    explainability_rubric: 1
+    upstream: Recombee
+    prose: |
+      Needs RECBENCH_RECOMBEE_DATABASE_ID and RECBENCH_RECOMBEE_TOKEN. A free-tier call is
+      enough for one smoke. Full-tier configs leave managed services off.
+  vertex_commerce:
+    title: Vertex AI Search for commerce
+    summary: Optional adapter. A live call is not required for v1.
+    tasks: [topn]
+    requires_images: false
+    cost_band: high
+    managed: true
+    complexity: {implementation: 3, tuning: 3, control: 2, data_hunger: 3, debugging: 3}
+    explainability_rubric: 1
+    upstream: Vertex AI Search for commerce
+    prose: |
+      The dictionary page and the adapter exist. A live smoke runs only when
+      RECBENCH_VERTEX_PROJECT and RECBENCH_VERTEX_PLACEMENT are already set. v1 does not wait on it.
+
+datasets:
+  movielens-25m:
+    title: MovieLens-25M
+    domain: video
+    summary: Explicit movie ratings, titles, and genres.
+    prose: GroupLens MovieLens 25M. The split is an 80/10/10 global time cut.
+  retailrocket:
+    title: Retailrocket
+    domain: ecommerce
+    summary: Session clickstream of views, carts, and transactions.
+    prose: Retailrocket events. Sessions are assigned with a 30-minute gap. Amazon Reviews is not in this benchmark.
+  hm:
+    title: H&M Personalized Fashion Recommendations
+    domain: ecommerce
+    summary: Fashion purchases, article text, customer attributes, and images.
+    prose: |
+      Full tier holds out the last 7 days of the public transactions file (2020-09-16 through
+      2020-09-22). Smoke and standard tiers use the quantile split on the capped slice and
+      write a tiny image per article in that slice when the Kaggle image archive is absent.
+  lastfm:
+    title: Last.fm 1K
+    domain: music
+    summary: Listening events. Item text is the artist name.
+    prose: Celma's Last.fm 1K dump. HetRec is not joined, because the artist ids do not match.
+  steam:
+    title: Steam
+    domain: games
+    summary: UCSD McAuley Steam playtime and review text.
+    prose: If the download URL fails, prepare records Steam as unavailable and the other datasets still train.

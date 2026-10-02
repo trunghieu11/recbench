@@ -1,0 +1,4 @@
+name: local-cpu
+requires_gpu: false
+model_config: smoke_cpu
+max_steps: 200

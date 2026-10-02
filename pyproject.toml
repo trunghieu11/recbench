@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "recbench"
+version = "0.1.0"
+description = "Registry-driven recommendation benchmark and dictionary."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "numpy>=1.26",
+  "pandas>=2.2",
+  "pyarrow>=15",
+  "duckdb>=1.1",
+  "pyyaml>=6",
+  "mlflow>=2.14,<3",
+  "fastapi>=0.115",
+  "uvicorn>=0.30",
+  "jinja2>=3.1",
+  "httpx>=0.27",
+  "kaggle>=1.6",
+]
+
+[project.optional-dependencies]
+cpu = ["torch>=2.2", "recbole>=1.2.0", "fuxictr>=2.3.0", "kmeans-pytorch", "numba", "scipy"]
+gpu = ["torch>=2.2", "recbole>=1.2.0", "fuxictr>=2.3.0", "kmeans-pytorch", "numba", "scipy"]
+dev = ["pytest>=8", "torch>=2.2", "recbole>=1.2.0", "fuxictr>=2.3.0", "kmeans-pytorch", "numba", "scipy"]
+dictionary = ["mkdocs-material>=9"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+recbench = ["dashboard/templates/*.html"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

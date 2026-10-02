@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block body %}
+<p>Full tier only. One task at a time. Smoke runs are not sorted here.</p>
+<p>
+  {% for task in tasks %}
+    <a href="/dashboard/{{ task }}">{{ task }}</a>
+  {% endfor %}
+</p>
+<h2>{{ task }}</h2>
+<table>
+  <tr><th>Dataset</th><th>Method</th><th>{{ metric }}</th><th>Preset</th><th>Steps</th><th>Sanity Recall@10</th></tr>
+  {% for row in rows %}
+  <tr>
+    <td>{{ row.dataset }}</td>
+    <td>{{ row.method }}</td>
+    <td>{{ row.value }}</td>
+    <td>{{ row.preset }}</td>
+    <td>{{ row.steps }}</td>
+    <td>{{ row.sanity }} (not ranked)</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

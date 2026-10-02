@@ -1,0 +1,37 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: recbench
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "1"
+    spec:
+      containerConcurrency: 4
+      containers:
+        - image: recbench
+          ports:
+            - containerPort: 8000
+          resources:
+            limits:
+              memory: 2Gi
+          env:
+            - name: RECBENCH_SERVE_METHODS
+              value: xsimgcl,bert4rec,dcnv2,din
+            - name: RECBENCH_TIER
+              value: smoke
+            - name: RECBENCH_PRESET
+              value: cpu
+            - name: DATA_DIR
+              value: /artifacts
+          volumeMounts:
+            - name: artifacts
+              mountPath: /artifacts
+      volumes:
+        - name: artifacts
+          csi:
+            driver: gcsfuse.run.googleapis.com
+            volumeAttributes:
+              bucketName: REPLACE_WITH_BUCKET

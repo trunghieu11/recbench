@@ -1,0 +1,22 @@
+tier: smoke
+hardware: configs/hardware/local-cpu.yaml
+resume: true
+continue_on_error: true
+managed_services: false
+datasets:
+  - movielens-25m
+  - retailrocket
+  - hm
+  - lastfm
+  - steam
+methods:
+  - xsimgcl
+  - bert4rec
+  - s3rec
+  - dcnv2
+  - din
+  - multimodal_tower
+  - tiger
+  - hstu
+  - generative_llm
+metrics: all

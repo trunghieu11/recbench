@@ -1,0 +1,13 @@
+tier: smoke
+hardware: configs/hardware/local-cpu.yaml
+max_steps: 20
+resume: false
+continue_on_error: true
+managed_services: true
+datasets:
+  - movielens-25m
+methods:
+  - personalize
+  - recombee
+  - vertex_commerce
+metrics: all

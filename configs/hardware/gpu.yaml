@@ -1,0 +1,10 @@
+name: gpu
+requires_gpu: true
+model_config: gpu_full
+presets:
+  24gb:
+    min_vram_gb: 24
+    max_steps: 10000
+  48gb:
+    min_vram_gb: 48
+    max_steps: 30000

@@ -17,4 +17,5 @@
 
 | Tier | Users | Items | Pre-test events | Test events | Warm eval users | Cold test users | Repeat share | Test starts (UTC) |
 |---|---|---|---|---|---|---|---|---|
+| full | 2,567,538 | 15,474 | 7,011,186 | 781,883 | 10,000 | 234,775 | 1.3% | 2017-10-17 00:00:00 |
 | smoke | 8,454 | 5,543 | 41,978 | 7,693 | 3,896 | 450 | 2.1% | 2017-10-17 00:00:00 |

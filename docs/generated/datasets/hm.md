@@ -17,4 +17,5 @@
 
 | Tier | Users | Items | Pre-test events | Test events | Warm eval users | Cold test users | Repeat share | Test starts (UTC) |
 |---|---|---|---|---|---|---|---|---|
+| full | 1,362,281 | 104,547 | 31,548,013 | 240,311 | 10,000 | 5,572 | 3.9% | 2020-09-16 00:00:00 |
 | smoke | 1,088 | 22,666 | 47,809 | 2,063 | 577 | 3 | 4.4% | 2020-09-16 00:00:00 |

@@ -176,6 +176,7 @@ nav:
       - Security: cloud/security.md
   - Results:
       - Leaderboards: results/leaderboards.md
+      - Smoke-tier leaderboards: results/leaderboards-smoke.md
       - How to read results: results/how-to-read-results.md
       - Decision guide: results/decision-guide.md
       - Known limitations: results/known-limitations.md

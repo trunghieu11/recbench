@@ -128,7 +128,7 @@ def _seed_everything(seed: int) -> None:
 
 def run_single(split_dir: Path, method_name: str, resolved: dict[str, Any]) -> dict[str, Any]:
     """Fit + evaluate one pair in THIS process and log it. Returns a status record."""
-    from recbench.evaluation import EvalSplit, Evaluator, save_result
+    from recbench.evaluation import EvalSplit, Evaluator, ValidationMonitor, save_result
 
     reg = ensure_loaded()
     method = reg.create_method(method_name)
@@ -169,14 +169,21 @@ def run_single(split_dir: Path, method_name: str, resolved: dict[str, Any]) -> d
             return {"status": "unsupported", "reason": skip}
         try:
             _seed_everything(int(cfg.get("seed", 42)))
+            split = EvalSplit(split_dir)
+            # Early stopping may look at a validation fold only (ValidationMonitor refuses test splits).
+            if split.meta.get("fold") == "valid" and cfg.get("early_stopping", True) and not cfg.get("epochs"):
+                method.monitor = ValidationMonitor(split, data, cfg)
             # The training window only changes what the method learns from; the evaluator keeps the full history.
             fit_data = data.restrict(cfg.get("train_window_days"), int(cfg.get("train_window_keep_last", 10)))
             began = time.perf_counter()
             method.fit(fit_data, cfg)
             train_seconds = time.perf_counter() - began
-            for key, value in (getattr(method, "fit_info", None) or {}).items():
-                mlflow.log_param(f"fit.{key}", value)
-            split = EvalSplit(split_dir)
+            fit_info = getattr(method, "fit_info", None) or {}
+            for key, value in fit_info.items():
+                if isinstance(value, (int, float, str, bool)) or value is None:
+                    mlflow.log_param(f"fit.{key}", value)
+            for point in getattr(method, "fit_curve", None) or []:  # learning curves, one point per epoch
+                mlflow.log_metrics({f"curve/{k}": float(v) for k, v in point.items() if k != "epoch" and v == v}, step=int(point["epoch"]))
             result = Evaluator(split, data, cfg).run(method, extra={"train_seconds": train_seconds})
             result.metrics["peak_rss_mb"] = _peak_rss_mb()
             result.metrics["peak_gpu_mb"] = _peak_gpu_mb()
@@ -192,7 +199,9 @@ def run_single(split_dir: Path, method_name: str, resolved: dict[str, Any]) -> d
                 if bundle is not None:
                     mlflow.set_tag("bundle", str(bundle))
             mlflow.set_tag("status", "finished")
-            return {"status": "finished", "metrics": {k: result.metrics[k] for k in ("ndcg_at_10", "recall_at_10") if k in result.metrics}}
+            summary = {k: result.metrics[k] for k in ("ndcg_at_10", "recall_at_10") if k in result.metrics}
+            return {"status": "finished", "metrics": summary, "train_seconds": train_seconds,
+                    "fit": {k: v for k, v in fit_info.items() if isinstance(v, (int, float, str, bool))}}
         except Unsupported as exc:
             mlflow.set_tags({"status": "unsupported", "reason": str(exc)[:500]})
             return {"status": "unsupported", "reason": str(exc)}

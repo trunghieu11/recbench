@@ -15,7 +15,7 @@ import torch
 from torch import nn
 
 from recbench.data import HistoryBatch, TrainView
-from recbench.methods._torch import EmbeddingRecommender, resolve_device, train_steps
+from recbench.methods._torch import EmbeddingRecommender, resolve_device, steps_per_epoch, train_epochs
 from recbench.methods.seq_trainer import next_item_loss, sequence_windows, to_tensor
 from recbench.protocol import MethodSpec, Task
 from recbench.registry import register_method
@@ -68,6 +68,7 @@ class SASRec(EmbeddingRecommender):
         needs_torch=True,
         upstream="in-repo PyTorch, following Kang & McAuley 2018 with full cross-entropy (Klenitskiy & Vasilev 2023)",
         cost_band="medium",
+        impl_version="2",  # epochs with early stopping, bf16, loss setting
     )
 
     def fit(self, data: TrainView, cfg: dict[str, Any]) -> None:
@@ -82,13 +83,17 @@ class SASRec(EmbeddingRecommender):
             self.seq_len,
             float(cfg.get("dropout", 0.2)),
         ).to(self.device)
-        windows = sequence_windows(data, self.seq_len, int(cfg.get("batch_size", 128)), int(cfg.get("seed", 42)))
+        batch_size = int(cfg.get("batch_size", 128))
+        windows = sequence_windows(data, self.seq_len, batch_size, int(cfg.get("seed", 42)))
+        mode, n_neg = str(cfg.get("sasrec_loss", "auto")), int(cfg.get("n_negatives", 1024))
 
         def loss(batch):
             hidden = self.net(to_tensor(batch["inputs"], self.device))
-            return next_item_loss(hidden, self.net.item.weight, to_tensor(batch["targets"], self.device))
+            return next_item_loss(hidden, self.net.item.weight, to_tensor(batch["targets"], self.device), mode=mode, n_negatives=n_neg)
 
-        self.fit_info = train_steps(self.net, windows, loss, cfg)
+        # One epoch = on average one window per user with at least two events.
+        per_epoch = steps_per_epoch(int((data.user_lengths >= 2).sum()), batch_size)
+        self.fit_info = train_epochs(self.net, windows, per_epoch, loss, cfg, owner=self)
 
     @torch.no_grad()
     def user_vectors(self, users: np.ndarray, hist: HistoryBatch) -> torch.Tensor:

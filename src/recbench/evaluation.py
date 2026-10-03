@@ -31,6 +31,7 @@ from recbench.registry import ensure_loaded
 CI_METRICS = ("ndcg_at_10", "recall_at_10", "hitrate_at_10", "next_ndcg_at_10")
 N_BOOTSTRAP = 1000
 N_EXPLAIN_USERS = 50
+N_MONITOR_USERS = 1000
 
 
 class EvalSplit:
@@ -302,6 +303,15 @@ class Evaluator:
             if name in per_user:
                 low, high = bootstrap_ci(per_user[name])
                 metrics[f"{name}_ci_low"], metrics[f"{name}_ci_high"] = low, high
+        candidates_for = getattr(method, "candidate_sets", None)
+        if callable(candidates_for):  # two-stage methods: how many relevant items could the re-ranker reach at all?
+            recall = candidate_recall(candidates_for(users), self.split.relevant(users, self.split.primary))
+            per_user["candidate_recall"] = recall
+            metrics["candidate_recall"] = float(np.nanmean(recall))
+        # Row i of every per-user array belongs to user_idx[i]; sampled_* arrays cover sampled_user_idx only.
+        per_user["user_idx"] = users.astype(np.int64)
+        if info["cand_valid"].any():
+            per_user["sampled_user_idx"] = users[info["cand_valid"]].astype(np.int64)
         if method.spec.handles_cold_users:
             metrics.update(self._cold_users(method))
         metrics["n_eval_users"] = float(len(users))
@@ -344,6 +354,57 @@ class Evaluator:
                 if len(records) < 30:
                     records.append({"user_id": self.data.user_ids[user], "item_id": self.data.item_ids[item], **exp.as_dict()})
         return records, (personal / total if total else None)
+
+
+def candidate_recall(candidates: list[np.ndarray] | np.ndarray, relevant: list[np.ndarray]) -> np.ndarray:
+    """Per user: share of relevant items present in the candidate list (NaN when a user has no relevant item)."""
+    out = np.full(len(relevant), np.nan)
+    for row, (cands, rel) in enumerate(zip(candidates, relevant)):
+        if len(rel):
+            out[row] = np.isin(rel, np.asarray(cands)).mean()
+    return out
+
+
+class ValidationMonitor:
+    """Scores a model DURING training on a fixed sample of a validation fold's users (for early stopping).
+
+    It refuses real test splits: only folds built by materialize(fold="valid") may steer training.
+    """
+
+    def __init__(self, split: EvalSplit, data: TrainView, cfg: dict[str, Any], n_users: int = N_MONITOR_USERS):
+        if split.meta.get("fold") != "valid":
+            raise ValueError("early stopping may only look at a validation fold, never at a test split")
+        users = split.users_of(warm=True)
+        rng = np.random.default_rng(int(cfg.get("seed", 42)) + 1)
+        self.users = np.sort(rng.permutation(users)[:n_users]) if len(users) > n_users else users
+        self.relevant = split.relevant(self.users, split.primary)
+        self.policy = split.primary
+        self.data = data
+        self.seq_len = int(cfg.get("seq_len", 50))
+        self.cold = ~data.warm_item_mask()
+        self.cold[0] = False
+        self.batch = max(1, int(5e7 // (data.n_items + 1)))
+        self.history: list[tuple[int, float]] = []
+
+    def __call__(self, method: Recommender, step: int) -> float:
+        from recbench.metrics.catalog import ndcg
+
+        lists = np.zeros((len(self.users), 10), dtype=np.int64)
+        for start in range(0, len(self.users), self.batch):
+            batch = self.users[start : start + self.batch]
+            scores = method.full_scores(batch, self.data.history_batch(batch, self.seq_len))
+            scores[:, 0] = NEG_INF
+            if not method.spec.scores_cold_items:
+                scores[:, self.cold] = NEG_INF
+            if self.policy == "exclude_seen":
+                rows, cols = self.data.seen[batch].nonzero()
+                scores[rows, cols] = NEG_INF
+            items, _ = top_k(scores, 10)
+            lists[start : start + len(batch), : items.shape[1]] = items
+        hits = np.stack([np.isin(row, rel) & (row > 0) for row, rel in zip(lists, self.relevant)])
+        value = float(ndcg(hits, np.array([len(r) for r in self.relevant]), 10).mean())
+        self.history.append((int(step), value))
+        return value
 
 
 def _filter_lists(listed: np.ndarray, mask: np.ndarray, k: int) -> np.ndarray:

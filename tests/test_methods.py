@@ -33,7 +33,7 @@ def test_every_method_fits_and_evaluates(toy, name):
 def test_sequence_models_solve_the_copy_task(copy_split, name, minimum):
     """Every user walks i -> i+1 -> ...; reading the wrong end of the history makes this unsolvable."""
     view, split = TrainView(copy_split), EvalSplit(copy_split)
-    cfg = {**FAST_CFG, "dim": 32, "max_steps": 300, "lr": 5e-3, "batch_size": 64, "dropout": 0.0, "seed": 0}
+    cfg = {**FAST_CFG, "dim": 32, "max_steps": 300, "max_epochs": 80, "lr": 5e-3, "batch_size": 64, "dropout": 0.0, "seed": 0}
     method = ensure_loaded().create_method(name)
     method.fit(view, cfg)
     users = split.users_of(warm=True)

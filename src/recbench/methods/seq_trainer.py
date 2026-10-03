@@ -54,28 +54,42 @@ def sequence_windows(data: TrainView, seq_len: int, batch_size: int, seed: int) 
         }
 
 
+LOSSES = ("auto", "sampled", "bce")
+
+
 def next_item_loss(
     hidden: torch.Tensor,
     item_weight: torch.Tensor,
     targets: torch.Tensor,
     *,
+    mode: str = "auto",
     logits_budget: float = 2.0e8,
     n_negatives: int = 1024,
     generator: torch.Generator | None = None,
 ) -> torch.Tensor:
-    """Cross-entropy for next-item prediction at every non-padding position.
+    """Loss for next-item prediction at every non-padding position.
 
     hidden: [B, L, d], item_weight: [N + 1, d] (row 0 = padding), targets: [B, L] (0 = ignore).
-    Full softmax over the catalog when B * L * N fits the budget, otherwise sampled softmax with
-    `n_negatives` uniformly drawn negatives shared by the whole batch (accidental hits masked).
+    mode="auto": full softmax over the catalog when B * L * N fits the budget, else sampled softmax.
+    mode="sampled": softmax over the target plus `n_negatives` uniform negatives shared by the batch.
+    mode="bce": the original SASRec loss, binary cross-entropy with one random negative per position.
+    Accidental hits (a negative equal to the target) are masked.
     """
+    if mode not in LOSSES:
+        raise ValueError(f"unknown loss {mode}; choose from {LOSSES}")
     mask = targets > 0
     if not mask.any():
         return hidden.sum() * 0.0
     h = hidden[mask]  # [P, d]
     t = targets[mask]  # [P]
     n_items = item_weight.shape[0] - 1
-    if h.shape[0] * (n_items + 1) <= logits_budget:
+    if mode == "bce":
+        negatives = torch.randint(1, n_items + 1, (len(t),), device=h.device, generator=generator)
+        pos = (h * item_weight[t]).sum(-1)
+        neg = (h * item_weight[negatives]).sum(-1)
+        keep = (negatives != t).to(h.dtype)
+        return (F.softplus(-pos) + keep * F.softplus(neg)).mean()
+    if mode == "auto" and h.shape[0] * (n_items + 1) <= logits_budget:
         logits = h @ item_weight.T
         logits[:, 0] = float("-inf")
         return F.cross_entropy(logits, t)

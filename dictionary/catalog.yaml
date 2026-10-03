@@ -307,6 +307,86 @@ methods:
       explainability: [1, "Black box: no reasons returned."]
 
 # Services documented in the dictionary but not benchmarked live (budget, access, or retirement).
+  rp3beta:
+    title: RP3beta
+    family: Graph random walk (item-item)
+    rung: 1
+    year: 2016
+    paper: {title: "Updatable, Accurate, Diverse, and Scalable Recommendations for Interactive Applications", venue: "ACM TiiS 2016", url: "https://doi.org/10.1145/2955101"}
+    code: "https://github.com/MaurizioFD/RecSys2019_DeepLearning_Evaluation"
+    fidelity: faithful
+    summary: Item-to-item scores from two-step random walks (item, user, item), divided by popularity to the power beta. A strong, cheap baseline.
+    rubric:
+      implementation: [2, "Two sparse matrix products and a top-k per item; about 40 lines."]
+      tuning: [2, "alpha, beta, and the number of neighbours."]
+      data_hunger: [2, "Works on sparse data; needs items that co-occur."]
+      controllability: [4, "Inspectable item-item weights; beta directly turns popularity down."]
+      explainability: [5, "Exact additive contributions of history items."]
+
+  puresvd:
+    title: PureSVD
+    family: Matrix factorisation (truncated SVD)
+    rung: 2
+    year: 2010
+    paper: {title: "Performance of Recommender Algorithms on Top-N Recommendation Tasks", venue: "RecSys 2010", url: "https://doi.org/10.1145/1864708.1864721"}
+    code: null
+    fidelity: faithful
+    summary: Projects a user's history onto the top-k singular vectors of the interaction matrix. The simplest learned-factor model.
+    rubric:
+      implementation: [1, "One randomized SVD call."]
+      tuning: [1, "One setting: the number of factors."]
+      data_hunger: [2, "Works on small data; too few factors collapse to popularity."]
+      controllability: [2, "Latent directions are hard to steer."]
+      explainability: [2, "Post-hoc only: items close in the factor space."]
+
+  slim:
+    title: SLIM (ElasticNet)
+    family: Sparse linear model (item-item)
+    rung: 1
+    year: 2011
+    paper: {title: "SLIM: Sparse Linear Methods for Top-N Recommender Systems", venue: "ICDM 2011", url: "https://doi.org/10.1109/ICDM.2011.134"}
+    code: "https://github.com/MaurizioFD/RecSys2019_DeepLearning_Evaluation"
+    fidelity: faithful
+    summary: One non-negative ElasticNet regression per item learns a sparse item-to-item weight matrix (fsSLIM with neighbour pre-selection).
+    rubric:
+      implementation: [3, "A regression per item; needs parallelism and neighbour pre-selection to be fast."]
+      tuning: [2, "Penalty strength, L1 share, and candidate neighbours."]
+      data_hunger: [2, "Works on sparse data."]
+      controllability: [4, "Sparse, non-negative, inspectable item-item weights."]
+      explainability: [5, "Exact additive contributions of history items."]
+
+  vsknn:
+    title: V-SKNN
+    family: Session-based nearest neighbours
+    rung: 4
+    year: 2018
+    paper: {title: "Evaluation of Session-based Recommendation Algorithms", venue: "User Modeling and User-Adapted Interaction 2018", url: "https://arxiv.org/abs/1803.09587"}
+    code: "https://github.com/rn5l/session-rec"
+    fidelity: simplified
+    summary: Scores items by the past sessions most similar to the user's latest session, weighting recent clicks more.
+    rubric:
+      implementation: [2, "Session reconstruction and a sparse neighbour search."]
+      tuning: [2, "Neighbours, sample size, and position weighting."]
+      data_hunger: [2, "Needs session patterns that repeat across users, not long histories."]
+      controllability: [3, "Neighbour sessions can be filtered; the weights are heuristics."]
+      explainability: [4, "'Sessions like yours also contained this item.'"]
+
+  sansa:
+    title: SANSA
+    family: Linear autoencoder (sparse approximate EASE)
+    rung: 1
+    year: 2023
+    paper: {title: "Scalable Approximate NonSymmetric Autoencoder for Collaborative Filtering", venue: "RecSys 2023", url: "https://doi.org/10.1145/3604915.3608827"}
+    code: "https://github.com/glami/sansa"
+    fidelity: faithful
+    summary: EASE's closed form computed with a sparse factorisation and a sparse approximate inverse, so the whole catalog fits.
+    rubric:
+      implementation: [2, "One library call, but SuiteSparse must be installed."]
+      tuning: [2, "lambda and the weight density."]
+      data_hunger: [2, "Like EASE: memory, not data, used to be the limit."]
+      controllability: [4, "Sparse item-item weights (stored as two factors)."]
+      explainability: [4, "Additive in the history, but the weights are a product of two sparse factors."]
+
 services:
   amazon_personalize:
     title: Amazon Personalize

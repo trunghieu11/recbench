@@ -29,12 +29,20 @@ queue:
   max_threads_per_job: 32  # OpenBLAS limit on many-core boxes
   # Job order inside each dataset block. resource: cpu | gpu; after: jobs of the same dataset to wait for.
   methods:
+    # 1. anchors (seconds)
     - {name: random, resource: cpu}
     - {name: most_popular, resource: cpu}
+    # 2. strong cheap baselines: the first provisional leaderboard
     - {name: ease, resource: cpu}
     - {name: itemknn, resource: cpu}
+    - {name: rp3beta, resource: cpu}
+    - {name: puresvd, resource: cpu}
+    # 3. the other CPU methods, in parallel with the GPU methods
     - {name: ials, resource: cpu}
     - {name: bpr_mf, resource: cpu}
+    - {name: slim, resource: cpu}
+    - {name: vsknn, resource: cpu}
+    - {name: sansa, resource: cpu}
     - {name: sasrec, resource: gpu}
 
 # Each dataset's top methods by quick-tier test NDCG@10 are re-checked on full data.

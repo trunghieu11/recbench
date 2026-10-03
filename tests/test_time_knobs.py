@@ -34,3 +34,15 @@ def test_weighted_matrix_decays_with_age(toy_split):
         assert np.isclose(decayed[user, item], 2.0 ** (-age / 7), rtol=1e-5)
     counts = data.weighted_matrix(half_life_days=7, binary=False)
     assert counts.sum() <= data.interaction_counts.sum() and counts.sum() > 0
+
+
+def test_before_is_a_past_view_and_views_compose(toy_split):
+    full = TrainView(toy_split)
+    cutoff = int(full.meta["valid_start_us"])
+    past = full.before(cutoff)
+    assert np.asarray(past._ts).max() < cutoff and past.meta["test_start_us"] == cutoff
+    assert past.item_pop.sum() == len(past._items) < len(full._items)
+    both = full.restrict(5, keep_last=3).before(cutoff)  # a view of a view still maps onto the original events
+    frame = full.export_frame()
+    kept = frame[both._kept_mask]
+    assert len(kept) == len(both._items) and (kept["ts_us"].to_numpy() < cutoff).all()

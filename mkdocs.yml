@@ -120,10 +120,15 @@ nav:
           - MostPopular: dictionary/algorithms/most-popular.md
           - ItemKNN: dictionary/algorithms/itemknn.md
           - EASE: dictionary/algorithms/ease.md
+          - RP3beta: dictionary/algorithms/rp3beta.md
+          - SLIM: dictionary/algorithms/slim.md
+          - SANSA: dictionary/algorithms/sansa.md
+          - PureSVD: dictionary/algorithms/puresvd.md
           - BPR-MF: dictionary/algorithms/bpr-mf.md
           - iALS: dictionary/algorithms/ials.md
           - LightGCN: dictionary/algorithms/lightgcn.md
           - XSimGCL: dictionary/algorithms/xsimgcl.md
+          - V-SKNN: dictionary/algorithms/vsknn.md
           - SASRec: dictionary/algorithms/sasrec.md
           - BERT4Rec: dictionary/algorithms/bert4rec.md
           - S3-Rec: dictionary/algorithms/s3rec.md

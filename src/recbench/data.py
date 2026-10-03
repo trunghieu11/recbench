@@ -221,6 +221,39 @@ class TrainView:
         last[:-1] = (rows[1:] != rows[:-1]) | (cols[1:] != cols[:-1])
         return sp.csr_matrix((weights[last], (rows[last], cols[last])), shape=shape)
 
+    def before(self, cutoff_us: int) -> "TrainView":
+        """A view of the events strictly before `cutoff_us`, as if that were the cutoff (two-stage training:
+        candidate generators learn from the past, the re-ranker learns which candidates came true after it)."""
+        keep = np.asarray(self._ts) < int(cutoff_us)
+        view = self._subset(keep)
+        view.meta = {**self.meta, "test_start_us": int(cutoff_us)}
+        recent = view.event_age_days() <= RECENT_DAYS
+        view.item_recent_pop = np.bincount(view._items[recent], minlength=self.n_items + 1).astype(np.int64)
+        return view
+
+    def _subset(self, keep: np.ndarray) -> "TrainView":
+        """A shallow copy that keeps only the events where `keep` is True (same users and items)."""
+        offsets = np.asarray(self._offsets, dtype=np.int64)
+        lengths = np.diff(offsets)
+        owner = np.repeat(np.arange(len(lengths), dtype=np.int64), lengths)
+        view = copy.copy(self)
+        for cached in ("user_lengths", "interaction_counts", "seen"):
+            view.__dict__.pop(cached, None)
+        view._items = np.asarray(self._items)[keep]
+        view._ts = np.asarray(self._ts)[keep]
+        new_offsets = np.zeros_like(offsets)
+        new_offsets[1:] = np.cumsum(np.bincount(owner[keep], minlength=len(lengths)))
+        view._offsets = new_offsets
+        view.item_pop = np.bincount(view._items, minlength=self.n_items + 1).astype(np.int64)
+        parent = getattr(self, "_kept_mask", None)  # always a mask over the ORIGINAL event order (export_frame)
+        if parent is None:
+            view._kept_mask = keep
+        else:
+            full = parent.copy()
+            full[np.flatnonzero(parent)] = keep
+            view._kept_mask = full
+        return view
+
     def restrict(self, window_days: float | None, keep_last: int = 10) -> "TrainView":
         """A view of the last `window_days` days before the cutoff, plus each user's `keep_last` most recent events.
 
@@ -234,17 +267,8 @@ class TrainView:
         owner = np.repeat(np.arange(len(lengths), dtype=np.int64), lengths)
         from_end = offsets[owner + 1] - 1 - np.arange(len(owner), dtype=np.int64)  # 0 = the user's latest event
         keep = (self.event_age_days() <= float(window_days)) | (from_end < int(keep_last))
-        view = copy.copy(self)
-        for cached in ("user_lengths", "interaction_counts", "seen"):
-            view.__dict__.pop(cached, None)
-        view._items = np.asarray(self._items)[keep]
-        view._ts = np.asarray(self._ts)[keep]
-        new_offsets = np.zeros_like(offsets)
-        new_offsets[1:] = np.cumsum(np.bincount(owner[keep], minlength=len(lengths)))
-        view._offsets = new_offsets
+        view = self._subset(keep)
         recent = view.event_age_days() <= RECENT_DAYS
-        view.item_pop = np.bincount(view._items, minlength=self.n_items + 1).astype(np.int64)
         view.item_recent_pop = np.bincount(view._items[recent], minlength=self.n_items + 1).astype(np.int64)
         view.meta = {**self.meta, "train_window_days": float(window_days), "train_window_keep_last": int(keep_last)}
-        view._kept_mask = keep
         return view

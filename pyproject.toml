@@ -43,7 +43,7 @@ cpu = ["recbench[bench]", "torch>=2.2", "recbole>=1.2.0,<1.3", "fuxictr>=2.3.0",
 gpu = ["recbench[bench]", "torch>=2.2", "recbole>=1.2.0,<1.3", "fuxictr>=2.3.0", "numba>=0.59", "kmeans-pytorch>=0.3",
        "sentence-transformers>=3.0"]
 # Scalable EASE. Needs SuiteSparse (apt install libsuitesparse-dev / brew install suite-sparse).
-sansa = ["sansa>=1.0"]
+sansa = ["sansa>=1.0", "scikit-sparse<0.5"]  # sansa 1.1 calls cholmod.analyze_AAt, removed in scikit-sparse 0.5
 # Managed recommendation services.
 managed = ["recombee-api-client==6.3.1"]
 # Documentation site. Material for MkDocs 9.x does not support MkDocs 2.

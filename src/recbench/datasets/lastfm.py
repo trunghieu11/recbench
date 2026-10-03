@@ -17,7 +17,11 @@ from recbench.pipeline.download import DownloadError, fetch
 from recbench.protocol import DatasetSpec
 from recbench.registry import register_dataset
 
-URLS = ["https://mtg.upf.edu/static/datasets/last.fm/lastfm-dataset-1K.tar.gz"]
+# The original host does not answer from some cloud machines; Zenodo mirrors the same archive.
+URLS = [
+    "https://mtg.upf.edu/static/datasets/last.fm/lastfm-dataset-1K.tar.gz",
+    "https://zenodo.org/records/6090214/files/lastfm-dataset-1K.tar.gz",
+]
 
 
 @register_dataset

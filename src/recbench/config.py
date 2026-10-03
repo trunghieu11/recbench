@@ -9,8 +9,7 @@ from typing import Any
 
 import yaml
 
-from recbench import __version__
-from recbench.protocol import PROTOCOL_VERSION
+from recbench.protocol import EVAL_VERSION, PROTOCOL_VERSION
 
 # Model sizes per hardware preset. Every neural method reads these keys.
 PRESETS: dict[str, dict[str, Any]] = {
@@ -69,12 +68,16 @@ def method_config(resolved: dict[str, Any], method: str) -> dict[str, Any]:
     return {**shared, **(resolved.get("method_params", {}).get(method) or {})}
 
 
-def config_hash(cfg: dict[str, Any], method: str, split_hash: str) -> str:
-    """Identity of one run. Changing the protocol, the split, the code version, or any setting changes it."""
-    ignored = {"resume", "continue_on_error", "timeout_minutes", "export_bundles", "managed_services"}
+def config_hash(cfg: dict[str, Any], method: str, split_hash: str, impl_version: str = "1") -> str:
+    """Identity of one run: protocol, evaluator and method-implementation versions, split, and every setting.
+
+    The package version is deliberately left out, so a docs-only release does not force re-runs.
+    """
+    ignored = {"resume", "continue_on_error", "timeout_minutes", "export_bundles", "managed_services", "git_sha", "git_dirty"}
     payload = {
         "protocol": PROTOCOL_VERSION,
-        "code": __version__,
+        "eval": EVAL_VERSION,
+        "impl": impl_version,
         "method": method,
         "split": split_hash,
         "cfg": {k: v for k, v in sorted(cfg.items()) if k not in ignored},

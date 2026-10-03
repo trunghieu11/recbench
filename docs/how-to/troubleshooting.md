@@ -8,6 +8,7 @@
 | `Unsupported: third_party/SELFRec is missing` | third-party code not fetched | `bash scripts/fetch_third_party.sh` |
 | `fuxictr is not installed` / RecBole import errors | installed with the `bench` or `serve` extra only | `uv pip install -e ".[cpu]"` |
 | many pandas FutureWarnings from RecBole | RecBole 1.2 uses older pandas APIs | harmless; the run scripts set `PYTHONWARNINGS=ignore` |
+| `No module named 'numba'` (LightGCN, XSimGCL) or `'kmeans_pytorch'` (BERT4Rec, S3-Rec) | an older install without these extras | reinstall with `uv pip install -e ".[cpu]"` (or `[gpu]`); both are now in the extras |
 
 ## Data preparation
 
@@ -15,6 +16,8 @@
 |---|---|---|
 | "Kaggle credentials missing" | no `~/.kaggle/kaggle.json` | see [install, step 5](../start/install.md#step-5-a-kaggle-token-for-hm-and-retailrocket) |
 | Kaggle 403 for H&M | competition rules not accepted | accept them on the competition page |
+| "Authentication required to call the Kaggle API" with a new-style key (`KGAT...`) | Kaggle CLI 2.x reads `~/.kaggle/access_token` | the run scripts copy the key there automatically (`ensure_kaggle_token` in `scripts/_common.sh`); or create the file yourself |
+| Last.fm download hangs or fails | the original host does not answer from some cloud machines | nothing: the adapter falls back to the Zenodo mirror |
 | `SplitError: only N warm eval users` | the split is too small to evaluate reliably | use a bigger tier, or lower `min_eval_users` via `tier_overrides` in the config (results get noisier) |
 | "Need at least 30 GB free" | disk space | free space, or `export DATA_DIR=/Volumes/Big/recbench-data` |
 | a dataset failed but others continued | by design | read the reason in `data/unavailable/<dataset>-<tier>.txt` |
@@ -28,6 +31,8 @@
 | `unsupported: S3-Rec needs item attributes` | the dataset has no categories (Last.fm) | expected |
 | `unsupported: RecBole's sequence dataset would need ~X GB` | not enough RAM for RecBole at this size | lower `seq_len`, use SASRec, or a bigger machine |
 | `timeout` | exceeded `timeout_minutes` (wall clock) | raise `timeout_minutes` in the config, or run the method on the GPU tier |
+| iALS fails with exit code -11 (segfault) on a many-core machine | OpenBLAS was built for at most 128 threads; the machine has more | the runner caps `OPENBLAS_NUM_THREADS`, `OMP_NUM_THREADS` and `MKL_NUM_THREADS` at 32 per child process; set them lower if needed |
+| `pkill -f recbench.runner` kills your own SSH command | the pattern also matches the remote shell running it | use `pkill -f "[r]ecbench\.runner"` |
 | `failed` | an exception | open the run in MLflow and read `error.txt` |
 | `skipped_existing` | an identical run already finished | change a setting, bump the version in `src/recbench/__init__.py`, or delete the run in MLflow to force a re-run |
 | results near Random for a new sequence model | reading padding instead of the newest item | use the last column of right-aligned histories (see [sequential models](../dictionary/concepts/sequential-and-session.md)) |

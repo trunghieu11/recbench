@@ -26,12 +26,17 @@ from typing import Any
 
 import numpy as np
 
+from recbench import __version__
 from recbench.config import config_hash, load_yaml, method_config, resolve_run_config
 from recbench.data import SplitError, TrainView
-from recbench.protocol import PROTOCOL_NOTE, PROTOCOL_VERSION, Unsupported
+from recbench.protocol import EVAL_VERSION, PROTOCOL_NOTE, PROTOCOL_VERSION, Unsupported
 from recbench.registry import ensure_loaded
 
 EXPERIMENT = "recbench"
+# OpenBLAS aborts (exit -11) when asked for more threads than it was built for (128 on the rented box),
+# so every child process gets an explicit cap.
+THREAD_VARS = ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS")
+MAX_THREADS = 32
 
 
 def repo_root() -> Path:
@@ -50,6 +55,28 @@ def tracking_uri() -> str:
 
 def data_root() -> Path:
     return Path(os.environ.get("DATA_DIR", repo_root() / "data")).resolve()
+
+
+def thread_env(threads: int | None = None) -> dict[str, str]:
+    """BLAS/OpenMP thread caps for a child process: `threads` if given, else the current value or min(cores, 32)."""
+    if threads:
+        return {var: str(int(threads)) for var in THREAD_VARS}
+    default = str(min(os.cpu_count() or 1, MAX_THREADS))
+    return {var: os.environ.get(var, default) for var in THREAD_VARS}
+
+
+def git_state() -> tuple[str, bool]:
+    """(short commit id, has uncommitted changes); ("", False) outside a git checkout."""
+    try:
+        run = lambda *args: subprocess.run(["git", *args], cwd=repo_root(), capture_output=True, text=True, check=True).stdout.strip()  # noqa: E731
+        return run("rev-parse", "--short=12", "HEAD"), bool(run("status", "--porcelain", "--untracked-files=no"))
+    except (OSError, subprocess.CalledProcessError):
+        return "", False
+
+
+def run_hash_for(resolved: dict[str, Any], method_name: str, split_hash: str) -> str:
+    spec = ensure_loaded().methods[method_name].spec
+    return config_hash(method_config(resolved, method_name), method_name, split_hash, spec.impl_version)
 
 
 def _mlflow():
@@ -107,7 +134,8 @@ def run_single(split_dir: Path, method_name: str, resolved: dict[str, Any]) -> d
     method = reg.create_method(method_name)
     data = TrainView(split_dir)
     cfg = method_config(resolved, method_name)
-    run_hash = config_hash(cfg, method_name, data.split_hash)
+    run_hash = config_hash(cfg, method_name, data.split_hash, method.spec.impl_version)
+    sha, dirty = (resolved["git_sha"], bool(resolved.get("git_dirty"))) if "git_sha" in resolved else git_state()
     tags = {
         "dataset": data.dataset,
         "method": method_name,
@@ -122,6 +150,14 @@ def run_single(split_dir: Path, method_name: str, resolved: dict[str, Any]) -> d
         "fidelity": method.spec.fidelity,
         "tasks": ",".join(sorted(t.value for t in method.spec.tasks)),
         "protocol": PROTOCOL_NOTE,
+        # stage: benchmark | search | final | confirm; tuning: defaults | tuned (set by recbench.tuning)
+        "stage": str(resolved.get("stage", "benchmark")),
+        "tuning": str(resolved.get("tuning", "defaults")),
+        "impl_version": method.spec.impl_version,
+        "eval_version": EVAL_VERSION,
+        "recbench_version": __version__,
+        "git_sha": sha,
+        "git_dirty": str(dirty).lower(),
     }
     skip = _skip_reason(method, data, resolved)
     mlflow = _mlflow()
@@ -189,7 +225,7 @@ def _export_bundle(method, data: TrainView, split, cfg: dict[str, Any]) -> Path 
 def run_pair(split_dir: Path, method_name: str, resolved: dict[str, Any], *, isolate: bool = True) -> dict[str, Any]:
     """Run one pair, by default in a child process with a timeout."""
     data = TrainView(split_dir)
-    run_hash = config_hash(method_config(resolved, method_name), method_name, data.split_hash)
+    run_hash = run_hash_for(resolved, method_name, data.split_hash)
     if resolved.get("resume", True) and already_finished(data.dataset, method_name, run_hash):
         return {"status": "skipped_existing"}
     if not isolate:
@@ -199,7 +235,7 @@ def run_pair(split_dir: Path, method_name: str, resolved: dict[str, Any], *, iso
         out_path = Path(tmp) / "result.json"
         cfg_path.write_text(json.dumps(resolved))
         command = [sys.executable, "-m", "recbench.runner", "--single", str(split_dir), method_name, str(cfg_path), str(out_path)]
-        env = {**os.environ, "MLFLOW_TRACKING_URI": tracking_uri(), "RECBENCH_ROOT": str(repo_root())}
+        env = {**os.environ, **thread_env(resolved.get("threads")), "MLFLOW_TRACKING_URI": tracking_uri(), "RECBENCH_ROOT": str(repo_root())}
         limit = float(resolved.get("timeout_minutes", 240)) * 60
         proc = subprocess.Popen(command, env=env)
         began = time.time()  # wall clock: keeps counting while a laptop sleeps (time.monotonic does not on macOS)
@@ -207,17 +243,18 @@ def run_pair(split_dir: Path, method_name: str, resolved: dict[str, Any], *, iso
             if time.time() - began > limit:
                 proc.kill()
                 proc.wait()
-                _log_outcome(data, method_name, run_hash, "timeout", f"exceeded {resolved.get('timeout_minutes')} minutes (wall clock)")
+                _log_outcome(data, method_name, run_hash, "timeout", f"exceeded {resolved.get('timeout_minutes')} minutes (wall clock)",
+                             str(resolved.get("stage", "benchmark")))
                 return {"status": "timeout"}
             time.sleep(1.0)
         if out_path.exists():
             return json.loads(out_path.read_text())
         reason = f"child process exited with code {proc.returncode} before reporting a result"
-        _log_outcome(data, method_name, run_hash, "failed", reason)
+        _log_outcome(data, method_name, run_hash, "failed", reason, str(resolved.get("stage", "benchmark")))
         return {"status": "failed", "reason": reason}
 
 
-def _log_outcome(data: TrainView, method_name: str, run_hash: str, status: str, reason: str) -> None:
+def _log_outcome(data: TrainView, method_name: str, run_hash: str, status: str, reason: str, stage: str = "benchmark") -> None:
     """Record a run that ended without the child logging it (timeout, crash, out-of-memory kill)."""
     mlflow = _mlflow()
     experiment = mlflow.get_experiment_by_name(EXPERIMENT)
@@ -241,6 +278,7 @@ def _log_outcome(data: TrainView, method_name: str, run_hash: str, status: str, 
                 "tier": data.tier,
                 "config_hash": run_hash,
                 "protocol_version": PROTOCOL_VERSION,
+                "stage": stage,
                 "status": status,
                 "reason": reason,
             }
@@ -249,6 +287,7 @@ def _log_outcome(data: TrainView, method_name: str, run_hash: str, status: str, 
 
 def run_matrix(config_path: Path, datasets: list[str], methods: list[str], preset: str | None) -> list[dict[str, Any]]:
     resolved = resolve_run_config(load_yaml(config_path), preset=preset, repo_root=repo_root())
+    resolved["git_sha"], resolved["git_dirty"] = git_state()
     reg = ensure_loaded()
     results = []
     for dataset in datasets or resolved["datasets"]:

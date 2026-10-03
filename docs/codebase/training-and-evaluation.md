@@ -32,7 +32,7 @@ Code: `src/recbench/runner.py::run_matrix` → `src/recbench/runner.py::run_pair
 
 1. **Resolve the config** (benchmark YAML + hardware YAML + preset): see [configuration](configuration.md).
 2. For each dataset with a valid split and each registered method:
-    - compute `config_hash` (protocol version, code version, split hash, and every setting);
+    - compute `config_hash` (protocol version, evaluator version, the method's `impl_version`, split hash, and every setting);
     - if a finished run with that hash exists in MLflow, skip it (`skipped_existing`);
     - otherwise start `python -m recbench.runner --single ...` as a **child process** and watch it with a wall-clock
       timeout (`timeout_minutes`). If the child dies or times out, the parent records `failed` or `timeout`, with
@@ -68,7 +68,7 @@ Code: `src/recbench/runner.py::run_matrix` → `src/recbench/runner.py::run_pair
 
 | MLflow field | Contents |
 |---|---|
-| tags | dataset, method, tier, preset, hardware, `protocol_version`, `config_hash`, `split_hash`, managed, ranked, fidelity, tasks, status, reason, bundle |
+| tags | dataset, method, tier, preset, hardware, `protocol_version`, `config_hash`, `split_hash`, managed, ranked, fidelity, tasks, status, reason, bundle, `stage` (benchmark, search, final, confirm), `tuning` (defaults or tuned), `impl_version`, `eval_version`, `recbench_version`, `git_sha`, `git_dirty` |
 | params | every numeric or text setting the method received, plus `fit.*` values the method reports |
 | metrics | every computed metric, `*_ci_low` and `*_ci_high`, `n_eval_users`, efficiency, and later `served_*` from the load tester |
 | artifacts | `per_user_metrics.npz`, `explanations.json`, `metric_errors.json` (if any), `error.txt` (failed runs) |

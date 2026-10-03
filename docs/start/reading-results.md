@@ -54,7 +54,8 @@ Click a run to see:
 - **Parameters:** every setting (dimension, steps, seed, ...), plus `fit.*` values the method reported (for example
   EASE's `fit.item_cap_coverage`).
 - **Metrics:** everything the report shows and more (`ndcg_at_20`, `recall_at_50`, ...).
-- **Tags:** dataset, method, tier, `protocol_version` (should be 2), `config_hash`, status, reason.
+- **Tags:** dataset, method, tier, `protocol_version` (should be 2), `config_hash`, status, reason, `stage` and
+  `tuning` (default settings or tuned), and `git_sha` (the code the run used).
 - **Artifacts:** `per_user_metrics.npz` (one value per user, for your own analyses), `explanations.json` (sample
   explanations), `metric_errors.json` (if any metric failed), `error.txt` (for failed runs).
 

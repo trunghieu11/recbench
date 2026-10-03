@@ -16,6 +16,8 @@ if TYPE_CHECKING:
     from recbench.data import HistoryBatch, TrainView
 
 PROTOCOL_VERSION = "2"
+# Bump when the evaluator changes how numbers are computed (metrics, masks, user sampling).
+EVAL_VERSION = "1"
 PROTOCOL_NOTE = (
     "Protocol v2: one global time cutoff (UTC); models are fitted only on events before the test cutoff; "
     "warm test users are ranked against the full catalog (sampled 1+100 is kept as a secondary check); "
@@ -77,6 +79,8 @@ class MethodSpec:
     upstream: str = ""
     fidelity: str = "faithful"
     cost_band: str = "low"
+    # Bump when a change to the method's code changes its results; old runs then stop counting as done.
+    impl_version: str = "1"
 
 
 class Recommender:

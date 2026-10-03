@@ -73,9 +73,10 @@ Every run has `tags.status`:
 
 ## Resume
 
-Before fitting, the runner computes a `config_hash` from the protocol version, code version, method, split, and
-every setting, and skips the pair if a finished run with that hash exists. Changing anything that affects results
-gives a new hash, so the pair runs again. See [configuration](../codebase/configuration.md).
+Before fitting, the runner computes a `config_hash` from the protocol version, the evaluator version, the method's
+implementation version (`impl_version`), the method, the split, and every setting, and skips the pair if a finished
+run with that hash exists. Changing anything that affects results gives a new hash, so the pair runs again. The
+package version is not part of the hash, so a docs-only release never forces re-runs. See [configuration](../codebase/configuration.md).
 
 ## Backups and sharing
 

@@ -56,7 +56,7 @@ Possible statuses:
 | `unsupported` | the method cannot run here, with a reason (for example "no item images on disk") |
 | `failed` | an error; the traceback is saved in MLflow as `error.txt` |
 | `timeout` | exceeded `timeout_minutes` (wall clock) |
-| `skipped_existing` | an identical run (same settings, data, and code version) already finished |
+| `skipped_existing` | an identical run (same settings, data, protocol, and method implementation version) already finished |
 
 ## Step 4: run everything
 

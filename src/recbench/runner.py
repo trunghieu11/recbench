@@ -169,8 +169,10 @@ def run_single(split_dir: Path, method_name: str, resolved: dict[str, Any]) -> d
             return {"status": "unsupported", "reason": skip}
         try:
             _seed_everything(int(cfg.get("seed", 42)))
+            # The training window only changes what the method learns from; the evaluator keeps the full history.
+            fit_data = data.restrict(cfg.get("train_window_days"), int(cfg.get("train_window_keep_last", 10)))
             began = time.perf_counter()
-            method.fit(data, cfg)
+            method.fit(fit_data, cfg)
             train_seconds = time.perf_counter() - began
             for key, value in (getattr(method, "fit_info", None) or {}).items():
                 mlflow.log_param(f"fit.{key}", value)

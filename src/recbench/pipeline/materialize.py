@@ -5,9 +5,13 @@ Steps, in order:
    number in the clean file), so equal timestamps always sort the same way.
 2. Compute the cutoffs on the FULL dataset, in UTC microseconds:
    valid_start <= test_start. Events before test_start are "pre-test".
-3. For smoke/standard/slice tiers, sample users (not rows) so that each kept
+3. For smoke/quick/standard/slice tiers, sample users (not rows) so that each kept
    user keeps a complete recent history; the cutoffs stay the same, so a smoke
    split is a subset of the full split.
+   A validation fold (`fold="valid"`, written as tier "<tier>-val") keeps the same
+   users, deletes every event at or after the real test cutoff, and then uses the
+   validation window as its test window. Tuning runs on folds, so the real test
+   events are physically absent while settings are chosen.
 4. Write train/valid/test parquet files, pre-test history arrays for models,
    item/user tables, test relevance sets, eval users, and the sampled
    1-positive + 100-negative candidate file (secondary protocol).
@@ -45,6 +49,8 @@ SESSION_GAP_US = 30 * 60 * 1_000_000
 TIERS: dict[str, dict[str, Any]] = {
     "smoke": {"target_events": 50_000, "max_user_pretest": 300, "max_user_test": 50, "min_eval_users": 30, "max_eval_users": 10_000},
     "standard": {"target_events": 1_000_000, "max_user_pretest": 1_000, "max_user_test": 200, "min_eval_users": 200, "max_eval_users": 10_000},
+    # The low-budget gate: every method is tuned and compared here first (same sizes as "standard").
+    "quick": {"target_events": 1_000_000, "max_user_pretest": 1_000, "max_user_test": 200, "min_eval_users": 200, "max_eval_users": 10_000},
     # Sized for a managed service's free plan: <= 10K items, ~40K events, 1K eval users.
     "slice": {"target_events": 40_000, "max_user_pretest": 200, "max_user_test": 50, "max_items": 10_000, "min_eval_users": 100, "max_eval_users": 1_000},
     "full": {"min_eval_users": 500, "max_eval_users": 10_000},
@@ -101,6 +107,19 @@ def cutoffs(con: duckdb.DuckDBPyConnection, split_rule: str, test_days: int) -> 
         earlier = con.execute("SELECT quantile_disc(ts_us, 0.889) FROM ev WHERE ts_us < ?", [test_start]).fetchone()[0]
         valid_start = int(earlier) if earlier is not None else test_start
     return valid_start, test_start
+
+
+def fold_cutoffs(con: duckdb.DuckDBPyConnection, split_rule: str, test_days: int) -> tuple[int, int]:
+    """Cutoffs of the validation fold: its "test" window is the real validation window.
+
+    Returns (fold_valid_start_us, fold_test_start_us), both on the whole event table `ev`, so the
+    fold mirrors the real split one window earlier: 7 days for last_days, 10% of events for quantile.
+    """
+    valid_start, _ = cutoffs(con, split_rule, test_days)
+    if split_rule == "last_days":
+        return valid_start - test_days * DAY_US, valid_start
+    inner = int(con.execute("SELECT quantile_disc(ts_us, 0.7) FROM ev").fetchone()[0])
+    return min(inner, valid_start), valid_start
 
 
 def _sample_users(con: duckdb.DuckDBPyConnection, test_start: int, params: dict[str, Any], seed: int) -> None:
@@ -170,9 +189,12 @@ def materialize(
     seed: int = 42,
     n_negatives: int = N_NEGATIVES,
     tier_overrides: dict[str, Any] | None = None,
+    fold: str | None = None,
 ) -> Path:
     if tier not in TIERS:
         raise ValueError(f"Unknown tier {tier}. Known: {sorted(TIERS)}")
+    if fold not in (None, "valid"):
+        raise ValueError(f"Unknown fold {fold}; only 'valid' is supported")
     params = {**TIERS[tier], **(tier_overrides or {})}
     clean_dir, out_dir = Path(clean_dir), Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -206,7 +228,12 @@ def materialize(
     if con.execute("SELECT count(*) FROM ev").fetchone()[0] == 0:
         raise SplitError(f"{dataset}: no events in {inter}")
     valid_start, test_start = cutoffs(con, split_rule, test_days)
+    real_test_start = test_start
+    # Users are always sampled against the REAL test cutoff, so a fold keeps exactly the base split's users.
     _sample_users(con, test_start, params, seed)
+    if fold == "valid":
+        con.execute(f"DELETE FROM sampled WHERE ts_us >= {real_test_start}")
+        valid_start, test_start = fold_cutoffs(con, split_rule, test_days)
 
     # Sessions: an explicit session_id wins; otherwise a gap of more than 30 minutes starts a new session.
     con.execute(
@@ -355,9 +382,10 @@ def materialize(
     test_users = test_items.groupby("user_idx").size()
     warm_test_users = int((n_pre.reindex(test_users.index).fillna(0) > 0).sum())
     clean_stat = (clean_dir / "interactions.parquet").stat()
+    split_tier = f"{tier}-val" if fold == "valid" else tier
     identity = {
         "dataset": dataset,
-        "tier": tier,
+        "tier": split_tier,
         "split_rule": split_rule,
         "test_days": test_days,
         "valid_start_us": valid_start,
@@ -371,10 +399,14 @@ def materialize(
         "n_items": n_items,
         "contract": CONTRACT_VERSION,
     }
+    if fold:  # only folds add keys, so existing (non-fold) split hashes stay unchanged
+        identity.update({"fold": fold, "real_test_start_us": real_test_start})
     split_hash = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()[:16]
     meta = {
         "dataset": dataset,
-        "tier": tier,
+        "tier": split_tier,
+        "base_tier": tier,
+        "fold": fold,
         "contract_version": CONTRACT_VERSION,
         "protocol_version": PROTOCOL_VERSION,
         "split_hash": split_hash,
@@ -405,7 +437,7 @@ def materialize(
     (out_dir / "meta.json").write_text(json.dumps(meta, indent=2))
     if n_eval_warm < int(params["min_eval_users"]):
         raise SplitError(
-            f"{dataset}/{tier}: only {n_eval_warm} warm eval users (minimum {params['min_eval_users']}). "
+            f"{dataset}/{split_tier}: only {n_eval_warm} warm eval users (minimum {params['min_eval_users']}). "
             "The split was written for inspection but must not be benchmarked."
         )
     return out_dir

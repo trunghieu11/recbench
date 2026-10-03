@@ -103,3 +103,21 @@ def test_history_batch_is_right_aligned(toy):
         assert batch.lengths[row] == len(items)
         left = batch.left_aligned()[row]
         assert list(left[: len(items)]) == list(items) and not left[len(items):].any()
+
+
+@pytest.mark.parametrize("tier,overrides", [("full", {}), ("smoke", {"target_events": 1500, "max_user_pretest": 20})])
+def test_validation_fold_has_no_real_test_events_and_keeps_the_users(tmp_path, tier, overrides):
+    write_toy_clean(tmp_path / "clean")
+    settings = {"min_eval_users": 1, **overrides}
+    base = materialize(tmp_path / "clean", tmp_path / "base", dataset="toy", tier=tier, tier_overrides=settings)
+    fold = materialize(tmp_path / "clean", tmp_path / "fold", dataset="toy", tier=tier, tier_overrides=settings, fold="valid")
+    bm, fm = (json.loads((p / "meta.json").read_text()) for p in (base, fold))
+    assert fm["tier"] == f"{tier}-val" and fm["split_hash"] != bm["split_hash"]
+    assert fm["test_start_us"] == bm["valid_start_us"]  # the fold's test window is the real validation window
+    for part in ("train", "valid", "test"):
+        assert (pd.read_parquet(fold / f"{part}.parquet")["ts_us"] < bm["test_start_us"]).all()
+    assert pd.read_parquet(fold / "test.parquet")["ts_us"].min() >= bm["valid_start_us"]
+    assert np.load(fold / "pretest_ts.npy").max() < bm["valid_start_us"]
+    base_users = set(pd.read_parquet(base / "users.parquet")["user_id"])
+    assert set(pd.read_parquet(fold / "users.parquet")["user_id"]) <= base_users  # same sampled users, never new ones
+    TrainView(fold)  # a fold is an ordinary split for models and the evaluator

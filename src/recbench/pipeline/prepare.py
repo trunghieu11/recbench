@@ -3,6 +3,9 @@
 Usage:
     python -m recbench.pipeline.prepare --config configs/benchmarks/smoke-cpu.yaml
     python -m recbench.pipeline.prepare --config ... --datasets hm --tier full
+    python -m recbench.pipeline.prepare --config ... --tier quick,quick-val,full-val   # dataset by dataset
+
+A tier name ending in "-val" builds that tier's validation fold (see materialize).
 
 Cleaning is skipped when data/clean/<dataset> was produced by the same adapter
 version (CLEAN_VERSION); splitting always runs, because it is cheap and its
@@ -26,8 +29,14 @@ def data_root() -> Path:
     return Path(os.environ.get("DATA_DIR", Path.cwd() / "data")).resolve()
 
 
+def split_tier(tier: str) -> tuple[str, str | None]:
+    """'quick-val' -> ('quick', 'valid'); 'full' -> ('full', None)."""
+    return (tier[: -len("-val")], "valid") if tier.endswith("-val") else (tier, None)
+
+
 def prepare_one(name: str, tier: str, root: Path | None = None, tier_overrides: dict[str, Any] | None = None) -> Path:
     reg = ensure_loaded()
+    base_tier, fold = split_tier(tier)
     dataset = reg.create_dataset(name)
     spec = dataset.spec
     root = root or data_root()
@@ -48,11 +57,12 @@ def prepare_one(name: str, tier: str, root: Path | None = None, tier_overrides: 
             clean,
             out,
             dataset=name,
-            tier=tier,
+            tier=base_tier,
             split_rule=spec.split_rule,
             test_days=spec.test_days,
             repeat_policies=spec.repeat_policies,
             tier_overrides=tier_overrides,
+            fold=fold,
         )
     except Exception:
         marker.parent.mkdir(parents=True, exist_ok=True)
@@ -66,20 +76,24 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Download, clean, and split datasets.")
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--datasets", type=str, default="")
-    parser.add_argument("--tier", type=str, default="")
+    parser.add_argument("--tier", type=str, default="", help="one tier or a comma-separated list, e.g. quick,quick-val")
     args = parser.parse_args()
     cfg = load_yaml(args.config)
     names = [n for n in args.datasets.split(",") if n] or list(cfg.get("datasets") or [])
-    tier = args.tier or cfg.get("tier", "smoke")
-    failures = []
-    for name in names:
-        try:
-            path = prepare_one(name, tier, tier_overrides=(cfg.get("tier_overrides") or {}).get(tier))
-            print(f"prepared {name} -> {path}")
-        except Exception as exc:  # noqa: BLE001 - recorded in data/unavailable/
-            failures.append(name)
-            print(f"prepare failed for {name}: {type(exc).__name__}: {exc}")
-    if failures and len(failures) == len(names):
+    tiers = [t for t in (args.tier or cfg.get("tier", "smoke")).split(",") if t]
+    overrides = cfg.get("tier_overrides") or {}
+    failures, total = [], 0
+    for name in names:  # dataset by dataset, so the first dataset is ready to run first
+        for tier in tiers:
+            total += 1
+            base_tier, _ = split_tier(tier)
+            try:
+                path = prepare_one(name, tier, tier_overrides={**(overrides.get(base_tier) or {}), **(overrides.get(tier) or {})})
+                print(f"prepared {name} -> {path}")
+            except Exception as exc:  # noqa: BLE001 - recorded in data/unavailable/
+                failures.append(f"{name}/{tier}")
+                print(f"prepare failed for {name}/{tier}: {type(exc).__name__}: {exc}")
+    if failures and len(failures) == total:
         raise SystemExit(1)
 
 

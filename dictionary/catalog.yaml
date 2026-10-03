@@ -419,6 +419,54 @@ methods:
       controllability: [3, "Interpretable filter shape, but no item-level weights to edit."]
       explainability: [3, "Scores are item-item sums through a filtered graph, but the filter mixes many paths."]
 
+  simplex:
+    title: SimpleX
+    family: Matrix factorisation (cosine contrastive loss)
+    rung: 2
+    year: 2021
+    paper: {title: "SimpleX: A Simple and Strong Baseline for Collaborative Filtering", venue: "CIKM 2021", url: "https://arxiv.org/abs/2109.12613"}
+    code: "https://github.com/reczoo/RecZoo"
+    fidelity: faithful
+    summary: MF with cosine similarity, many negatives with a margin (CCL loss), and user vectors that mix in the average of the history.
+    rubric:
+      implementation: [2, "An embedding model, a history average, and a margin loss; about 60 lines."]
+      tuning: [4, "Negatives, margin, negative weight, gamma, and the usual learning settings interact."]
+      data_hunger: [3, "Learns embeddings, so it needs several interactions per item."]
+      controllability: [2, "Latent vectors; little to steer directly."]
+      explainability: [2, "Post-hoc only: history items close in the embedding space."]
+
+  directau:
+    title: DirectAU
+    family: Matrix factorisation (alignment and uniformity)
+    rung: 2
+    year: 2022
+    paper: {title: "Towards Representation Alignment and Uniformity in Collaborative Filtering", venue: "KDD 2022", url: "https://arxiv.org/abs/2206.12811"}
+    code: "https://github.com/THUwangcy/DirectAU"
+    fidelity: faithful
+    summary: MF trained to align users with their items and to spread embeddings evenly over the sphere; no negative sampling.
+    rubric:
+      implementation: [2, "Two short loss functions on top of an embedding model."]
+      tuning: [2, "gamma matters most; weight decay and batch size second."]
+      data_hunger: [3, "Learns embeddings, so it needs several interactions per item."]
+      controllability: [2, "Latent vectors; little to steer directly."]
+      explainability: [2, "Post-hoc only: history items close in the embedding space."]
+
+  ultragcn:
+    title: UltraGCN
+    family: Graph-weighted matrix factorisation
+    rung: 3
+    year: 2021
+    paper: {title: "UltraGCN: Ultra Simplification of Graph Convolutional Networks for Recommendation", venue: "CIKM 2021", url: "https://arxiv.org/abs/2110.15114"}
+    code: "https://github.com/reczoo/RecZoo"
+    fidelity: faithful
+    summary: MF whose loss weights encode what infinitely many graph-convolution layers converge to, plus an item-item neighbour term; no message passing.
+    rubric:
+      implementation: [3, "Degree weights, an item-neighbour table, and a three-part loss."]
+      tuning: [5, "w1-w4, negatives, negative weight, gamma, lambda, and the learning settings; sensitive to them."]
+      data_hunger: [3, "Learns embeddings; the graph weights help sparse users a little."]
+      controllability: [2, "Latent vectors; little to steer directly."]
+      explainability: [2, "Post-hoc only: history items close in the embedding space."]
+
 services:
   amazon_personalize:
     title: Amazon Personalize

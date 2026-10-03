@@ -147,3 +147,49 @@ def test_ease_torch_backend_matches_numpy(toy):
     finite = np.isfinite(sa)
     assert np.allclose(sa[finite], sb[finite], atol=1e-4)
     assert b.explain(users[:2], np.array([[1, 2], [3, 4]]), hist)  # explanations work on the torch path too
+
+
+@pytest.mark.parametrize("name,extra", [
+    ("simplex", {}),
+    ("directau", {}),
+    ("ultragcn", {"ultragcn_negatives": 10, "ultragcn_neg_weight": 10}),  # the paper's 200 negatives exceed the toy's 40 items
+])
+def test_learned_embedding_methods_beat_random_on_toy_data(toy, name, extra):
+    from recbench.evaluation import Evaluator
+    from recbench.registry import ensure_loaded
+
+    data, split = toy
+    cfg = {**FAST_CFG, "max_epochs": 30, "lr": 1e-2, "batch_size": 256, **extra}
+    scores = {}
+    for method_name in ("random", name):
+        method = ensure_loaded().create_method(method_name)
+        method.fit(data, cfg)
+        scores[method_name] = Evaluator(split, data, cfg).run(method).metrics["ndcg_at_10"]
+    assert scores[name] > scores["random"] + 0.1, scores
+
+
+def test_alignment_and_uniformity():
+    import torch
+
+    from recbench.methods.mf_losses import alignment, uniformity
+
+    same = torch.nn.functional.normalize(torch.ones(4, 3), dim=-1)
+    spread = torch.eye(3)
+    assert alignment(same, same).item() == pytest.approx(0.0)
+    assert uniformity(same).item() == pytest.approx(0.0, abs=1e-6)  # all vectors in one spot: the worst case
+    assert uniformity(spread).item() < -3.0  # orthogonal unit vectors: squared distance 2, log(exp(-4)) = -4
+
+
+def test_ultragcn_neighbours_match_the_dense_definition(toy):
+    from recbench.methods.ultragcn import item_neighbours
+
+    data, _ = toy
+    x = (data.seen.toarray() > 0).astype(float)
+    a = x.T @ x
+    g = a.sum(axis=1)
+    left = np.where(g > 0, np.sqrt(g + 1) / np.maximum(g, 1e-12), 0)
+    omega = a * left[:, None] * (1 / np.sqrt(g + 1))[None, :]
+    ids, weights = item_neighbours(data.seen, k=5)
+    for item in range(1, a.shape[0]):
+        best = np.sort(omega[item])[::-1][:5]
+        assert np.allclose(np.sort(weights[item])[::-1], best, atol=1e-5)

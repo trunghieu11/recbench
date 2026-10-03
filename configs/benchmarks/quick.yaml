@@ -45,6 +45,9 @@ queue:
     - {name: slim, resource: cpu}
     - {name: vsknn, resource: cpu}
     - {name: sansa, resource: cpu}
+    - {name: simplex, resource: gpu}
+    - {name: directau, resource: gpu}
+    - {name: ultragcn, resource: gpu}
     - {name: sasrec, resource: gpu}
 
 # Each dataset's top methods by quick-tier test NDCG@10 are re-checked on full data.

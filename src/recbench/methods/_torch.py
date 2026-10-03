@@ -43,6 +43,8 @@ def sample_negatives(
     rounds: int = 3,
 ) -> np.ndarray:
     """n negatives per user drawn uniformly from `pool`, re-drawn (a few times) when the user has seen the item."""
+    if n <= 0:  # losses without negatives (DirectAU)
+        return np.zeros((len(users), 0), dtype=np.int64)
     negs = pool[rng.integers(0, len(pool), size=(len(users), n))]
     for _ in range(rounds):
         hit = np.asarray(seen[np.repeat(users, n), negs.ravel()]).reshape(len(users), n) > 0

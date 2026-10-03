@@ -10,11 +10,14 @@
 | [SANSA](sansa.md) | 1 | Linear autoencoder (sparse approximate EASE) | topn, sequential, similar_items | yes | no | no | faithful | yes |
 | [SLIM (ElasticNet)](slim.md) | 1 | Sparse linear model (item-item) | topn, sequential, similar_items | yes | no | no | faithful | yes |
 | [BPR-MF](bpr-mf.md) | 2 | Matrix factorisation (pairwise loss) | topn, sequential, similar_items | no | no | no | faithful | yes |
+| [DirectAU](directau.md) | 2 | Matrix factorisation (alignment and uniformity) | topn, sequential, similar_items | no | no | no | faithful | yes |
 | [iALS](ials.md) | 2 | Matrix factorisation (weighted least squares) | topn, sequential, similar_items | no | no | no | faithful | yes |
 | [PureSVD](puresvd.md) | 2 | Matrix factorisation (truncated SVD) | topn, sequential, similar_items | yes | no | no | faithful | yes |
+| [SimpleX](simplex.md) | 2 | Matrix factorisation (cosine contrastive loss) | topn, sequential, similar_items | yes | no | no | faithful | yes |
 | [GF-CF](gfcf.md) | 3 | Graph filter (training-free) | topn, sequential, similar_items | yes | no | no | faithful | yes |
 | [LightGCN](lightgcn.md) | 3 | Graph collaborative filtering | topn, sequential, similar_items | no | no | no | faithful | yes |
 | [Turbo-CF](turbocf.md) | 3 | Graph filter (training-free, polynomial) | topn, sequential, similar_items | yes | no | no | faithful | yes |
+| [UltraGCN](ultragcn.md) | 3 | Graph-weighted matrix factorisation | topn, sequential, similar_items | no | no | no | faithful | yes |
 | [XSimGCL](xsimgcl.md) | 3 | Graph contrastive learning | topn, sequential, similar_items | no | no | no | faithful | yes |
 | [BERT4Rec](bert4rec.md) | 4 | Sequential (bidirectional masked modelling) | topn, sequential, session, similar_items | yes | no | no | faithful | yes |
 | [HSTU](hstu.md) | 4 | Generative sequential transducer | topn, sequential, session, similar_items | yes | no | no | simplified | yes |

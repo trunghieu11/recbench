@@ -128,6 +128,8 @@ nav:
           - iALS: dictionary/algorithms/ials.md
           - SimpleX: dictionary/algorithms/simplex.md
           - DirectAU: dictionary/algorithms/directau.md
+          - MultVAE: dictionary/algorithms/multvae.md
+          - RecVAE: dictionary/algorithms/recvae.md
           - GF-CF: dictionary/algorithms/gfcf.md
           - Turbo-CF: dictionary/algorithms/turbocf.md
           - UltraGCN: dictionary/algorithms/ultragcn.md

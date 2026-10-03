@@ -12,7 +12,9 @@
 | [BPR-MF](bpr-mf.md) | 2 | Matrix factorisation (pairwise loss) | topn, sequential, similar_items | no | no | no | faithful | yes |
 | [DirectAU](directau.md) | 2 | Matrix factorisation (alignment and uniformity) | topn, sequential, similar_items | no | no | no | faithful | yes |
 | [iALS](ials.md) | 2 | Matrix factorisation (weighted least squares) | topn, sequential, similar_items | no | no | no | faithful | yes |
+| [MultVAE](multvae.md) | 2 | Variational autoencoder | topn, sequential, similar_items | yes | no | no | faithful | yes |
 | [PureSVD](puresvd.md) | 2 | Matrix factorisation (truncated SVD) | topn, sequential, similar_items | yes | no | no | faithful | yes |
+| [RecVAE](recvae.md) | 2 | Variational autoencoder | topn, sequential, similar_items | yes | no | no | faithful | yes |
 | [SimpleX](simplex.md) | 2 | Matrix factorisation (cosine contrastive loss) | topn, sequential, similar_items | yes | no | no | faithful | yes |
 | [GF-CF](gfcf.md) | 3 | Graph filter (training-free) | topn, sequential, similar_items | yes | no | no | faithful | yes |
 | [LightGCN](lightgcn.md) | 3 | Graph collaborative filtering | topn, sequential, similar_items | no | no | no | faithful | yes |

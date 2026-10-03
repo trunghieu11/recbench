@@ -109,17 +109,13 @@ def steps_per_epoch(n_examples: int, batch_size: int) -> int:
     return max(1, math.ceil(n_examples / max(batch_size, 1)))
 
 
-def train_epochs(
+def early_stopping_loop(
     model: torch.nn.Module,
-    batches: Iterator[Any],
-    n_steps_per_epoch: int,
-    loss_fn: Callable[[Any], torch.Tensor],
+    run_epoch: Callable[[int], float],
     cfg: dict[str, Any],
     owner: Recommender | None = None,
-    lr: float | None = None,
-    weight_decay: float = 0.0,
 ) -> dict[str, float]:
-    """Adam in epochs, with early stopping on a validation fold.
+    """Call run_epoch(epoch) (one epoch of training; returns its mean loss) with recbench's stopping rules.
 
     - cfg['epochs']: train exactly this many epochs and never look at validation data. The final run uses the
       best epoch count found while tuning.
@@ -129,8 +125,6 @@ def train_epochs(
     - cfg['fit_deadline'] (unix time): stop before an epoch that would end after it.
     The per-epoch curve is stored on owner.fit_curve for MLflow.
     """
-    device = next(model.parameters()).device
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr or float(cfg.get("lr", 1e-3)), weight_decay=weight_decay)
     fixed = cfg.get("epochs")
     max_epochs = int(fixed) if fixed else int(cfg.get("max_epochs", 30))
     monitor = None if fixed or owner is None else getattr(owner, "monitor", None)
@@ -139,25 +133,15 @@ def train_epochs(
     began = time.perf_counter()
     curve: list[dict[str, float]] = []
     best_val, best_epoch, best_state, waited, stopped = -1.0, 0, None, 0, "max_epochs"
-    first = last = None
     for epoch in range(1, max_epochs + 1):
         if deadline and curve and time.time() + curve[-1]["seconds"] > deadline:
             stopped = "deadline"
             break
         model.train()
-        epoch_began, total = time.perf_counter(), 0.0
-        for _, batch in zip(range(n_steps_per_epoch), batches):
-            with autocast(device, cfg):
-                loss = loss_fn(batch)
-            optimizer.zero_grad(set_to_none=True)
-            loss.backward()
-            optimizer.step()
-            value = float(loss.detach())
-            first = value if first is None else first
-            total += value
-        last = total / n_steps_per_epoch
+        epoch_began = time.perf_counter()
+        loss = float(run_epoch(epoch))
         model.eval()
-        point = {"epoch": epoch, "loss": last, "seconds": time.perf_counter() - epoch_began}
+        point = {"epoch": epoch, "loss": loss, "seconds": time.perf_counter() - epoch_began}
         if monitor is not None:
             with torch.no_grad():
                 point["val_ndcg_at_10"] = monitor(owner, epoch)
@@ -180,11 +164,40 @@ def train_epochs(
         "best_epoch": best_epoch or len(curve),
         "best_val_ndcg_at_10": best_val if monitor is not None else float("nan"),
         "stopped": stopped,
-        "steps_per_epoch": n_steps_per_epoch,
-        "first_loss": first or 0.0,
-        "last_loss": last or 0.0,
+        "first_loss": curve[0]["loss"] if curve else 0.0,
+        "last_loss": curve[-1]["loss"] if curve else 0.0,
         "train_loop_seconds": time.perf_counter() - began,
     }
+
+
+def train_epochs(
+    model: torch.nn.Module,
+    batches: Iterator[Any],
+    n_steps_per_epoch: int,
+    loss_fn: Callable[[Any], torch.Tensor],
+    cfg: dict[str, Any],
+    owner: Recommender | None = None,
+    lr: float | None = None,
+    weight_decay: float = 0.0,
+) -> dict[str, float]:
+    """Adam in epochs of `n_steps_per_epoch` batches, with early_stopping_loop's rules and bf16 on CUDA."""
+    device = next(model.parameters()).device
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr or float(cfg.get("lr", 1e-3)), weight_decay=weight_decay)
+
+    def run_epoch(_: int) -> float:
+        total = 0.0
+        for _, batch in zip(range(n_steps_per_epoch), batches):
+            with autocast(device, cfg):
+                loss = loss_fn(batch)
+            optimizer.zero_grad(set_to_none=True)
+            loss.backward()
+            optimizer.step()
+            total += float(loss.detach())
+        return total / n_steps_per_epoch
+
+    info = early_stopping_loop(model, run_epoch, cfg, owner)
+    info["steps_per_epoch"] = n_steps_per_epoch
+    return info
 
 
 class EmbeddingRecommender(Recommender):

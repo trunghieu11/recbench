@@ -16,7 +16,8 @@ from recbench.methods import (
     sasrec,
     tiger,
     ultragcn,
+    vae,
 )
 
 __all__ = ["baselines", "content", "dcnv2", "graph", "graph_filters", "hstu", "implicit_mf", "linear", "mf_losses", "neighbourhood",
-           "recbole_models", "recombee", "sasrec", "tiger", "ultragcn"]
+           "recbole_models", "recombee", "sasrec", "tiger", "ultragcn", "vae"]

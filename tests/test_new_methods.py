@@ -153,6 +153,8 @@ def test_ease_torch_backend_matches_numpy(toy):
     ("simplex", {}),
     ("directau", {}),
     ("ultragcn", {"ultragcn_negatives": 10, "ultragcn_neg_weight": 10}),  # the paper's 200 negatives exceed the toy's 40 items
+    ("multvae", {"vae_hidden": 64, "vae_latent": 16, "vae_batch_size": 32, "lr": 5e-3}),
+    ("recvae", {"vae_hidden": 64, "vae_latent": 16, "vae_batch_size": 32, "lr": 5e-3}),
 ])
 def test_learned_embedding_methods_beat_random_on_toy_data(toy, name, extra):
     from recbench.evaluation import Evaluator

@@ -467,6 +467,38 @@ methods:
       controllability: [2, "Latent vectors; little to steer directly."]
       explainability: [2, "Post-hoc only: history items close in the embedding space."]
 
+  multvae:
+    title: MultVAE
+    family: Variational autoencoder
+    rung: 2
+    year: 2018
+    paper: {title: "Variational Autoencoders for Collaborative Filtering", venue: "WWW 2018", url: "https://arxiv.org/abs/1802.05814"}
+    code: "https://github.com/dawenl/vae_cf"
+    fidelity: faithful
+    summary: Encodes a user's whole history into a small random code and decodes a softmax over all items (multinomial likelihood, KL annealing).
+    rubric:
+      implementation: [3, "A small encoder-decoder network plus KL annealing."]
+      tuning: [3, "Layer sizes, dropout, KL cap, annealing, learning rate."]
+      data_hunger: [3, "Strongest on dense histories; weaker for users with very few items."]
+      controllability: [2, "Latent codes; little to steer directly."]
+      explainability: [2, "Post-hoc only."]
+
+  recvae:
+    title: RecVAE
+    family: Variational autoencoder
+    rung: 2
+    year: 2020
+    paper: {title: "RecVAE: a New Variational Autoencoder for Top-N Recommendations with Implicit Feedback", venue: "WSDM 2020", url: "https://arxiv.org/abs/1912.11160"}
+    code: "https://github.com/ilya-shenbin/RecVAE"
+    fidelity: faithful
+    summary: MultVAE with a deeper dense-residual encoder, a composite prior, a KL weight scaled by user activity, and alternating encoder and decoder updates.
+    rubric:
+      implementation: [3, "A deeper encoder, a mixture prior, and two alternating optimisers."]
+      tuning: [3, "gamma, layer sizes, dropout, learning rate."]
+      data_hunger: [3, "Strongest on dense histories."]
+      controllability: [2, "Latent codes; little to steer directly."]
+      explainability: [2, "Post-hoc only."]
+
 services:
   amazon_personalize:
     title: Amazon Personalize

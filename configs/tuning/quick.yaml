@@ -131,3 +131,20 @@ methods:
       ultragcn_lambda: {type: log, low: 0.0001, high: 0.01}
       ultragcn_neighbors: {type: choice, values: [5, 10, 20]}
       lr: {type: log, low: 0.0001, high: 0.01}
+
+  multvae:             # Liang et al. 2018 ([600, 200], dropout 0.5, beta cap 0.2)
+    params:
+      vae_hidden: {type: choice, values: [200, 600, 1000]}
+      vae_latent: {type: choice, values: [64, 128, 200, 256]}
+      vae_dropout: {type: float, low: 0.2, high: 0.7}
+      vae_beta_cap: {type: log, low: 0.05, high: 1.0}
+      vae_anneal_epochs: {type: choice, values: [5, 10, 20]}
+      lr: {type: log, low: 0.0001, high: 0.01}
+
+  recvae:              # Shenbin et al. 2020 (gamma 0.005, lr 5e-4, [600, 200])
+    params:
+      recvae_gamma: {type: log, low: 0.001, high: 0.05}
+      vae_hidden: {type: choice, values: [200, 600, 1000]}
+      vae_latent: {type: choice, values: [64, 128, 200, 256]}
+      vae_dropout: {type: float, low: 0.3, high: 0.7}
+      lr: {type: log, low: 0.0001, high: 0.005}

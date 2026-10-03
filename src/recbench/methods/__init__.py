@@ -5,6 +5,7 @@ from recbench.methods import (
     content,
     dcnv2,
     graph,
+    graph_filters,
     hstu,
     implicit_mf,
     linear,
@@ -15,5 +16,5 @@ from recbench.methods import (
     tiger,
 )
 
-__all__ = ["baselines", "content", "dcnv2", "graph", "hstu", "implicit_mf", "linear", "neighbourhood", "recbole_models",
+__all__ = ["baselines", "content", "dcnv2", "graph", "graph_filters", "hstu", "implicit_mf", "linear", "neighbourhood", "recbole_models",
            "recombee", "sasrec", "tiger"]

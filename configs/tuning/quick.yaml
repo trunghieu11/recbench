@@ -92,3 +92,16 @@ methods:
       sansa_density: {type: log, low: 0.00001, high: 0.01}
       decay_half_life_days: {type: choice, values: [null, 30, 90, 365]}
     confirm: {param: sansa_lambda, factors: [0.5, 1.0, 2.0], scale_with: users}
+
+  gfcf:                # Shen et al. 2021 (alpha = 0.3, k = 256 in the paper)
+    params:
+      gfcf_alpha: {type: float, low: 0.0, high: 1.0}
+      gfcf_k: {type: choice, values: [64, 128, 256, 512, 1024]}
+      decay_half_life_days: {type: choice, values: [null, 30, 90, 365]}
+
+  turbocf:             # Park et al. 2024 (normalisation, element-wise power, filter shape)
+    params:
+      turbocf_alpha: {type: float, low: 0.3, high: 0.7}
+      turbocf_power: {type: float, low: 0.5, high: 1.5}
+      turbocf_filter: {type: choice, values: [1, 2, 3]}
+      decay_half_life_days: {type: choice, values: [null, 30, 90, 365]}

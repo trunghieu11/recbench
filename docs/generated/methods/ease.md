@@ -6,7 +6,7 @@
 | Ladder rung | 1 — Neighbourhood and linear models |
 | Paper | [Embarrassingly Shallow Autoencoders for Sparse Data](https://arxiv.org/abs/1905.03375) (WWW 2019) |
 | Reference code | [https://github.com/hasteck/EASE_WWW19](https://github.com/hasteck/EASE_WWW19) |
-| What recbench runs | numpy (in-repo closed form) |
+| What recbench runs | numpy or PyTorch (in-repo closed form) |
 | Fidelity | faithful |
 | Tasks | topn, sequential, similar_items |
 | Uses the order of the history | yes |

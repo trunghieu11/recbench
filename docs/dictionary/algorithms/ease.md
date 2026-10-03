@@ -12,7 +12,7 @@
 
 !!! warning "When not to"
     - Very large catalogs (hundreds of thousands of items): the dense matrix does not fit. recbench caps the
-      catalog for this reason.
+      catalog for this reason; [SANSA](sansa.md) computes a sparse approximation without a cap.
     - When the order of actions matters, or for brand-new items.
 
 ## 1. Intuition
@@ -118,19 +118,24 @@ exactly with a Lagrange multiplier, which is where the division by $P_{jj}$ come
   items in float32, each item × item matrix takes 1.6 GB, and several exist briefly. On a laptop this is
   seconds to about a minute.
 - **Inference:** $x_u B$ for each user, a sparse row times a dense matrix.
-- **Hardware:** CPU. The memory is the limit, not the compute.
+- **Hardware:** CPU, or a GPU. On a CUDA GPU, recbench computes the inverse and the scores in PyTorch, which is
+  much faster, and sets the cap from the free GPU memory: about 55,000 items on a 48 GB card. Memory is the
+  limit, not the compute.
 
 ## 6. Hyperparameters
 
 | Name in recbench config | What it does | Default | Typical range | Tip |
 |---|---|---|---|---|
 | `ease_lambda` | L2 penalty $\lambda$ | 500.0 | 50–5,000 | larger for denser data and bigger catalogs |
-| `ease_max_items` | catalog cap (most recently popular items) | 30,000; 20,000 on the laptop profile | 10K–40K | limited by RAM: about 3 × items² × 4 bytes |
+| `ease_max_items` | catalog cap (most recently popular items) | 30,000; 20,000 on the laptop profile | 10K–60K | limited by RAM or GPU memory: about 3 × items² × 4 bytes |
+| `ease_backend` | `auto` (PyTorch on a CUDA GPU, else NumPy), `numpy`, or `torch` | auto | — | the two backends give the same weights (a test checks it) |
+| `decay_half_life_days` | recent interactions weigh more, in the model and in the user's profile | none | none, 30, 90, 365 | helps when tastes drift |
 
 ## 7. In recbench
 
 - Code: `src/recbench/methods/baselines.py::EASE`. The computation runs in float32 to halve memory, and the
-  inverse is turned into $B$ in place.
+  inverse is turned into $B$ in place. On a GPU the same steps run in PyTorch, and the cap comes from
+  `src/recbench/methods/_memory.py::dense_item_cap`.
 - **Catalog cap:** if a dataset has more items than `ease_max_items`, EASE keeps the most recently popular
   ones and logs `fit.item_cap_coverage`, the share of pre-test interactions those items cover. Items
   outside the cap are never recommended.

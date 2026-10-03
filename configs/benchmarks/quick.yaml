@@ -33,10 +33,12 @@ queue:
     - {name: random, resource: cpu}
     - {name: most_popular, resource: cpu}
     # 2. strong cheap baselines: the first provisional leaderboard
-    - {name: ease, resource: cpu}
+    - {name: ease, resource: gpu}       # PyTorch on the GPU; a CPU worker runs it when there is no GPU
     - {name: itemknn, resource: cpu}
     - {name: rp3beta, resource: cpu}
     - {name: puresvd, resource: cpu}
+    - {name: gfcf, resource: cpu}
+    - {name: turbocf, resource: gpu}
     # 3. the other CPU methods, in parallel with the GPU methods
     - {name: ials, resource: cpu}
     - {name: bpr_mf, resource: cpu}

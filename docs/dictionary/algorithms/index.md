@@ -10,7 +10,7 @@ understand modern recommender systems.
 | 0 — Baselines | "no learning" reference points | [Random](random.md), [MostPopular](most-popular.md) |
 | 1 — Neighbourhood and linear | items that co-occur are related | [ItemKNN](itemknn.md), [EASE](ease.md), [RP3beta](rp3beta.md), [SLIM](slim.md), [SANSA](sansa.md) |
 | 2 — Matrix factorisation | users and items as learned vectors | [PureSVD](puresvd.md), [BPR-MF](bpr-mf.md), [iALS](ials.md) |
-| 3 — Graph neural networks | neighbours of neighbours carry signal | [LightGCN](lightgcn.md), [XSimGCL](xsimgcl.md) |
+| 3 — Graph methods | neighbours of neighbours carry signal | [GF-CF](gfcf.md), [Turbo-CF](turbocf.md) (training-free filters), [LightGCN](lightgcn.md), [XSimGCL](xsimgcl.md) |
 | 4 — Sequential models | the *order* of a user's history matters | [V-SKNN](vsknn.md), [SASRec](sasrec.md), [BERT4Rec](bert4rec.md), [S3-Rec](s3rec.md), [HSTU](hstu.md), [TIGER-lite](tiger-lite.md) |
 | 5 — CTR-style rankers | score one (user, item) pair at a time with rich features | [DIN](din.md), [DCN-V2](dcnv2.md) |
 | 6 — Content towers | understand items from their text and images | [Text hash tower](text-hash-tower.md), [Multimodal tower](multimodal-tower.md) |

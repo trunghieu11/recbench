@@ -126,6 +126,8 @@ nav:
           - PureSVD: dictionary/algorithms/puresvd.md
           - BPR-MF: dictionary/algorithms/bpr-mf.md
           - iALS: dictionary/algorithms/ials.md
+          - GF-CF: dictionary/algorithms/gfcf.md
+          - Turbo-CF: dictionary/algorithms/turbocf.md
           - LightGCN: dictionary/algorithms/lightgcn.md
           - XSimGCL: dictionary/algorithms/xsimgcl.md
           - V-SKNN: dictionary/algorithms/vsknn.md

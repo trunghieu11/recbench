@@ -13,6 +13,7 @@ import scipy.sparse as sp
 
 from recbench.data import HistoryBatch, TrainView
 from recbench.methods._explain import contribution_explanations
+from recbench.methods._memory import dense_item_cap
 from recbench.protocol import NEG_INF, Explanation, MethodSpec, Recommender, Task
 from recbench.registry import register_method
 
@@ -208,22 +209,25 @@ class EASE(Recommender):
     B = I - P / diag(P), with P = (X^T X + lambda I)^-1 and diag(B) = 0. score(u) = x_u B.
     The item x item matrix is dense, so the catalog is capped at `ease_max_items`
     (most recently popular items); items outside the cap are never recommended.
+    On a CUDA GPU (or with ease_backend: torch) the inverse and the scoring run in PyTorch, and the cap
+    is set by the free GPU memory instead (about 55,000 items on a 48 GB card).
     """
 
     spec = MethodSpec(
         name="ease",
         tasks=BASELINE_TASKS,
         uses_history=True,
-        upstream="numpy (in-repo closed form)",
+        upstream="numpy or PyTorch (in-repo closed form)",
         cost_band="low",
-        impl_version="2",  # time decay
+        impl_version="3",  # time decay; GPU backend
         deterministic=True,
     )
 
     def fit(self, data: TrainView, cfg: dict[str, Any]) -> None:
         self.bind(data)
         self.lam = float(cfg.get("ease_lambda", 500.0))
-        cap = int(cfg.get("ease_max_items", 30_000))
+        self.device = _ease_device(cfg)
+        cap = dense_item_cap(int(cfg.get("ease_max_items", 30_000)), self.device, n_matrices=3)
         warm = np.flatnonzero(data.item_pop > 0)
         warm = warm[warm > 0]
         if len(warm) > cap:
@@ -234,13 +238,25 @@ class EASE(Recommender):
         x = self.seen[:, self.kept].astype(np.float32)
         # float32 keeps the dense item x item matrices at 4 bytes per entry (30K items ~ 3.6 GB each).
         gram = np.asarray((x.T @ x).todense(), dtype=np.float32)
-        gram[np.diag_indices_from(gram)] += self.lam
-        inverse = np.linalg.inv(gram)
-        del gram
-        diag = np.diag(inverse).copy()
-        inverse /= -diag[None, :]
-        inverse[np.diag_indices_from(inverse)] = 0.0
-        self.weights = inverse
+        if self.device is None:
+            gram[np.diag_indices_from(gram)] += self.lam
+            inverse = np.linalg.inv(gram)
+            del gram
+            diag = np.diag(inverse).copy()
+            inverse /= -diag[None, :]
+            inverse[np.diag_indices_from(inverse)] = 0.0
+            self.weights = inverse
+        else:
+            import torch
+
+            g = torch.as_tensor(gram, device=self.device)
+            del gram
+            g.diagonal().add_(self.lam)
+            inverse = torch.linalg.inv(g)
+            del g
+            inverse /= -torch.diagonal(inverse).clone()[None, :]
+            inverse.fill_diagonal_(0.0)
+            self.weights = inverse  # a torch tensor on the GPU
         self.position = np.full(self.n_items + 1, -1, dtype=np.int64)
         self.position[self.kept] = np.arange(len(self.kept))
         total = max(int(data.item_pop[1:].sum()), 1)
@@ -248,7 +264,12 @@ class EASE(Recommender):
 
     def score_users(self, users: np.ndarray, hist: HistoryBatch) -> np.ndarray:
         x = self.seen[users][:, self.kept]
-        partial = np.asarray(x @ self.weights, dtype=np.float32)
+        if self.device is None:
+            partial = np.asarray(x @ self.weights, dtype=np.float32)
+        else:
+            import torch
+
+            partial = (torch.as_tensor(x.toarray(), device=self.device) @ self.weights).float().cpu().numpy()
         out = np.full((len(users), self.n_items + 1), NEG_INF, dtype=np.float32)
         out[:, self.kept] = partial
         return out
@@ -259,7 +280,27 @@ class EASE(Recommender):
             pos_h = self.position[history]
             out = np.zeros(len(history))
             ok = (pos_h >= 0) & (pos_j >= 0)
-            out[ok] = self.weights[pos_h[ok], pos_j]
+            if ok.any():
+                if self.device is None:
+                    out[ok] = self.weights[pos_h[ok], pos_j]
+                else:
+                    import torch
+
+                    rows = torch.as_tensor(pos_h[ok], device=self.device)
+                    out[ok] = self.weights[rows, int(pos_j)].float().cpu().numpy()
             return out
 
         return contribution_explanations(users, items, lambda u: self.seen[u].indices, weight, self.item_ids, "EASE")
+
+
+def _ease_device(cfg: dict[str, Any]):
+    """The torch device for EASE, or None for the numpy path (no CUDA, or torch not installed)."""
+    backend = str(cfg.get("ease_backend", "auto"))
+    if backend == "numpy":
+        return None
+    try:
+        from recbench.methods._torch import resolve_device
+    except ImportError:  # the bench extra has no torch
+        return None
+    device = resolve_device(cfg)
+    return device if (backend == "torch" or device.type == "cuda") else None

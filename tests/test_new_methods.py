@@ -93,3 +93,57 @@ def test_sansa_ranks_like_exact_ease(toy):
     for row in range(len(users)):  # the two differ only on already-seen items (EASE zeroes its diagonal)
         mask = unseen[row] & np.isfinite(a[row])
         assert np.corrcoef(a[row][mask], b[row][mask])[0, 1] > 0.99
+
+
+def _dense_norm(x: np.ndarray, a: float) -> np.ndarray:
+    rows, cols = x.sum(axis=1), x.sum(axis=0)
+    d_u = np.where(rows > 0, np.power(np.maximum(rows, 1e-12), -a), 0.0)
+    d_i = np.where(cols > 0, np.power(np.maximum(cols, 1e-12), a - 1.0), 0.0)
+    return d_u[:, None] * x * d_i[None, :]
+
+
+def test_gfcf_matches_the_dense_formula(toy):
+    from recbench.methods.graph_filters import GFCF
+
+    data, _ = toy
+    method = GFCF()
+    method.fit(data, {"gfcf_alpha": 0.3, "gfcf_k": 6})
+    x = data.seen.toarray()
+    norm = _dense_norm(x, 0.5)
+    _, _, vt = np.linalg.svd(norm, full_matrices=False)
+    cols = x.sum(axis=0)
+    d_inv, d = np.where(cols > 0, cols ** -0.5, 0), np.where(cols > 0, cols**0.5, 0)
+    users = data.warm_users()[:20]
+    reference = x[users] @ norm.T @ norm + 0.3 * ((x[users] * d_inv) @ vt[:6].T @ vt[:6]) * d
+    got = method.score_users(users, data.history_batch(users, 10))
+    assert np.allclose(got[:, 1:], reference[:, 1:], atol=1e-3)  # randomized vs exact SVD, float32
+
+
+@pytest.mark.parametrize("order", [1, 2, 3])
+def test_turbocf_matches_the_dense_formula(toy, order):
+    from recbench.methods.graph_filters import TurboCF
+
+    data, _ = toy
+    method = TurboCF()
+    method.fit(data, {"turbocf_alpha": 0.6, "turbocf_power": 0.8, "turbocf_filter": order, "device": "cpu"})
+    keep = method.kept
+    x = data.seen.toarray()[:, keep]
+    norm = _dense_norm(x, 0.6)
+    p = (norm.T @ norm) ** 0.8
+    f = {1: p, 2: 2 * p - p @ p, 3: p + 0.01 * (-p @ p @ p + 10 * p @ p - 29 * p)}[order]
+    users = data.warm_users()[:20]
+    got = method.score_users(users, data.history_batch(users, 10))[:, keep]
+    assert np.allclose(got, x[users] @ f, atol=1e-3)
+
+
+def test_ease_torch_backend_matches_numpy(toy):
+    data, _ = toy
+    users = data.warm_users()[:20]
+    hist = data.history_batch(users, 10)
+    a, b = EASE(), EASE()
+    a.fit(data, {"ease_lambda": 20.0, "ease_backend": "numpy"})
+    b.fit(data, {"ease_lambda": 20.0, "ease_backend": "torch", "device": "cpu"})
+    sa, sb = a.score_users(users, hist), b.score_users(users, hist)
+    finite = np.isfinite(sa)
+    assert np.allclose(sa[finite], sb[finite], atol=1e-4)
+    assert b.explain(users[:2], np.array([[1, 2], [3, 4]]), hist)  # explanations work on the torch path too

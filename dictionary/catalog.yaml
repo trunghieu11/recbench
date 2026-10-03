@@ -387,6 +387,38 @@ methods:
       controllability: [4, "Sparse item-item weights (stored as two factors)."]
       explainability: [4, "Additive in the history, but the weights are a product of two sparse factors."]
 
+  gfcf:
+    title: GF-CF
+    family: Graph filter (training-free)
+    rung: 3
+    year: 2021
+    paper: {title: "How Powerful is Graph Convolution for Recommendation?", venue: "CIKM 2021", url: "https://arxiv.org/abs/2108.07567"}
+    code: "https://github.com/yshenaw/GF_CF"
+    fidelity: faithful
+    summary: Smooths a user's history over the normalised item-item graph and adds a low-rank "ideal low-pass" part. No training.
+    rubric:
+      implementation: [2, "A sparse product and a truncated SVD; about 30 lines."]
+      tuning: [1, "Two settings: alpha and the number of singular vectors."]
+      data_hunger: [2, "Works on sparse data; needs co-occurring items."]
+      controllability: [3, "Fixed formulas, but the low-rank part is not item-by-item."]
+      explainability: [3, "The linear part is an item-item sum; the low-rank part is abstract."]
+
+  turbocf:
+    title: Turbo-CF
+    family: Graph filter (training-free, polynomial)
+    rung: 3
+    year: 2024
+    paper: {title: "Turbo-CF: Matrix Decomposition-Free Graph Filtering for Fast Recommendation", venue: "SIGIR 2024", url: "https://arxiv.org/abs/2404.14243"}
+    code: "https://github.com/jindeok/Turbo-CF"
+    fidelity: faithful
+    summary: Applies a small polynomial filter to the dense normalised item-item graph; only matrix products, so it is fast on a GPU.
+    rubric:
+      implementation: [2, "A normalisation and a few dense matrix products."]
+      tuning: [2, "Normalisation, power, and the choice of filter."]
+      data_hunger: [2, "Works on sparse data; the item cap is set by memory."]
+      controllability: [3, "Interpretable filter shape, but no item-level weights to edit."]
+      explainability: [3, "Scores are item-item sums through a filtered graph, but the filter mixes many paths."]
+
 services:
   amazon_personalize:
     title: Amazon Personalize

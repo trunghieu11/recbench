@@ -22,6 +22,7 @@
 | [UltraGCN](ultragcn.md) | 3 | Graph-weighted matrix factorisation | topn, sequential, similar_items | no | no | no | faithful | yes |
 | [XSimGCL](xsimgcl.md) | 3 | Graph contrastive learning | topn, sequential, similar_items | no | no | no | faithful | yes |
 | [BERT4Rec](bert4rec.md) | 4 | Sequential (bidirectional masked modelling) | topn, sequential, session, similar_items | yes | no | no | faithful | yes |
+| [GRU4Rec](gru4rec.md) | 4 | Recurrent neural network (sequential) | topn, sequential, session | yes | no | no | faithful | yes |
 | [HSTU](hstu.md) | 4 | Generative sequential transducer | topn, sequential, session, similar_items | yes | no | no | simplified | yes |
 | [S3-Rec](s3rec.md) | 4 | Sequential (self-supervised pre-training) | topn, sequential, session, similar_items | yes | no | yes | faithful | yes |
 | [SASRec](sasrec.md) | 4 | Sequential (causal self-attention) | topn, sequential, session, similar_items | yes | no | no | faithful | yes |

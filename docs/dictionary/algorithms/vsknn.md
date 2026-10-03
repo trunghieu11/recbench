@@ -145,4 +145,5 @@ $$
 
 - Ludewig, Jannach (2018). *Evaluation of Session-based Recommendation Algorithms.* User Modeling and
   User-Adapted Interaction. [arXiv](https://arxiv.org/abs/1803.09587)
-- [Sequential and session recommendation](../concepts/sequential-and-session.md), [SASRec](sasrec.md).
+- [Sequential and session recommendation](../concepts/sequential-and-session.md), [GRU4Rec](gru4rec.md),
+  [SASRec](sasrec.md).

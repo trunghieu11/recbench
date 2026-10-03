@@ -499,6 +499,22 @@ methods:
       controllability: [2, "Latent codes; little to steer directly."]
       explainability: [2, "Post-hoc only."]
 
+  gru4rec:
+    title: GRU4Rec
+    family: Recurrent neural network (sequential)
+    rung: 4
+    year: 2016
+    paper: {title: "Session-based Recommendations with Recurrent Neural Networks", venue: "ICLR 2016", url: "https://arxiv.org/abs/1511.06939"}
+    code: "https://github.com/hidasib/GRU4Rec_PyTorch_Official"
+    fidelity: faithful
+    summary: A GRU reads the user's clicks in order and scores every item as the next click; the authors' official PyTorch code.
+    rubric:
+      implementation: [2, "An adapter around the official code; the stepping for scoring is ours."]
+      tuning: [4, "Loss, hidden size, batch size, learning rate, momentum, dropouts, sampling."]
+      data_hunger: [3, "Needs many sequences; short histories give little to learn from."]
+      controllability: [2, "A hidden state; little to steer directly."]
+      explainability: [2, "Post-hoc only."]
+
 services:
   amazon_personalize:
     title: Amazon Personalize

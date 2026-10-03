@@ -50,6 +50,7 @@ queue:
     - {name: ultragcn, resource: gpu}
     - {name: multvae, resource: gpu}
     - {name: recvae, resource: gpu}
+    - {name: gru4rec, resource: gpu}
     - {name: sasrec, resource: gpu}
 
 # Each dataset's top methods by quick-tier test NDCG@10 are re-checked on full data.

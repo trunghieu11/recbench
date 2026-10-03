@@ -136,6 +136,7 @@ nav:
           - LightGCN: dictionary/algorithms/lightgcn.md
           - XSimGCL: dictionary/algorithms/xsimgcl.md
           - V-SKNN: dictionary/algorithms/vsknn.md
+          - GRU4Rec: dictionary/algorithms/gru4rec.md
           - SASRec: dictionary/algorithms/sasrec.md
           - BERT4Rec: dictionary/algorithms/bert4rec.md
           - S3-Rec: dictionary/algorithms/s3rec.md

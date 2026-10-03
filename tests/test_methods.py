@@ -28,12 +28,17 @@ def test_every_method_fits_and_evaluates(toy, name):
     assert np.isfinite(result.metrics["score_seconds_per_1k_users"])
 
 
+GRU4REC_COPY = {"gru4rec_loss": "cross-entropy", "gru4rec_lr": 0.1, "gru4rec_dropout_embed": 0.0, "gru4rec_dropout_hidden": 0.0,
+                "gru4rec_hidden": 64, "gru4rec_batch_size": 32, "gru4rec_n_sample": 32}
+
+
 @pytest.mark.slow
-@pytest.mark.parametrize("name,minimum", [("sasrec", 0.9), ("hstu", 0.9), ("tiger_lite", 0.9), ("bert4rec", 0.6)])
-def test_sequence_models_solve_the_copy_task(copy_split, name, minimum):
+@pytest.mark.parametrize("name,minimum,extra", [("sasrec", 0.9, {}), ("hstu", 0.9, {}), ("tiger_lite", 0.9, {}), ("bert4rec", 0.6, {}),
+                                                ("gru4rec", 0.9, GRU4REC_COPY)])
+def test_sequence_models_solve_the_copy_task(copy_split, name, minimum, extra):
     """Every user walks i -> i+1 -> ...; reading the wrong end of the history makes this unsolvable."""
     view, split = TrainView(copy_split), EvalSplit(copy_split)
-    cfg = {**FAST_CFG, "dim": 32, "max_steps": 300, "max_epochs": 80, "lr": 5e-3, "batch_size": 64, "dropout": 0.0, "seed": 0}
+    cfg = {**FAST_CFG, "dim": 32, "max_steps": 300, "max_epochs": 80, "lr": 5e-3, "batch_size": 64, "dropout": 0.0, "seed": 0, **extra}
     method = ensure_loaded().create_method(name)
     method.fit(view, cfg)
     users = split.users_of(warm=True)

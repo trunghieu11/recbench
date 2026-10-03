@@ -246,7 +246,8 @@ def run_pair(split_dir: Path, method_name: str, resolved: dict[str, Any], *, iso
         out_path = Path(tmp) / "result.json"
         cfg_path.write_text(json.dumps(resolved))
         command = [sys.executable, "-m", "recbench.runner", "--single", str(split_dir), method_name, str(cfg_path), str(out_path)]
-        env = {**os.environ, **thread_env(resolved.get("threads")), "MLFLOW_TRACKING_URI": tracking_uri(), "RECBENCH_ROOT": str(repo_root())}
+        env = {**os.environ, **thread_env(resolved.get("threads")), **(resolved.get("child_env") or {}),
+               "MLFLOW_TRACKING_URI": tracking_uri(), "RECBENCH_ROOT": str(repo_root())}
         limit = float(resolved.get("timeout_minutes", 240)) * 60
         proc = subprocess.Popen(command, env=env)
         began = time.time()  # wall clock: keeps counting while a laptop sleeps (time.monotonic does not on macOS)

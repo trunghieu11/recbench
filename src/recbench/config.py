@@ -16,6 +16,8 @@ PRESETS: dict[str, dict[str, Any]] = {
     "cpu": {"dim": 32, "layers": 2, "heads": 2, "seq_len": 50, "batch_size": 128, "lr": 1e-3, "max_steps": 400},
     "24gb": {"dim": 64, "layers": 2, "heads": 2, "seq_len": 50, "batch_size": 256, "lr": 1e-3, "max_steps": 10_000},
     "48gb": {"dim": 128, "layers": 3, "heads": 4, "seq_len": 200, "batch_size": 512, "lr": 1e-3, "max_steps": 30_000},
+    # Quick-tier defaults for settings that are not tuned; epoch-based models stop early on the validation fold.
+    "quick": {"dim": 64, "layers": 2, "heads": 2, "seq_len": 50, "batch_size": 256, "lr": 1e-3, "max_steps": 10_000, "max_epochs": 30},
 }
 
 
@@ -36,7 +38,7 @@ def resolve_run_config(
     """Merge the benchmark file, its hardware profile, and the model-size preset."""
     root = repo_root or Path.cwd()
     hardware = load_yaml(root / benchmark.get("hardware", "configs/hardware/local-cpu.yaml"))
-    chosen = preset or hardware.get("default_preset", "cpu")
+    chosen = preset or benchmark.get("preset") or hardware.get("default_preset", "cpu")
     if chosen not in PRESETS:
         raise ValueError(f"Unknown preset {chosen}. Known: {sorted(PRESETS)}")
     resolved: dict[str, Any] = {
@@ -73,7 +75,9 @@ def config_hash(cfg: dict[str, Any], method: str, split_hash: str, impl_version:
 
     The package version is deliberately left out, so a docs-only release does not force re-runs.
     """
-    ignored = {"resume", "continue_on_error", "timeout_minutes", "export_bundles", "managed_services", "git_sha", "git_dirty"}
+    # Bookkeeping that does not change results: limits, environment, attempt numbers, provenance.
+    ignored = {"resume", "continue_on_error", "timeout_minutes", "export_bundles", "managed_services", "git_sha", "git_dirty",
+               "trial", "fit_deadline", "child_env", "threads"}
     payload = {
         "protocol": PROTOCOL_VERSION,
         "eval": EVAL_VERSION,

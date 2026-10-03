@@ -1,0 +1,44 @@
+# Quick-tier bake-off: every low-budget method, tuned with the same budget, dataset by dataset.
+#   python -m recbench.pipeline.prepare --config configs/benchmarks/quick.yaml --tier quick,quick-val
+#   python -m recbench.queue run --config configs/benchmarks/quick.yaml
+#   python -m recbench.queue status --config configs/benchmarks/quick.yaml
+# Each job (one method on one dataset) searches `trials` configurations on the validation fold, then runs
+# the best one once on test, all within `cap_minutes`. Heavy methods are not here; they must pass this gate
+# first (see docs/results/quick-tier.md).
+tier: quick
+preset: quick
+hardware: configs/hardware/box.yaml
+seed: 42
+resume: true
+continue_on_error: true
+managed_services: false
+export_bundles: false
+
+# Run order: the most studied dataset first, then contrasting regimes, the flagship shop, and the
+# statistically weakest last. Each dataset finishes before the next one starts (idle workers backfill).
+datasets: [movielens-25m, retailrocket, steam, hm, lastfm]
+
+tuning:
+  spaces: configs/tuning/quick.yaml
+  trials: 10
+  search_users: 3000
+  cap_minutes: 180
+
+queue:
+  jobs_per_gpu: 3          # small quick-tier models share a GPU
+  max_threads_per_job: 32  # OpenBLAS limit on many-core boxes
+  # Job order inside each dataset block. resource: cpu | gpu; after: jobs of the same dataset to wait for.
+  methods:
+    - {name: random, resource: cpu}
+    - {name: most_popular, resource: cpu}
+    - {name: ease, resource: cpu}
+    - {name: itemknn, resource: cpu}
+    - {name: ials, resource: cpu}
+    - {name: bpr_mf, resource: cpu}
+    - {name: sasrec, resource: gpu}
+
+# Each dataset's top methods by quick-tier test NDCG@10 are re-checked on full data.
+confirm:
+  top: 3
+  tier: full
+  seeds: [42, 43, 44]

@@ -49,7 +49,11 @@ class RandomRec(Recommender):
 
 @register_method
 class MostPopular(Recommender):
-    """Everyone gets the items with the most interactions in the last `pop_window_days` before the cutoff."""
+    """Everyone gets the items with the most interactions in the last `pop_window_days` before the cutoff.
+
+    With `pop_half_life_days`, each interaction in the window counts 2^(-age / half_life) instead of 1, so
+    yesterday's interactions weigh more than last month's.
+    """
 
     spec = MethodSpec(
         name="most_popular",
@@ -58,18 +62,23 @@ class MostPopular(Recommender):
         handles_cold_users=True,
         upstream="numpy",
         cost_band="low",
+        impl_version="2",  # optional time decay
     )
 
     def fit(self, data: TrainView, cfg: dict[str, Any]) -> None:
         self.bind(data)
-        self.window_days = int(cfg.get("pop_window_days", 28))
+        self.window_days = int(cfg.get("pop_window_days") or 28)
+        half_life = cfg.get("pop_half_life_days")
         events = data.events()
-        start = int(data.meta["test_start_us"]) - self.window_days * DAY_US
-        recent = np.bincount(events.loc[events["ts_us"] >= start, "item_idx"], minlength=self.n_items + 1)
+        in_window = (events["ts_us"] >= int(data.meta["test_start_us"]) - self.window_days * DAY_US).to_numpy()
+        items = events["item_idx"].to_numpy()[in_window]
+        weights = data.event_weights(half_life)[in_window] if half_life else None
+        recent = np.bincount(items, weights=weights, minlength=self.n_items + 1).astype(np.float64)
         overall = data.item_pop.astype(np.float64)
-        # Recent count first; all-time count only breaks ties (scaled below 1).
-        self.recent = recent.astype(np.int64)
-        self.scores = (recent + overall / (overall.max() + 1.0)).astype(np.float32)
+        # Recent (possibly decayed) count first; the all-time count only breaks ties (scaled below the smallest step).
+        self.recent = np.bincount(items, minlength=self.n_items + 1).astype(np.int64)
+        tie_break = overall / (overall.max() + 1.0) * (recent[recent > 0].min() if (recent > 0).any() else 1.0)
+        self.scores = (recent + tie_break).astype(np.float32)
         self.scores[0] = NEG_INF
 
     def score_users(self, users: np.ndarray, hist: HistoryBatch) -> np.ndarray:
@@ -95,6 +104,9 @@ class ItemKNN(Recommender):
 
     sim(i, j) = |users(i) & users(j)| / (sqrt(|users(i)|) * sqrt(|users(j)|) + shrink), keeping the top-k
     neighbours of each item. score(u, j) = sum of sim(i, j) over the items i in u's history.
+    Settings: `knn_weighting` (none / tfidf / bm25) down-weights very active users when measuring
+    similarity; `decay_half_life_days` makes recent interactions count more, in the similarity and in the
+    user's profile.
     """
 
     spec = MethodSpec(
@@ -103,14 +115,15 @@ class ItemKNN(Recommender):
         uses_history=True,
         upstream="scipy.sparse (in-repo)",
         cost_band="low",
+        impl_version="2",  # weighting and time decay
     )
 
     def fit(self, data: TrainView, cfg: dict[str, Any]) -> None:
         self.bind(data)
         self.k = int(cfg.get("knn_neighbors", 100))
         self.shrink = float(cfg.get("knn_shrink", 10.0))
-        self.seen = data.seen
-        self.sim = item_cosine_topk(self.seen, self.k, self.shrink)
+        self.seen = data.weighted_matrix(cfg.get("decay_half_life_days"))
+        self.sim = item_cosine_topk(weight_users(self.seen, str(cfg.get("knn_weighting") or "none")), self.k, self.shrink)
 
     def score_users(self, users: np.ndarray, hist: HistoryBatch) -> np.ndarray:
         return np.asarray((self.seen[users] @ self.sim).todense(), dtype=np.float32)
@@ -124,6 +137,33 @@ class ItemKNN(Recommender):
             self.item_ids,
             "ItemKNN",
         )
+
+
+def weight_users(x: sp.csr_matrix, scheme: str = "none", k1: float = 1.2, b: float = 0.75) -> sp.csr_matrix:
+    """Re-weight a user x item matrix before computing item-item similarity.
+
+    Items play the role of documents and users the role of words, as in text retrieval:
+    - tfidf: x_ui * idf_u with idf_u = log(n_items / (1 + items of u)); a user who touched everything says little.
+    - bm25: like tfidf, but repeated (or large) weights saturate (k1) and long items (many users) are
+      normalised (b), as in the BM25 ranking function.
+    """
+    if scheme in (None, "", "none"):
+        return x
+    x = sp.csr_matrix(x, dtype=np.float32, copy=True)
+    n_items = x.shape[1]
+    per_user = np.diff(x.indptr)
+    idf = np.log(n_items / (1.0 + per_user)).astype(np.float32)
+    idf = np.maximum(idf, 0.0)
+    rows = np.repeat(np.arange(x.shape[0]), per_user)
+    if scheme == "tfidf":
+        x.data *= idf[rows]
+        return x
+    if scheme == "bm25":
+        item_len = np.asarray((x > 0).sum(axis=0)).ravel().astype(np.float32)
+        norm = k1 * (1.0 - b + b * item_len / max(item_len.mean(), 1e-9))
+        x.data = x.data * (k1 + 1.0) / (x.data + norm[x.indices]) * idf[rows]
+        return x
+    raise ValueError(f"unknown weighting {scheme}; use none, tfidf, or bm25")
 
 
 def item_cosine_topk(matrix: sp.csr_matrix, k: int, shrink: float, block: int = 2048) -> sp.csr_matrix:
@@ -174,6 +214,7 @@ class EASE(Recommender):
         uses_history=True,
         upstream="numpy (in-repo closed form)",
         cost_band="low",
+        impl_version="2",  # time decay
     )
 
     def fit(self, data: TrainView, cfg: dict[str, Any]) -> None:
@@ -186,7 +227,7 @@ class EASE(Recommender):
             order = np.lexsort((-data.item_pop[warm], -data.item_recent_pop[warm]))
             warm = np.sort(warm[order[:cap]])
         self.kept = warm.astype(np.int64)
-        self.seen = data.seen
+        self.seen = data.weighted_matrix(cfg.get("decay_half_life_days"))
         x = self.seen[:, self.kept].astype(np.float32)
         # float32 keeps the dense item x item matrices at 4 bytes per entry (30K items ~ 3.6 GB each).
         gram = np.asarray((x.T @ x).todense(), dtype=np.float32)

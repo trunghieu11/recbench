@@ -18,3 +18,5 @@ fetch() {
 }
 fetch https://github.com/Coder-Yu/SELFRec.git SELFRec 5b0229423cb1c727e85a704d63e460368c8b9dde
 fetch https://github.com/facebookresearch/generative-recommenders.git generative-recommenders ea7b85f16647766cbd7188a54bb447b20cee14bd
+# Official GRU4Rec (PyTorch) by its author. Its licence restricts commercial use; it is fetched here, never vendored.
+fetch https://github.com/hidasib/GRU4Rec_PyTorch_Official.git GRU4Rec_PyTorch_Official d1fc31105577665d2f105de1c8d9a38d223a9a22

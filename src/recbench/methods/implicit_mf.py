@@ -50,7 +50,8 @@ def _implicit():
 
 @register_method
 class IALS(_ImplicitMF):
-    spec = MethodSpec(name="ials", tasks=MF_TASKS, upstream="implicit 0.7.3 AlternatingLeastSquares", cost_band="low")
+    spec = MethodSpec(name="ials", tasks=MF_TASKS, upstream="implicit 0.7.3 AlternatingLeastSquares", cost_band="low",
+                      impl_version="2")  # decayed confidence
 
     def fit(self, data: TrainView, cfg: dict[str, Any]) -> None:
         self.bind(data)
@@ -63,7 +64,8 @@ class IALS(_ImplicitMF):
             random_state=int(cfg.get("seed", 42)),
             use_gpu=False,
         )
-        model.fit(data.interaction_counts.tocsr(), show_progress=False)
+        # Confidence grows with (time-decayed) interaction counts: c_ui = 1 + alpha * count_ui.
+        model.fit(data.weighted_matrix(cfg.get("decay_half_life_days"), binary=False).tocsr(), show_progress=False)
         self._factors(model)
 
 

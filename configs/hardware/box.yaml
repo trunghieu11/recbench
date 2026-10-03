@@ -1,0 +1,7 @@
+# A rented GPU box (vast.ai or similar): many CPU cores and one or more 24-48 GB NVIDIA GPUs.
+# The quick tier sets its own preset ("quick"); full-tier runs use 48gb on a 48 GB GPU.
+name: box
+device: auto
+default_preset: 48gb
+overrides:
+  ease_max_items: 30000

@@ -135,6 +135,8 @@ def run_single(split_dir: Path, method_name: str, resolved: dict[str, Any]) -> d
     data = TrainView(split_dir)
     cfg = method_config(resolved, method_name)
     run_hash = config_hash(cfg, method_name, data.split_hash, method.spec.impl_version)
+    # Runs that differ only in their seed share a config group; leaderboards average them.
+    group = config_hash({k: v for k, v in cfg.items() if k != "seed"}, method_name, data.split_hash, method.spec.impl_version)
     sha, dirty = (resolved["git_sha"], bool(resolved.get("git_dirty"))) if "git_sha" in resolved else git_state()
     tags = {
         "dataset": data.dataset,
@@ -144,6 +146,7 @@ def run_single(split_dir: Path, method_name: str, resolved: dict[str, Any]) -> d
         "hardware": str(resolved.get("hardware_name")),
         "protocol_version": PROTOCOL_VERSION,
         "config_hash": run_hash,
+        "config_group": group,
         "split_hash": data.split_hash,
         "managed": str(method.spec.managed).lower(),
         "ranked": str(method.spec.ranked).lower(),

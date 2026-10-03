@@ -63,6 +63,7 @@ class MostPopular(Recommender):
         upstream="numpy",
         cost_band="low",
         impl_version="2",  # optional time decay
+        deterministic=True,
     )
 
     def fit(self, data: TrainView, cfg: dict[str, Any]) -> None:
@@ -116,6 +117,7 @@ class ItemKNN(Recommender):
         upstream="scipy.sparse (in-repo)",
         cost_band="low",
         impl_version="2",  # weighting and time decay
+        deterministic=True,
     )
 
     def fit(self, data: TrainView, cfg: dict[str, Any]) -> None:
@@ -215,6 +217,7 @@ class EASE(Recommender):
         upstream="numpy (in-repo closed form)",
         cost_band="low",
         impl_version="2",  # time decay
+        deterministic=True,
     )
 
     def fit(self, data: TrainView, cfg: dict[str, Any]) -> None:

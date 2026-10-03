@@ -217,3 +217,93 @@ def run_job(
     summary["ended"] = time.time()
     _write_summary(summary)
     return summary
+
+
+def confirm_values(space: MethodSpace | None, best_params: dict[str, Any], scale: float) -> list[dict[str, Any]]:
+    """Configurations to re-check on full data: the quick-tier best, plus the size-sensitive setting moved by
+    `factors` (and multiplied by `scale`, the full/quick user ratio, when `scale_with: users`)."""
+    spec = (space.confirm if space else {}) or {}
+    name = spec.get("param")
+    if not name or name not in best_params or not isinstance(best_params[name], (int, float)):
+        return [dict(best_params)]
+    base = float(best_params[name]) * (scale if spec.get("scale_with") == "users" else 1.0)
+    return [{**best_params, name: base * float(f)} for f in spec.get("factors", [0.5, 1.0, 2.0])]
+
+
+def run_confirm(
+    dataset: str,
+    method: str,
+    resolved: dict[str, Any],
+    settings: JobSettings,
+    space: MethodSpace | None,
+    *,
+    tier: str = "full",
+    seeds: list[int] | None = None,
+    child_env: dict[str, str] | None = None,
+    isolate: bool = True,
+) -> dict[str, Any]:
+    """Re-check a quick-tier winner on full data: a few values of its size-sensitive setting on the full
+    validation fold, then the final test run (one per seed for methods whose training is random)."""
+    from recbench.data import TrainView
+
+    began = time.time()
+    deadline = began + settings.cap_minutes * 60
+    quick = read_summary(settings.tier, dataset, method)
+    summary: dict[str, Any] = {"tier": tier, "dataset": dataset, "method": method, "stage": "confirm", "started": began,
+                               "from_tier": settings.tier, "cap_minutes": settings.cap_minutes}
+    root = data_root()
+    val_dir, test_dir = root / "splits" / dataset / f"{tier}-val", root / "splits" / dataset / tier
+    if not quick or quick.get("status") != "finished":
+        summary.update(status="skipped", reason=f"no finished {settings.tier} job to confirm", ended=time.time())
+        _write_summary(summary)
+        return summary
+    missing = [str(p) for p in (val_dir, test_dir) if not (p / "meta.json").exists()]
+    if missing:
+        summary.update(status="missing_split", reason=f"prepare these splits first: {missing}", ended=time.time())
+        _write_summary(summary)
+        return summary
+    quick_val = root / "splits" / dataset / f"{settings.tier}-val"
+    scale = TrainView(val_dir).n_users / max(TrainView(quick_val).n_users, 1)
+    base = _base_cfg(resolved, method, set(quick["best_params"]))
+    base.update({"tuning": "tuned", "export_bundles": False, "resume": True, "max_eval_users": settings.search_users})
+    if child_env:
+        base["child_env"] = dict(child_env)
+    checks = []
+    for params in confirm_values(space, quick["best_params"], scale):
+        remaining = deadline - time.time()
+        if remaining < 120:
+            break
+        cfg = {**base, **params, "stage": "confirm", "timeout_minutes": remaining / 60 * 0.5, "fit_deadline": time.time() + remaining * 0.4}
+        t0 = time.time()
+        outcome = run_pair(val_dir, method, cfg, isolate=isolate)
+        checks.append({"params": params, "value": _outcome_value(outcome, dataset, method, cfg, val_dir), "status": outcome.get("status"),
+                       "seconds": time.time() - t0, "best_epoch": (outcome.get("fit") or {}).get("best_epoch")})
+    good = [c for c in checks if c["value"] is not None]
+    summary["checks"] = checks
+    if not good:
+        summary.update(status="over_budget" if checks and all(c["status"] == "timeout" for c in checks) else "failed",
+                       reason="no confirmation run finished", ended=time.time())
+        _write_summary(summary)
+        return summary
+    best = max(good, key=lambda c: c["value"])
+    summary.update(best_params=best["params"], best_val=best["value"], best_epoch=best["best_epoch"])
+    spec = ensure_loaded().methods[method].spec
+    run_seeds = [int(resolved.get("seed", 42))] if spec.deterministic else list(seeds or [int(resolved.get("seed", 42))])
+    finals = []
+    for seed in run_seeds:
+        remaining = deadline - time.time()
+        if remaining < 60:
+            break
+        cfg = {**base, **best["params"], "seed": seed, "stage": "final", "max_eval_users": resolved.get("max_eval_users"),
+               "timeout_minutes": remaining / 60}
+        if best["best_epoch"]:
+            cfg["epochs"] = int(best["best_epoch"])
+        outcome = run_pair(test_dir, method, cfg, isolate=isolate)
+        finals.append({"seed": seed, "status": outcome.get("status"), "value": _outcome_value(outcome, dataset, method, cfg, test_dir)})
+    values = [f["value"] for f in finals if f["value"] is not None]
+    summary["finals"] = finals
+    summary["test"] = {METRIC: statistics.fmean(values), f"{METRIC}_seed_sd": statistics.pstdev(values) if len(values) > 1 else 0.0} if values else None
+    summary["status"] = "finished" if values else ("over_budget" if any(f["status"] == "timeout" for f in finals) else "failed")
+    summary["ended"] = time.time()
+    _write_summary(summary)
+    return summary

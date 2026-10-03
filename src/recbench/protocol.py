@@ -81,6 +81,8 @@ class MethodSpec:
     cost_band: str = "low"
     # Bump when a change to the method's code changes its results; old runs then stop counting as done.
     impl_version: str = "1"
+    # True when fitting involves no randomness (closed forms, counting): one seed is enough when confirming.
+    deterministic: bool = False
 
 
 class Recommender:

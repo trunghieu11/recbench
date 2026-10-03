@@ -1,10 +1,11 @@
 """Write leaderboards as Markdown (+ HTML) from MLflow results.
 
     python -m recbench.report.build --tier smoke --out reports/smoke-latest
-    python -m recbench.report.build --tier full --out reports/full-latest --docs
+    python -m recbench.report.build --tier full --tuning defaults --out reports/full-untuned-v0.2 --docs
+    python -m recbench.report.build --tier quick --tuning tuned --out reports/quick-tuned --docs
 
---docs also writes docs/generated/leaderboards/<tier>/<dataset>.md, which the
-documentation site embeds. Numbers in the docs therefore always come from here.
+--docs also writes docs/generated/leaderboards/<tier>/<dataset>.md (or <tier>-tuned/ for --tuning tuned),
+which the documentation site embeds. Numbers in the docs therefore always come from here.
 """
 
 from __future__ import annotations
@@ -115,13 +116,19 @@ def dataset_section(frame: pd.DataFrame, dataset: str, tier: str, data_dir: Path
     return out
 
 
-def build(tier: str, out_dir: Path, *, docs_dir: Path | None = None, data_dir: Path | None = None) -> Path:
+def docs_label(tier: str, tuning: str | None) -> str:
+    """Folder name for a tier's docs fragments: tuned results never overwrite untuned ones."""
+    return f"{tier}-tuned" if tuning == "tuned" else tier
+
+
+def build(tier: str, out_dir: Path, *, docs_dir: Path | None = None, data_dir: Path | None = None, tuning: str | None = None) -> Path:
     data_dir = data_dir or Path(os.environ.get("DATA_DIR", "data"))
-    frame = load_runs(tier)
+    frame = load_runs(tier, tuning=tuning)
     status = latest_status(tier)
     out_dir.mkdir(parents=True, exist_ok=True)
     datasets = sorted(set(frame["tags.dataset"])) if not frame.empty else []
-    header = [f"# Results — {tier} tier", "", f"> {PROTOCOL_NOTE}", ""]
+    title = f"{tier} tier" + (f", {tuning}" if tuning else "")
+    header = [f"# Results — {title}", "", f"> {PROTOCOL_NOTE}", ""]
     if tier == "smoke":
         header += ["> Smoke splits are small user samples (about 50K events, at most 2,000 eval users), so confidence "
                    "intervals are wide. Use them to check the pipeline, and the full tier to choose a method.", ""]
@@ -130,14 +137,14 @@ def build(tier: str, out_dir: Path, *, docs_dir: Path | None = None, data_dir: P
         section = dataset_section(frame, dataset, tier, data_dir, status)
         body += section
         if docs_dir is not None:
-            target = docs_dir / "generated" / "leaderboards" / tier / f"{dataset}.md"
+            target = docs_dir / "generated" / "leaderboards" / docs_label(tier, tuning) / f"{dataset}.md"
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text("\n".join(section[1:]) + "\n")
     if not datasets:
         body = ["No finished protocol-v2 runs for this tier yet."]
     text = "\n".join(header + body) + "\n"
     (out_dir / "report.md").write_text(text)
-    (out_dir / "report.html").write_text(_html(text, f"Results — {tier} tier"))
+    (out_dir / "report.html").write_text(_html(text, f"Results — {title}"))
     return out_dir
 
 
@@ -157,9 +164,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Write benchmark leaderboards.")
     parser.add_argument("--tier", default="smoke")
     parser.add_argument("--out", type=Path, required=True)
-    parser.add_argument("--docs", action="store_true", help="also write docs/generated/leaderboards/<tier>/*.md")
+    parser.add_argument("--docs", action="store_true", help="also write docs/generated/leaderboards/<tier>[-tuned]/*.md")
+    parser.add_argument("--tuning", choices=["defaults", "tuned"], default=None, help="only runs with default or tuned settings")
     args = parser.parse_args()
-    print(build(args.tier, args.out, docs_dir=Path("docs") if args.docs else None))
+    print(build(args.tier, args.out, docs_dir=Path("docs") if args.docs else None, tuning=args.tuning))
 
 
 if __name__ == "__main__":

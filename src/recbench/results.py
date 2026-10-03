@@ -34,8 +34,14 @@ def tracking_uri() -> str:
     return (root / "runs" / "mlflow").as_uri()
 
 
-def load_runs(tier: str | None = None, *, include_unfinished: bool = False) -> pd.DataFrame:
-    """One row per run: tags.* and metrics.* columns, protocol v2 only."""
+def load_runs(tier: str | None = None, *, include_unfinished: bool = False, tuning: str | None = None) -> pd.DataFrame:
+    """One row per (dataset, tier, method): tags.* and metrics.* columns, protocol v2 only.
+
+    tuning: "defaults" or "tuned" keeps only runs with that tag (runs from before the tag count as defaults).
+    When the latest finished run of a method was repeated with other seeds (same tags.config_group), its
+    metrics are averaged over those seeds; metrics.n_seeds and metrics.ndcg_at_10_seed_sd say how many and
+    how much they varied.
+    """
     import mlflow
 
     mlflow.set_tracking_uri(tracking_uri())
@@ -48,10 +54,26 @@ def load_runs(tier: str | None = None, *, include_unfinished: bool = False) -> p
     frame = frame[frame.get("tags.protocol_version", pd.Series(dtype=str)) == PROTOCOL_VERSION]
     if tier:
         frame = frame[frame["tags.tier"] == tier]
+    if tuning:
+        tags = frame["tags.tuning"].fillna("defaults") if "tags.tuning" in frame else pd.Series("defaults", index=frame.index)
+        frame = frame[tags == tuning]
     if not include_unfinished:
         frame = frame[frame["tags.status"] == "finished"]
-    frame = frame.sort_values("start_time").drop_duplicates(["tags.dataset", "tags.tier", "tags.method"], keep="last")
-    return frame.reset_index(drop=True)
+    frame = frame.sort_values("start_time")
+    latest = frame.drop_duplicates(["tags.dataset", "tags.tier", "tags.method"], keep="last").copy()
+    if not include_unfinished and "tags.config_group" in frame and not latest.empty:
+        metric_cols = [c for c in frame.columns if c.startswith("metrics.")]
+        for idx, row in latest.iterrows():
+            group = row.get("tags.config_group")
+            if not isinstance(group, str) or not group:
+                continue
+            same = frame[(frame["tags.config_group"] == group) & (frame["tags.dataset"] == row["tags.dataset"])
+                         & (frame["tags.tier"] == row["tags.tier"]) & (frame["tags.method"] == row["tags.method"])]
+            if len(same) > 1:
+                latest.loc[idx, metric_cols] = same[metric_cols].mean(numeric_only=True)
+                latest.loc[idx, "metrics.ndcg_at_10_seed_sd"] = float(same["metrics.ndcg_at_10"].std(ddof=0))
+            latest.loc[idx, "metrics.n_seeds"] = float(len(same))
+    return latest.reset_index(drop=True)
 
 
 def latest_status(tier: str | None = None) -> pd.DataFrame:

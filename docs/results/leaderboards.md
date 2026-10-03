@@ -4,7 +4,7 @@ These are the **full-tier** results: every dataset at full size, up to 10,000 wa
 are generated from MLflow by
 
 ```bash
-python -m recbench.report.build --tier full --out reports/full-untuned-v0.2 --docs
+python -m recbench.report.build --tier full --tuning defaults --out reports/full-untuned-v0.2 --docs
 ```
 
 Never edit them by hand. To read them correctly, start with [how to read results](how-to-read-results.md). The

@@ -49,7 +49,8 @@ def test_snippets_point_at_generated_fragments():
     allowed = {"generated/capability.md", "generated/metrics.md", "generated/services.md"}
     allowed |= {f"generated/methods/{n}.md" for n in reg.methods} | {f"generated/methods/{n}-results.md" for n in reg.methods}
     allowed |= {f"generated/datasets/{n}.md" for n in reg.datasets}
-    allowed |= {f"generated/leaderboards/{tier}/{n}.md" for tier in ("smoke", "full") for n in reg.datasets}
+    tiers = ("smoke", "full", "quick-tuned", "full-tuned")
+    allowed |= {f"generated/leaderboards/{tier}/{n}.md" for tier in tiers for n in reg.datasets}
     bad = [f"{p.relative_to(DOCS)}: {s}" for p in _pages() for s in SNIPPET.findall(p.read_text()) if s not in allowed]
     assert not bad, "\n".join(bad)
 

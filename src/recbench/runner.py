@@ -199,7 +199,8 @@ def run_single(split_dir: Path, method_name: str, resolved: dict[str, Any]) -> d
                     mlflow.log_artifact(str(path))
             bundle = None
             if resolved.get("export_bundles") and method.spec.ranked and not method.spec.managed:
-                bundle = _export_bundle(method, data, split, cfg, run_id=mlflow.active_run().info.run_id, run_hash=run_hash)
+                bundle = _export_bundle(method, data, split, cfg, run_id=mlflow.active_run().info.run_id, run_hash=run_hash,
+                                        offline=result.metrics)
                 if bundle is not None:
                     mlflow.set_tag("bundle", str(bundle))
             mlflow.set_tag("status", "finished")
@@ -231,13 +232,17 @@ def _skip_reason(method, data: TrainView, resolved: dict[str, Any]) -> str | Non
     return None
 
 
-def _export_bundle(method, data: TrainView, split, cfg: dict[str, Any], *, run_id: str = "", run_hash: str = "") -> Path | None:
+def _export_bundle(method, data: TrainView, split, cfg: dict[str, Any], *, run_id: str = "", run_hash: str = "",
+                   offline: dict[str, float] | None = None) -> Path | None:
     try:
         from recbench.serving.bundle import export_bundle
     except ImportError:
         return None
     out = data_root() / "bundles" / data.dataset / data.tier / method.spec.name
-    extra = {"run_id": run_id, "config_hash": run_hash, "stage": str(cfg.get("stage", "benchmark")), "tuning": str(cfg.get("tuning", "defaults"))}
+    extra = {"run_id": run_id, "config_hash": run_hash, "stage": str(cfg.get("stage", "benchmark")), "tuning": str(cfg.get("tuning", "defaults")),
+             # the offline results of the same run, so the serving monitor can compare what is served with them
+             "offline": {k: float(v) for k, v in (offline or {}).items()
+                         if k in ("ndcg_at_10", "coverage_at_10", "popularity_percentile_at_10") and v == v}}
     return export_bundle(method, data, out, k=int(cfg.get("bundle_k", 100)), max_users=int(cfg.get("bundle_users", 20_000)), extra=extra)
 
 

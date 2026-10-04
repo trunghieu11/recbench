@@ -99,12 +99,16 @@ deploy script creates a new revision, so the simplest rule is: **after uploading
 
 ## Logs and monitoring
 
-The Cloud Run console page of the service shows requests, latencies, instance counts, and logs. From the
+The Cloud Run console page of the service shows requests, latencies, instance counts, and logs. The API also writes
+one JSON line per `/recommend` call (dataset, method, status, latency, fallback), and answers `GET /stats`. From the
 terminal:
 
 ```bash
 gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="recbench"' --limit 50
 ```
+
+[Monitoring the API](monitoring.md) covers the whole picture: health, cost and quality signals, the uptime check
+and alerts (`deploy/monitoring.sh`), and the checking command `python -m recbench.serving.monitor`.
 
 If the logs show that bundles cannot be read, the service account lacks access to the bucket. Grant it
 `roles/storage.objectViewer` on the bucket (see [security](security.md#least-privilege-optional-hardening)).

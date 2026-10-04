@@ -68,11 +68,19 @@ table) adds a gigabyte or two. Storage costs stay small. See [Cloud Storage pric
 ## Versions and freshness
 
 Each bundle's `manifest.json` records the split hash, the export time, and a freshness note ("lists reflect
-events before ..."). To check what is online:
+events before ..."). Newer bundles also name the MLflow run that made them and its offline results. To check what
+is online:
 
 ```bash
 gcloud storage cat gs://YOUR_BUCKET/bundles/movielens-25m/smoke/ease/manifest.json
 ```
+
+The running service reports the same facts, and how old they are, at `GET /stats`; see
+[monitoring the API](monitoring.md).
+
+Bundles for the bake-off's winners are written on the rented box during each dataset's confirmation, under
+`data/bundles/<dataset>/full/`, and `scripts/fetch_results.sh` copies them to the laptop. Deploy them with
+`RECBENCH_TIER=full` ([step 8 of the tutorial](../start/deploy-cloud-run.md#step-8-serve-the-bake-offs-winners)).
 
 ## Alternatives (not implemented)
 

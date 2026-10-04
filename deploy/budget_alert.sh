@@ -1,12 +1,16 @@
 #!/usr/bin/env bash
 # Create a monthly budget with e-mail alerts at 50%, 90%, and 100% (default 40 USD).
 # Alerts only notify you; they do not stop spending. Use deploy/teardown.sh to stop costs.
-#   GCP_BILLING_ACCOUNT=XXXXXX-XXXXXX-XXXXXX ./deploy/budget_alert.sh 40
+#   GCP_BILLING_ACCOUNT=XXXXXX-XXXXXX-XXXXXX GCP_PROJECT=my-project ./deploy/budget_alert.sh 40
+# With GCP_PROJECT, the budget counts only that project's costs; without it, the whole billing account.
 set -euo pipefail
 ACCOUNT="${GCP_BILLING_ACCOUNT:?Set GCP_BILLING_ACCOUNT (gcloud billing accounts list)}"
 AMOUNT="${1:-40}"
+SCOPE=()
+[[ -n "${GCP_PROJECT:-}" ]] && SCOPE=(--filter-projects="projects/${GCP_PROJECT}")
 gcloud billing budgets create \
   --billing-account="$ACCOUNT" \
+  "${SCOPE[@]}" \
   --display-name="recbench-monthly-${AMOUNT}usd" \
   --budget-amount="${AMOUNT}USD" \
   --threshold-rule=percent=0.5 \

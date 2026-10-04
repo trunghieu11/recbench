@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -111,6 +112,43 @@ def test_api_serves_bundles(toy_split, tmp_path, monkeypatch):
     reply = client.post("/recommend", json={"dataset": "toy", "method": "most_popular", "user_id": str(view.user_ids[1]), "k": 3})
     assert reply.status_code == 200 and len(reply.json()["recommendations"]) == 3
     assert client.post("/recommend", json={"dataset": "toy", "method": "ease", "user_id": "u1"}).status_code == 404
+
+
+def test_stats_and_monitor_report_freshness_quality_and_traffic(toy_split, tmp_path, monkeypatch, capsys):
+    view = TrainView(toy_split)
+    method = ensure_loaded().create_method("most_popular")
+    method.fit(view, {})
+    folder = tmp_path / "bundles" / "toy" / "smoke" / "most_popular"
+    export_bundle(method, view, folder, k=10, extra={"run_id": "abc", "offline": {"coverage_at_10": 0.05}})
+    monkeypatch.setenv("RECBENCH_BUNDLES", str(tmp_path / "bundles"))
+    monkeypatch.setenv("RECBENCH_TIER", "smoke")
+    from recbench.serving import app as app_module
+    from recbench.serving.monitor import run_checks
+
+    app_module.load_bundle.cache_clear()
+    app_module._BUNDLE_STATS.clear()
+    app_module.TRAFFIC = app_module.Traffic()
+    client = TestClient(app_module.app)
+    client.post("/recommend", json={"dataset": "toy", "method": "most_popular", "user_id": str(view.user_ids[1]), "k": 3})
+    client.post("/recommend", json={"dataset": "toy", "method": "most_popular", "user_id": "nobody", "k": 3})
+    log = [json.loads(line) for line in capsys.readouterr().out.splitlines() if line.startswith("{")]
+    assert [e["fallback"] for e in log] == [False, True] and all(e["status"] == 200 for e in log)
+    stats = client.get("/stats").json()
+    assert stats["traffic"]["requests"] == 2 and stats["traffic"]["fallback_share"] == 0.5
+    bundle = stats["bundles"][0]
+    assert bundle["run_id"] == "abc" and 0 < bundle["served"]["coverage_at_10"] <= 1
+    assert 0 < bundle["served"]["popularity_percentile_at_10"] <= 1 and bundle["export_age_days"] < 1
+    checks = {c.name: c.status for c in run_checks(client)}
+    assert checks["health"] == "PASS" and checks["errors"] == "PASS"
+    assert checks["unknown users"] == "PASS"  # 50% fallback is at the default limit, not above it
+    assert {c.name: c.status for c in run_checks(client, max_fallback_share=0.2)}["unknown users"] == "WARN"
+    assert checks["toy/most_popular: freshness"] == "PASS"
+    # a bundle exported long ago is reported as stale
+    manifest = json.loads((folder / "manifest.json").read_text())
+    (folder / "manifest.json").write_text(json.dumps({**manifest, "exported_at": "2020-01-01T00:00:00Z"}))
+    app_module._BUNDLE_STATS.clear()
+    stale = {c.name: c.status for c in run_checks(client, max_export_age_days=30)}
+    assert stale["toy/most_popular: freshness"] == "WARN"
 
 
 def test_api_without_bundles_or_results_says_so(tmp_path, monkeypatch):

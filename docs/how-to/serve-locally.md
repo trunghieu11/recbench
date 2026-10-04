@@ -24,7 +24,7 @@ Useful environment variables: `RECBENCH_TIER` (default `smoke`), `RECBENCH_BUNDL
 
 ```bash
 curl localhost:8080/health
-# {"ok": true, "version": "0.2.0", "bundles": 75}
+# {"ok": true, "version": "0.2.0", "tier": "smoke", "bundles": 70}    (HTTP 503 and "ok": false when there are none)
 
 curl localhost:8080/methods
 # [{"dataset": "hm", "tier": "smoke", "method": "bpr_mf"}, ...]
@@ -49,9 +49,19 @@ A response looks like:
 }
 ```
 
-(Illustrative values.) Unknown users get the popularity list and `"fallback": true`. Open
-<http://localhost:8080/docs> for the interactive API documentation, and <http://localhost:8080/dashboard> for
-leaderboards (needs the `bench` extra, which provides MLflow).
+(Illustrative values.) Unknown users get the popularity list and `"fallback": true`. The terminal running uvicorn
+prints one JSON line per call (dataset, method, status, latency, fallback); `RECBENCH_REQUEST_LOG=0` turns it off.
+
+Check what is served and how fresh it is:
+
+```bash
+curl -s localhost:8080/stats | python -m json.tool | head -30
+python -m recbench.serving.monitor --base-url http://127.0.0.1:8080
+```
+
+[Monitoring the API](../cloud/monitoring.md) explains both. Open <http://localhost:8080/docs> for the interactive
+API documentation, and <http://localhost:8080/dashboard> for leaderboards (needs the `bench` extra, which provides
+MLflow; `?tuning=defaults` or `?tuning=tuned` keeps one kind of run).
 
 ## 4. With Docker
 
@@ -74,4 +84,4 @@ The image installs only the `serve` extra. Details in [Docker](../cloud/docker.m
 |---|---|
 | `"bundles": 0` | wrong `RECBENCH_TIER` or `RECBENCH_BUNDLES`; check the folder layout `<dataset>/<tier>/<method>/manifest.json` |
 | 404 "No bundle for ..." | that method did not finish on that dataset (see the report's "Did not run" table) |
-| dashboard 404 | install the `bench` extra; the Docker image deliberately does not include MLflow |
+| dashboard 404 | install the `bench` extra; the Docker image deliberately does not include MLflow (`GET /` lists what the service offers) |

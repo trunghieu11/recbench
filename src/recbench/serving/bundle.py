@@ -107,6 +107,22 @@ class Bundle:
         self.item_id = items["item_id"].astype(str).to_numpy()
         self.item_text = items["text"].astype(str).to_numpy()
 
+    def quality(self) -> dict[str, Any]:
+        """What the stored lists look like, computed like the offline metrics of the same names on the top 10:
+        coverage@10 (share of the catalog that appears) and the mean popularity percentile (1 = the most popular
+        items only). Popularity needs bundle version 2 or later."""
+        if not hasattr(self, "_quality"):
+            top10 = np.asarray(self.topk[:, :10])
+            items = top10[top10 > 0]
+            n_items = int(self.manifest.get("n_items") or max(len(self.item_id) - 1, 1))
+            out: dict[str, Any] = {"coverage_at_10": float(len(np.unique(items)) / max(n_items, 1)) if items.size else None,
+                                   "popularity_percentile_at_10": None}
+            if self.item_popularity is not None and items.size:
+                ordered = np.sort(self.item_popularity[1:])
+                out["popularity_percentile_at_10"] = float(np.mean(np.searchsorted(ordered, self.item_popularity[items], side="right") / len(ordered)))
+            self._quality = out
+        return self._quality
+
     def recommend(self, user_id: str, k: int) -> dict[str, Any]:
         k = max(1, min(int(k), int(self.manifest["k"])))
         row = self.row_of.get(str(user_id))

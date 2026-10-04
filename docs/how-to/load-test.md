@@ -20,12 +20,18 @@ python -m recbench.serving.latency --base-url "$URL" --token "$(gcloud auth prin
 Options: `--requests` (default 300), `--concurrency` (requests in flight, default 8), `--tier` (default smoke),
 and `--no-log` (do not write to MLflow).
 
+!!! warning "The tier must match the service"
+    User ids come from the bundle **on this machine** (`data/bundles/<dataset>/<tier>/<method>/`). Use the tier the
+    service serves (`RECBENCH_TIER`, `smoke` unless you deployed `full`), and make sure that bundle exists locally.
+
 ## What it does
 
 1. Picks real user ids from the bundle, plus about 10% unknown ids (which exercise the popularity fallback).
 2. Sends 20 warm-up requests (so cold starts do not count).
-3. Sends the measured requests concurrently, timing each one.
-4. Prints, and logs to the latest finished MLflow run of that (dataset, method):
+3. Sends the measured requests concurrently, timing each one. A failed request (an HTTP error or no answer) is
+   counted, not fatal; only when every request fails does it stop and say why.
+4. Prints the results and logs them to the MLflow run that **made the bundle**, which the bundle's manifest
+   names. For older bundles without that link, it uses the latest default-settings run of that (dataset, method):
 
 ```json
 {
@@ -34,6 +40,7 @@ and `--no-log` (do not write to MLflow).
   "served_p99_ms": 15.2,
   "served_rps": 1650.3,
   "served_requests": 300.0,
+  "served_error_rate": 0.0,
   "served_concurrency": 8.0,
   "logged": 1.0
 }

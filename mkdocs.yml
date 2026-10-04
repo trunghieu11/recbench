@@ -192,6 +192,7 @@ nav:
       - GCP basics: cloud/gcp-basics.md
       - Docker: cloud/docker.md
       - Cloud Run: cloud/cloud-run.md
+      - Monitoring the API: cloud/monitoring.md
       - Cloud Storage and bundles: cloud/storage-and-bundles.md
       - MLflow: cloud/mlflow.md
       - Cost control: cloud/cost-control.md

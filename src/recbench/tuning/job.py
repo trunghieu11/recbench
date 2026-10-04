@@ -7,8 +7,12 @@ A job (one method on one dataset):
 2. stops searching when the time left would not fit one more trial plus the final run (the job cap
    includes everything);
 3. runs the best configuration once on '<tier>' (the real test split), reusing the best epoch count, so
-   the test split is touched exactly once;
+   the test split is touched exactly once. With `final_seeds` (the lab), methods whose training is random run that
+   one configuration once per seed, and the test result is their average;
 4. writes a summary to runs/tuning/<tier>/<dataset>/<method>.json.
+
+A lab experiment is a job with a `label`: its summary is <method>@<label>.json and it has its own Optuna study. In
+the lab workspace all of this lives under runs/lab/ (see recbench.paths).
 
 Finished trials live in an Optuna journal and finished runs in MLflow, so an interrupted job resumes
 where it stopped.
@@ -23,12 +27,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from recbench.config import config_hash, method_config
+from recbench.paths import runs_dir
 from recbench.registry import ensure_loaded
-from recbench.runner import EXPERIMENT, _mlflow, data_root, repo_root, run_pair
+from recbench.runner import EXPERIMENT, _mlflow, data_root, method_version, run_hash_for, run_pair
 from recbench.tuning.spaces import MethodSpace
 
 METRIC = "ndcg_at_10"
+BASELINE = "baseline"  # the label of a method's plain job (no label in its file name)
 
 
 @dataclass
@@ -41,27 +46,32 @@ class JobSettings:
     seed: int = 42
     space_version: int = 1
     force: dict[str, Any] | None = None  # settings that win over the search spaces (dry runs: {max_epochs: 3})
+    final_seeds: list[int] | None = None  # the lab: test random methods once per seed, then average
 
 
-def tuning_dir() -> Path:
-    path = repo_root() / "runs" / "tuning"
-    path.mkdir(parents=True, exist_ok=True)
-    return path
+def tuning_dir(workspace: str | None = None) -> Path:
+    """runs/tuning, or runs/<workspace>/tuning (`workspace` reads another one; "" is the bake-off). Reading creates
+    nothing; writers create the folders they need."""
+    return runs_dir(workspace) / "tuning"
 
 
-def summary_path(tier: str, dataset: str, method: str, stage: str = "tune") -> Path:
-    """runs/tuning/<tier>/<dataset>/<method>.json for a tuning job, <method>.confirm.json for a confirmation."""
+def summary_path(tier: str, dataset: str, method: str, stage: str = "tune", *, label: str | None = None,
+                 workspace: str | None = None) -> Path:
+    """runs/tuning/<tier>/<dataset>/<method>.json for a tuning job, <method>.confirm.json for a confirmation, and
+    <method>@<label>.json for a lab experiment."""
     suffix = ".confirm" if stage == "confirm" else ""
-    return tuning_dir() / tier / dataset / f"{method}{suffix}.json"
+    tag = f"@{label}" if label and label != BASELINE else ""
+    return tuning_dir(workspace) / tier / dataset / f"{method}{tag}{suffix}.json"
 
 
-def read_summary(tier: str, dataset: str, method: str, stage: str = "tune") -> dict[str, Any] | None:
-    path = summary_path(tier, dataset, method, stage)
+def read_summary(tier: str, dataset: str, method: str, stage: str = "tune", *, label: str | None = None,
+                 workspace: str | None = None) -> dict[str, Any] | None:
+    path = summary_path(tier, dataset, method, stage, label=label, workspace=workspace)
     return json.loads(path.read_text()) if path.exists() else None
 
 
 def _write_summary(summary: dict[str, Any]) -> Path:
-    path = summary_path(summary["tier"], summary["dataset"], summary["method"], summary.get("stage", "tune"))
+    path = summary_path(summary["tier"], summary["dataset"], summary["method"], summary.get("stage", "tune"), label=summary.get("label"))
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(summary, indent=2, default=str))
@@ -69,10 +79,28 @@ def _write_summary(summary: dict[str, Any]) -> Path:
     return path
 
 
+def prepare_rerun(tier: str, dataset: str, method: str, *, label: str | None = None) -> bool:
+    """Make a finished job run again from scratch (after a promotion, or a changed lab experiment): its summary moves
+    to archive/ and a stub with the next attempt number takes its place, so the job starts a fresh study and stays
+    resumable. Returns False when there was no finished job to re-run."""
+    path = summary_path(tier, dataset, method, label=label)
+    old = json.loads(path.read_text()) if path.exists() else None
+    if not old or old.get("status") in (None, "pending", "running"):
+        return False
+    archive = path.parent / "archive"
+    archive.mkdir(exist_ok=True)
+    path.replace(archive / f"{path.stem}.{time.strftime('%Y%m%dT%H%M%S')}.json")
+    stub = {"tier": tier, "dataset": dataset, "method": method, "label": label, "status": "pending",
+            "attempt": int(old.get("attempt", 0)) + 1, "rerun_of": old.get("ended")}
+    _write_summary(stub)
+    return True
+
+
 def _storage():
     from optuna.storages import JournalStorage
     from optuna.storages.journal import JournalFileBackend
 
+    tuning_dir().mkdir(parents=True, exist_ok=True)
     return JournalStorage(JournalFileBackend(str(tuning_dir() / "journal.log")))
 
 
@@ -80,8 +108,7 @@ def _finished_metrics(dataset: str, method: str, cfg: dict[str, Any], split_dir:
     """The metrics of an identical run that already finished (a resumed job, or a repeated configuration)."""
     from recbench.data import TrainView
 
-    spec = ensure_loaded().methods[method].spec
-    run_hash = config_hash(method_config(cfg, method), method, TrainView(split_dir).split_hash, spec.impl_version)
+    run_hash = run_hash_for(cfg, method, TrainView(split_dir).split_hash)
     mlflow = _mlflow()
     experiment = mlflow.get_experiment_by_name(EXPERIMENT)
     frame = mlflow.search_runs(
@@ -125,11 +152,15 @@ def run_job(
     child_env: dict[str, str] | None = None,
     isolate: bool = True,
     retry: bool = False,
+    label: str | None = None,
+    fingerprint: str | None = None,
 ) -> dict[str, Any]:
     """Tune `method` on `dataset` and evaluate the best configuration once. Returns the job summary.
 
     With retry=True, a job that failed starts a new attempt: a fresh study, so trials that failed (for example
-    before a bug fix) do not use up its budget. An interrupted attempt resumes where it stopped."""
+    before a bug fix) do not use up its budget. An interrupted attempt resumes where it stopped.
+    `label` names a lab experiment (its own summary and study); `fingerprint` identifies the experiment's definition
+    and code, so a changed experiment never continues the study of the old one."""
     import optuna
     from optuna.trial import TrialState
 
@@ -143,13 +174,17 @@ def run_job(
         "tier": settings.tier, "dataset": dataset, "method": method, "started": began,
         "cap_minutes": settings.cap_minutes, "trials_budget": 0, "trials": [],
     }
+    if label and label != BASELINE:
+        summary["label"] = label
+    if fingerprint:
+        summary["fingerprint"] = fingerprint
     missing = [str(p) for p in (val_dir, test_dir) if not (p / "meta.json").exists()]
     if missing:
         summary.update(status="missing_split", reason=f"prepare these splits first: {missing}", ended=time.time())
         _write_summary(summary)
         return summary
 
-    previous = read_summary(settings.tier, dataset, method) or {}
+    previous = read_summary(settings.tier, dataset, method, label=label) or {}
     attempt = int(previous.get("attempt", 0)) + (1 if retry and previous.get("status") == "failed" else 0)
     summary.update(attempt=attempt, status="running")
     _write_summary(summary)  # an interrupted job resumes this attempt
@@ -160,8 +195,12 @@ def run_job(
     base.update({"tuning": "tuned", "export_bundles": False, "resume": True})
     if child_env:
         base["child_env"] = dict(child_env)
+    summary["space"] = {"params": space.params, "fixed": space.fixed}
+    summary["impl_version"] = method_version(method, base)
+    name = method + (f"@{label}" if label and label != BASELINE else "")
     study = optuna.create_study(
-        study_name=f"{settings.tier}/{dataset}/{method}/v{settings.space_version}/s{settings.seed}" + (f"/a{attempt}" if attempt else ""),
+        study_name=f"{settings.tier}/{dataset}/{name}/v{settings.space_version}/s{settings.seed}" + (f"/a{attempt}" if attempt else "")
+        + (f"/f{fingerprint}" if fingerprint else ""),
         storage=_storage(),
         sampler=optuna.samplers.TPESampler(seed=settings.seed, n_startup_trials=min(5, n_trials)),
         direction="maximize",
@@ -223,22 +262,44 @@ def run_job(
     best = study.best_trial
     best_params = {**space.fixed, **best.params}
     summary.update(best_trial=best.number, best_params=best_params, best_val=best.value, best_epoch=best.user_attrs.get("best_epoch"))
-    remaining = deadline - time.time()
-    final_cfg = {**base, **best_params, **(settings.force or {}), "stage": "final", "timeout_minutes": max(remaining, 60) / 60}
+    final_cfg = {**base, **best_params, **(settings.force or {}), "stage": "final"}
     if best.user_attrs.get("best_epoch"):
         final_cfg["epochs"] = int(best.user_attrs["best_epoch"])
+    seeds = [int(final_cfg.get("seed", 42))]
+    if settings.final_seeds and not ensure_loaded().methods[method].spec.deterministic:
+        seeds = [int(s) for s in settings.final_seeds]  # the same configuration per seed: training noise, not selection
+    from recbench.data import TrainView
+
+    split_hash = TrainView(test_dir).split_hash
     t0 = time.time()
-    final = run_pair(test_dir, method, final_cfg, isolate=isolate)
+    finals = []
+    for i, seed in enumerate(seeds):
+        remaining = deadline - time.time()
+        if i and remaining < 60:
+            finals.append({"seed": seed, "status": "skipped", "reason": "no time left in the job's cap"})
+            continue
+        cfg = {**final_cfg, "seed": seed, "timeout_minutes": max(remaining, 60) / 60}
+        outcome = run_pair(test_dir, method, cfg, isolate=isolate)
+        metrics = _outcome_metrics(outcome, dataset, method, cfg, test_dir) or {}
+        finals.append({"seed": seed, "status": outcome.get("status"), "value": metrics.get(METRIC),
+                       "config_hash": run_hash_for(cfg, method, split_hash), "metrics": metrics,
+                       **({"reason": outcome["reason"]} if outcome.get("reason") else {})})
     summary["final_seconds"] = time.time() - t0
-    summary["final_status"] = final.get("status")
-    test_metrics = _outcome_metrics(final, dataset, method, final_cfg, test_dir) or {}
-    test_value = test_metrics.get(METRIC)
-    summary["test"] = test_metrics or final.get("metrics")
-    if test_value is not None:
+    summary["final_status"] = finals[0]["status"]
+    summary["final_runs"] = [{k: f[k] for k in ("seed", "status", "value", "config_hash") if k in f} for f in finals]
+    good = [f for f in finals if f.get("value") is not None]
+    if good:
+        keys = set.intersection(*(set(f["metrics"]) for f in good))
+        test = {k: statistics.fmean(float(f["metrics"][k]) for f in good) for k in sorted(keys)}
+        if len(good) > 1:
+            test[f"{METRIC}_seed_sd"] = statistics.pstdev(float(f["value"]) for f in good)
+        summary["test"] = test
         summary["status"] = "finished"
     else:
-        summary["status"] = {"timeout": "over_budget", "unsupported": "unsupported"}.get(str(final.get("status")), "failed")
-        summary["reason"] = final.get("reason", final.get("status"))
+        first = finals[0]
+        summary["test"] = first.get("metrics") or None
+        summary["status"] = {"timeout": "over_budget", "unsupported": "unsupported"}.get(str(first.get("status")), "failed")
+        summary["reason"] = first.get("reason", first.get("status"))
     summary["ended"] = time.time()
     _write_summary(summary)
     return summary

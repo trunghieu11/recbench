@@ -1,0 +1,40 @@
+# The improvement lab: the 11 light methods on the quick tier, tuned on this laptop exactly as in the bake-off
+# (10 settings tried on quick-val, the best one tested once on quick). Everything lives under runs/lab/ and
+# reports/lab/, apart from the bake-off's own results.
+#   python -m recbench.lab baseline     # the numbers to beat (about half a day; resumes if interrupted)
+#   python -m recbench.lab status
+# Experiments are defined in labs/<nn>-<method>/experiments.yaml: see docs/handbook/run-experiments.md.
+extends: configs/benchmarks/quick.yaml
+workspace: lab                              # runs/lab/ and reports/lab/ (see src/recbench/paths.py)
+hardware: configs/hardware/local-cpu.yaml   # this laptop: EASE keeps at most 20,000 items
+track_code: true          # a run's identity includes its method's code, so runs compute again after you edit it
+overrides:
+  ease_backend: numpy     # no CUDA here; numpy keeps PyTorch out of the process, so LightGBM can use all its threads on macOS
+eval:
+  save_topk: true         # keep each user's top-10 list for item-level error analysis (python -m recbench.compare --segments)
+
+# Smallest first, so four datasets finish early; RetailRocket, the largest, comes last.
+datasets: [movielens-25m, lastfm, hm, steam, retailrocket]
+
+tuning:
+  final_seeds: [42, 43, 44]   # methods whose training is random (iALS, BPR-MF, the re-ranker) are tested 3 times, averaged
+
+confirm:
+  top: 0                  # no full-data confirmation in the lab
+
+queue:
+  cpu_workers: 2          # two jobs at a time, each with half of the cores; 24 GB of memory fits two
+  # Cheapest first. The lab's order for learning is the folder numbers in labs/ (ItemKNN first, the re-ranker last).
+  methods:
+    - {name: most_popular}    # the floor: not one of the labs, but every method should beat it
+    - {name: itemknn}
+    - {name: rp3beta}
+    - {name: puresvd}
+    - {name: gfcf}
+    - {name: ials}
+    - {name: bpr_mf}
+    - {name: vsknn}
+    - {name: slim}
+    - {name: ease}
+    - {name: sansa}
+    - {name: lgbm_rerank, after: [ease, itemknn]}   # its candidates come from the lab's tuned EASE and ItemKNN

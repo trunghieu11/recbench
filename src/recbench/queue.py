@@ -19,7 +19,9 @@ How jobs are scheduled:
   With --price-per-hour, both also show the cost of the session so far.
 - When a dataset's tuning jobs are all done, its report is written. If `confirm` is set, its top methods
   are queued for the full-data check right away, ahead of the next dataset.
-Everything resumes: a finished job (its summary in runs/tuning/) is not run again.
+Everything resumes: a finished job (its summary in runs/tuning/) is not run again. After a promotion,
+`--rerun --methods <m>` runs those methods' finished jobs again (their summaries are archived first).
+A config with `workspace: lab` keeps all of this under runs/lab/ and reports/lab/ (see recbench.paths).
 """
 
 from __future__ import annotations
@@ -35,9 +37,10 @@ from pathlib import Path
 from typing import Any
 
 from recbench import queue_status
+from recbench.paths import reports_dir, runs_dir, workspace
 from recbench.runner import repo_root
 from recbench.tuning.__main__ import load_benchmark
-from recbench.tuning.job import JobSettings, read_summary, run_confirm, run_job
+from recbench.tuning.job import JobSettings, prepare_rerun, read_summary, run_confirm, run_job
 
 DONE = {"finished", "over_budget", "failed", "unsupported", "missing_split", "skipped"}
 RETRY_ON_RESUME = {"missing_split"}  # the splits may have been prepared since
@@ -73,20 +76,20 @@ def gpu_count() -> int:
 
 
 def state_path(tier: str) -> Path:
-    path = repo_root() / "runs" / "queue" / f"{tier}.json"
+    path = runs_dir() / "queue" / f"{tier}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     return path
 
 
 def status_page(tier: str) -> Path:
-    return repo_root() / "reports" / "queue" / f"{tier}.html"
+    return reports_dir() / "queue" / f"{tier}.html"
 
 
 class Queue:
     def __init__(self, config: Path, *, datasets: list[str] | None = None, methods: list[str] | None = None,
                  hardware: str | None = None, deadline_hours: float | None = None, stop_after_dataset: bool = False,
                  retry_failed: bool = False, isolate: bool = True, gpus: int | None = None, cpu_workers: int | None = None,
-                 price_per_hour: float | None = None):
+                 price_per_hour: float | None = None, rerun: bool = False):
         self.benchmark, self.resolved, self.spaces, self.settings = load_benchmark(config, hardware)
         self.price_per_hour = price_per_hour
         self.session_started = time.time()
@@ -115,8 +118,10 @@ class Queue:
         for d, dataset in enumerate(self.datasets):
             for m, entry in enumerate(entries):
                 self.jobs.append(Job(dataset, entry["name"], "tune", entry.get("resource", "cpu"), (d, 0, m), list(entry.get("after") or [])))
-        for job in self.jobs:  # resume: finished jobs keep their summary
-            self._load_done(job)
+        for job in self.jobs:
+            if rerun:  # a promotion: archive the finished summary, so this job runs again with a fresh study
+                prepare_rerun(self.settings.tier, job.dataset, job.method)
+            self._load_done(job)  # resume: finished jobs keep their summary
         self.active_dataset: str | None = None
         self._refresh_active()
 
@@ -230,19 +235,22 @@ class Queue:
             self._refresh_active()
 
     def _report(self, dataset: str, confirm: bool = False) -> None:
-        try:
-            from recbench.report.build import build
-
-            tier = str(self.confirm_cfg.get("tier", "full")) if confirm else self.settings.tier
-            out = repo_root() / "reports" / f"{tier}-tuned"
-            docs = repo_root() / "docs" if self.benchmark.get("write_docs", True) else None  # off for dry runs
-            build(tier, out, docs_dir=docs, tuning="tuned")
-            from recbench.report.overall import build as build_overall
-
-            build_overall(docs_dir=docs, out_dir=repo_root() / "reports" / "overall", root=repo_root())
-            print(f"[queue] {dataset}: {'confirmation' if confirm else 'quick tier'} done; reports in {out} and reports/overall", flush=True)
-        except Exception as exc:  # noqa: BLE001 - a report failure must not stop the queue
-            print(f"[queue] report for {dataset} failed: {type(exc).__name__}: {exc}", flush=True)
+        """Rebuild the reports after a dataset block. Each part on its own: a report failure must not stop the queue."""
+        tier = str(self.confirm_cfg.get("tier", "full")) if confirm else self.settings.tier
+        out = reports_dir() / f"{tier}-tuned"
+        # Docs fragments only from the bake-off itself (off for dry runs, and never from a workspace such as the lab).
+        docs = repo_root() / "docs" if self.benchmark.get("write_docs", True) and not workspace() else None
+        parts = [("report", lambda: __import__("recbench.report.build", fromlist=["build"]).build(tier, out, docs_dir=docs, tuning="tuned")),
+                 ("overall comparison", lambda: __import__("recbench.report.overall", fromlist=["build"]).build(
+                     docs_dir=docs, out_dir=reports_dir() / "overall", root=repo_root()))]
+        if workspace() == "lab":  # the lab's scoreboard (reports/lab/scoreboard.md; the docs copy is built on purpose)
+            parts.append(("scoreboard", lambda: __import__("recbench.lab.scoreboard", fromlist=["build"]).build()))
+        for name, make in parts:
+            try:
+                make()
+            except Exception as exc:  # noqa: BLE001
+                print(f"[queue] {name} for {dataset} failed: {type(exc).__name__}: {exc}", flush=True)
+        print(f"[queue] {dataset}: {'confirmation' if confirm else 'quick tier'} done; reports in {reports_dir()}", flush=True)
 
     # ----- running -----
     def _execute(self, job: Job, slot: str) -> dict[str, Any]:
@@ -335,6 +343,8 @@ def main() -> None:
     run.add_argument("--retry-failed", action="store_true")
     run.add_argument("--cpu-workers", type=int, default=None)
     run.add_argument("--price-per-hour", type=float, default=None, help="the box's $/hour, to show the session's cost so far")
+    run.add_argument("--rerun", action="store_true",
+                     help="run the selected methods' finished jobs again with a fresh study (after a promotion); needs --methods")
     status = sub.add_parser("status")
     status.add_argument("--config", type=Path, required=True)
     status.add_argument("--state", type=Path, default=None, help="another machine's copied state file, e.g. runs/queue-box/quick.json")
@@ -343,10 +353,13 @@ def main() -> None:
     if args.command == "status":
         print_status(args.config, state_file=args.state, html=args.html)
         return
+    if args.rerun and not args.methods:
+        parser.error("--rerun needs --methods, so that a whole bake-off is never re-run by accident")
     queue = Queue(args.config, datasets=[d for d in args.datasets.split(",") if d] or None,
                   methods=[m for m in args.methods.split(",") if m] or None, hardware=args.hardware,
                   deadline_hours=args.deadline_hours, stop_after_dataset=args.stop_after_dataset,
-                  retry_failed=args.retry_failed, cpu_workers=args.cpu_workers, price_per_hour=args.price_per_hour)
+                  retry_failed=args.retry_failed, cpu_workers=args.cpu_workers, price_per_hour=args.price_per_hour,
+                  rerun=args.rerun)
     queue.run()
     print_status(args.config)
 

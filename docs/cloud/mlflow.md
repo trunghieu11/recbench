@@ -23,10 +23,12 @@ The full list of what is logged is in [training and evaluation](../codebase/trai
 
 ## Where the store is
 
-`src/recbench/results.py::tracking_uri` decides:
+`src/recbench/paths.py::tracking_uri` decides:
 
-1. `MLFLOW_TRACKING_URI` if set (the run scripts set it to `file://<repo>/runs/mlflow`);
-2. otherwise `<RECBENCH_ROOT or current folder>/runs/mlflow` as an absolute `file://` URI.
+1. in a workspace such as the lab (`workspace: lab` in `configs/benchmarks/lab.yaml`): always
+   `runs/<workspace>/mlflow`, here `runs/lab/mlflow`, so lab experiments never land in the bake-off's store;
+2. otherwise `MLFLOW_TRACKING_URI` if set (the run scripts set it to `file://<repo>/runs/mlflow`);
+3. otherwise `<RECBENCH_ROOT or current folder>/runs/mlflow` as an absolute `file://` URI.
 
 An absolute URI matters: the runner starts a child process per method, and a relative path would resolve
 differently if the working directory changed.
@@ -37,6 +39,8 @@ differently if the working directory changed.
 mlflow ui --backend-store-uri "file://$PWD/runs/mlflow" --port 5001
 # then open http://127.0.0.1:5001
 ```
+
+The lab's runs are in their own store: `mlflow ui --backend-store-uri "file://$PWD/runs/lab/mlflow" --port 5002`.
 
 Port 5001 avoids a clash with macOS AirPlay, which uses port 5000. Alternatively,
 `docker compose -f deploy/compose.yaml up` starts an MLflow container on the same port (see [Docker](docker.md)).

@@ -13,8 +13,10 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
+import re
 import resource
 import subprocess
 import sys
@@ -29,6 +31,7 @@ import numpy as np
 from recbench import __version__
 from recbench.config import config_hash, load_benchmark_yaml, method_config, resolve_run_config
 from recbench.data import SplitError, TrainView
+from recbench.paths import repo_root, reports_dir, runs_dir, tracking_uri, workspace  # noqa: F401 - re-exported
 from recbench.protocol import EVAL_VERSION, PROTOCOL_NOTE, PROTOCOL_VERSION, Unsupported
 from recbench.registry import ensure_loaded
 
@@ -39,18 +42,26 @@ THREAD_VARS = ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS")
 MAX_THREADS = 32
 
 
-def repo_root() -> Path:
-    return Path(os.environ.get("RECBENCH_ROOT", Path.cwd())).resolve()
+def source_fingerprint(method_name: str) -> str:
+    """A short hash of the code behind a method: its module, the recbench.methods modules that module imports, and
+    recbench/data.py. Editing any of them changes the hash."""
+    module = sys.modules[ensure_loaded().methods[method_name].__module__]
+    path = Path(module.__file__)
+    files = {path, Path(__file__).with_name("data.py")}
+    files |= {path.with_name(f"{name}.py") for name in re.findall(r"recbench\.methods\.(\w+)", path.read_text())}
+    digest = hashlib.sha256()
+    for file in sorted(f for f in files if f.exists()):
+        digest.update(file.name.encode())
+        digest.update(file.read_bytes())
+    return digest.hexdigest()[:8]
 
 
-def tracking_uri() -> str:
-    """MLflow store: $MLFLOW_TRACKING_URI, else an absolute file store under runs/mlflow."""
-    uri = os.environ.get("MLFLOW_TRACKING_URI")
-    if uri:
-        if uri.startswith("file:") and not uri.startswith("file:///"):
-            return (repo_root() / uri[len("file:") :]).resolve().as_uri()
-        return uri
-    return (repo_root() / "runs" / "mlflow").resolve().as_uri()
+def method_version(method_name: str, cfg: dict[str, Any]) -> str:
+    """The implementation version that goes into a run's identity: the method's impl_version, plus a hash of its
+    source when `track_code` is on (as in the lab). Then a run is computed again after a code edit, instead of
+    returning the cached result of the old code."""
+    version = ensure_loaded().methods[method_name].spec.impl_version
+    return f"{version}+src.{source_fingerprint(method_name)}" if cfg.get("track_code") else version
 
 
 def data_root() -> Path:
@@ -75,8 +86,8 @@ def git_state() -> tuple[str, bool]:
 
 
 def run_hash_for(resolved: dict[str, Any], method_name: str, split_hash: str) -> str:
-    spec = ensure_loaded().methods[method_name].spec
-    return config_hash(method_config(resolved, method_name), method_name, split_hash, spec.impl_version)
+    cfg = method_config(resolved, method_name)
+    return config_hash(cfg, method_name, split_hash, method_version(method_name, cfg))
 
 
 def _mlflow():
@@ -134,9 +145,10 @@ def run_single(split_dir: Path, method_name: str, resolved: dict[str, Any]) -> d
     method = reg.create_method(method_name)
     data = TrainView(split_dir)
     cfg = method_config(resolved, method_name)
-    run_hash = config_hash(cfg, method_name, data.split_hash, method.spec.impl_version)
+    version = method_version(method_name, cfg)
+    run_hash = config_hash(cfg, method_name, data.split_hash, version)
     # Runs that differ only in their seed share a config group; leaderboards average them.
-    group = config_hash({k: v for k, v in cfg.items() if k != "seed"}, method_name, data.split_hash, method.spec.impl_version)
+    group = config_hash({k: v for k, v in cfg.items() if k != "seed"}, method_name, data.split_hash, version)
     sha, dirty = (resolved["git_sha"], bool(resolved.get("git_dirty"))) if "git_sha" in resolved else git_state()
     tags = {
         "dataset": data.dataset,
@@ -156,7 +168,7 @@ def run_single(split_dir: Path, method_name: str, resolved: dict[str, Any]) -> d
         # stage: benchmark | search | final | confirm; tuning: defaults | tuned (set by recbench.tuning)
         "stage": str(resolved.get("stage", "benchmark")),
         "tuning": str(resolved.get("tuning", "defaults")),
-        "impl_version": method.spec.impl_version,
+        "impl_version": version,
         "eval_version": EVAL_VERSION,
         "recbench_version": __version__,
         "git_sha": sha,

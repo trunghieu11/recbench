@@ -2,7 +2,8 @@
 # Every method gets the same number of trials (configs/benchmarks/quick.yaml: tuning.trials), so the
 # comparison is fair. Ranges follow published tuning recipes; the source is noted per method.
 # `confirm` names the setting that depends on data size; it is re-checked when a winner moves to full data.
-version: 1
+# `version` is part of every tuning study's name: raise it when a space changes, so no study mixes old and new trials.
+version: 2   # 2: SANSA searches sansa_weights_per_item instead of sansa_density
 
 # Added to every method unless it says `common: false`.
 common:
@@ -90,8 +91,8 @@ methods:
   sansa:               # Spisak et al. 2023 (lambda as EASE; the size of the sparse weights)
     params:
       sansa_lambda: {type: log, low: 1.0, high: 20000.0}
-      # weights kept per item: on the MovieLens quick tier, 32 scored 0.096, 320 scored 0.171 and 960 scored 0.173
-      # (EASE: 0.190), at 12 s, 104 s and 496 s on a laptop. Per item, the range suits any catalog size.
+      # weights kept per item: on MovieLens' quick-val fold (27,673 items), about 28 scored 0.096, 277 scored 0.171
+      # and 830 scored 0.173 (EASE: 0.190), at 12 s, 104 s and 496 s on a laptop. Per item, the range suits any catalog.
       sansa_weights_per_item: {type: logint, low: 20, high: 500}
       decay_half_life_days: {type: choice, values: [null, 30, 90, 365]}
     confirm: {param: sansa_lambda, factors: [0.5, 1.0, 2.0], scale_with: users}

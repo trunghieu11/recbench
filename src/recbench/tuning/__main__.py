@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from recbench.config import load_benchmark_yaml, resolve_run_config
+from recbench.paths import use_workspace
 from recbench.runner import git_state, repo_root
 from recbench.tuning.job import JobSettings, run_job
 from recbench.tuning.spaces import load_spaces
@@ -30,12 +31,15 @@ def job_settings(benchmark: dict[str, Any], space_settings: dict[str, Any]) -> J
         seed=int(benchmark.get("seed", 42)),
         space_version=int(space_settings.get("version", 1)),
         force=dict(tuning.get("force") or {}),
+        final_seeds=[int(s) for s in tuning.get("final_seeds") or []] or None,
     )
 
 
 def load_benchmark(path: Path, hardware: str | None = None, preset: str | None = None) -> tuple[dict, dict, Any, JobSettings]:
-    """(raw benchmark yaml, resolved run config, method spaces, job settings)."""
+    """(raw benchmark yaml, resolved run config, method spaces, job settings). The file's `workspace` (for example
+    "lab") becomes this process's workspace, so everything the job writes goes there (see recbench.paths)."""
     benchmark = load_benchmark_yaml(path, repo_root())
+    use_workspace(benchmark.get("workspace"))
     if hardware:
         benchmark["hardware"] = hardware
     resolved = resolve_run_config(benchmark, preset=preset, repo_root=repo_root())

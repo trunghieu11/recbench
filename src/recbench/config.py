@@ -78,6 +78,8 @@ def resolve_run_config(
     }
     if benchmark.get("max_steps") is not None:
         resolved["max_steps"] = int(benchmark["max_steps"])
+    if benchmark.get("track_code"):  # the lab: a run's identity includes its method's source (runner.method_version)
+        resolved["track_code"] = True
     resolved.update(benchmark.get("eval") or {})
     return resolved
 
@@ -94,8 +96,9 @@ def config_hash(cfg: dict[str, Any], method: str, split_hash: str, impl_version:
     The package version is deliberately left out, so a docs-only release does not force re-runs.
     """
     # Bookkeeping that does not change results: limits, environment, attempt numbers, provenance.
+    # track_code acts through impl_version instead (runner.method_version); save_topk only adds an output file.
     ignored = {"resume", "continue_on_error", "timeout_minutes", "export_bundles", "managed_services", "git_sha", "git_dirty",
-               "trial", "fit_deadline", "child_env", "threads"}
+               "trial", "fit_deadline", "child_env", "threads", "track_code", "save_topk"}
     payload = {
         "protocol": PROTOCOL_VERSION,
         "eval": EVAL_VERSION,

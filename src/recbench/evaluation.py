@@ -310,6 +310,8 @@ class Evaluator:
             metrics["candidate_recall"] = float(np.nanmean(recall))
         # Row i of every per-user array belongs to user_idx[i]; sampled_* arrays cover sampled_user_idx only.
         per_user["user_idx"] = users.astype(np.int64)
+        if self.cfg.get("save_topk"):  # the lab: each user's top-10 list, for item-level error analysis (recbench.compare)
+            per_user["top10"] = topk[self.split.primary][:, :10].astype(np.int64)
         if info["cand_valid"].any():
             per_user["sampled_user_idx"] = users[info["cand_valid"]].astype(np.int64)
         if method.spec.handles_cold_users:

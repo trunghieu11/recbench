@@ -7,12 +7,10 @@ always agree on which run counts: the most recent finished run per
 
 from __future__ import annotations
 
-import os
-from pathlib import Path
-
 import numpy as np
 import pandas as pd
 
+from recbench.paths import tracking_uri  # the active workspace's store (runs/mlflow for the bake-off)
 from recbench.protocol import PROTOCOL_VERSION
 
 # Leaderboard metric per task. CTR is diagnostic (no real impressions in these datasets).
@@ -24,14 +22,6 @@ TASK_BOARDS = {
 LOWER_IS_BETTER = {"gini_at_10", "popularity_percentile_at_10", "calibration_kl_at_10", "user_group_ndcg_gap_at_10",
                    "train_seconds", "score_seconds_per_1k_users", "peak_rss_mb", "peak_gpu_mb", "sampled_logloss",
                    "served_p50_ms", "served_p95_ms", "served_p99_ms", "served_error_rate"}
-
-
-def tracking_uri() -> str:
-    uri = os.environ.get("MLFLOW_TRACKING_URI")
-    if uri:
-        return uri
-    root = Path(os.environ.get("RECBENCH_ROOT", Path.cwd())).resolve()
-    return (root / "runs" / "mlflow").as_uri()
 
 
 def load_runs(tier: str | None = None, *, include_unfinished: bool = False, tuning: str | None = None) -> pd.DataFrame:

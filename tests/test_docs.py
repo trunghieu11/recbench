@@ -55,6 +55,9 @@ def test_snippets_point_at_generated_fragments():
 
     allowed |= {"generated/overall/headline.md", "generated/overall/scorecard.md"}
     allowed |= {f"generated/overall/{part}-{key}.md" for part in ("matrix", "cost", "beyond", "status") for key, *_ in SOURCES}
+    from recbench.lab.experiments import lab_methods
+
+    allowed |= {"generated/lab/scoreboard.md"} | {f"generated/lab/{m}.md" for m in lab_methods(ROOT)}
     bad = [f"{p.relative_to(DOCS)}: {s}" for p in _pages() for s in SNIPPET.findall(p.read_text()) if s not in allowed]
     assert not bad, "\n".join(bad)
 
@@ -74,6 +77,7 @@ def test_catalog_has_every_method(name):
 COMMAND = re.compile(r"python -m (recbench(?:\.[a-z_]+)+)((?:[ \t]+(?:\\\n[ \t]*)?[^\s`|;&]+)*)")
 SCRIPT = re.compile(r"\b((?:scripts|deploy)/[\w./-]+\.sh)\b")
 INTERNAL_FLAGS = {("recbench.runner", "--single")}  # the runner's child-process entry, parsed before argparse
+SUBCOMMANDS = {"recbench.queue": {"run", "status"}, "recbench.lab": {"baseline", "status", "once", "sweep", "run", "scoreboard"}}
 
 
 def _texts() -> list[tuple[str, str]]:
@@ -99,7 +103,7 @@ def test_documented_command_flags_exist():
     for name, text in _texts():
         for match in COMMAND.finditer(text):
             module, rest = match.group(1), match.group(2).replace("\\\n", " ").split()
-            sub = rest[0] if module == "recbench.queue" and rest and rest[0] in ("run", "status") else None
+            sub = rest[0] if rest and rest[0] in SUBCOMMANDS.get(module, ()) else None
             for token in rest:
                 if token.startswith("--"):
                     flag = token.split("=", 1)[0]
@@ -128,7 +132,10 @@ def _counts() -> dict[str, set[int]]:
     queued = quick["queue"]["methods"]
     smoke = yaml.safe_load((ROOT / "configs" / "benchmarks" / "smoke-cpu.yaml").read_text())
     full = yaml.safe_load((ROOT / "configs" / "benchmarks" / "gpu-full.yaml").read_text())
+    from recbench.lab.experiments import lab_benchmark, lab_methods
+
     methods = {
+        len(lab_methods(ROOT)), len(lab_benchmark(ROOT)["queue"]["methods"]),  # the labs, and the lab's baseline queue
         len(reg.methods),                                                   # registered
         sum(not c.spec.managed for c in reg.methods.values()),              # local
         len(queued),                                                        # in the bake-off
@@ -169,6 +176,29 @@ def test_method_pages_follow_the_template(name):
     queued = {e["name"] for e in yaml.safe_load((ROOT / "configs" / "benchmarks" / "quick.yaml").read_text())["queue"]["methods"]}
     if name in queued:
         assert '!!! abstract "In plain words"' in text, "bake-off methods start with an 'In plain words' box"
+
+
+LAB_SECTIONS = ["Before you start", "Level 1", "Level 2", "Level 3", "Level 4", "Record your results", "Further reading"]
+
+
+def _lab_folders() -> list[tuple[str, str]]:
+    from recbench.lab.experiments import lab_folders
+
+    return [(method, folder.name) for method, folder in lab_folders(ROOT).items()]
+
+
+@pytest.mark.parametrize("method,folder", _lab_folders())
+def test_lab_pages_follow_the_template(method, folder):
+    """Every lab has a page with the fixed sections, folded hints and solutions, and its generated starting point."""
+    page = DOCS / "labs" / f"{folder}.md"
+    assert page.exists(), f"docs/labs/{folder}.md is missing"
+    text = page.read_text()
+    headings = re.findall(r"^## (.+)$", text, re.M)
+    found = [next((h for h in headings if h.startswith(s)), None) for s in LAB_SECTIONS]
+    assert None not in found, f"sections must include {LAB_SECTIONS}; found {headings}"
+    assert [headings.index(h) for h in found] == sorted(headings.index(h) for h in found), "sections out of order"
+    assert '!!! abstract "In plain words"' in text and '??? tip "Hint' in text and '??? success "Solution' in text
+    assert f'--8<-- "generated/lab/{method}.md"' in text, "show the generated starting point (the baseline numbers)"
 
 
 def test_readme_method_table_is_current():

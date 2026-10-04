@@ -46,7 +46,7 @@ def _side(ref: Ref, dataset: str, tier: str):
         return load_side(ref, dataset, workspace="lab", tier=tier), ""
     except Missing:
         status = (read_summary(tier, dataset, ref.method, label=ref.label) or {}).get("status")
-        return None, {None: "not run", "pending": "not run", "finished": "run missing"}.get(status, status)
+        return None, {None: "not run", "pending": "not run", "running": "unfinished", "finished": "run missing"}.get(status, status)
 
 
 def _num(value: Any) -> str:
@@ -97,9 +97,9 @@ def method_fragment(method: str, datasets: list[str], tier: str, floor: dict[str
         base_rows.append(f"| {dataset} | {mean:.4f} [{low:.4f}, {high:.4f}]{seeds} | {_num(side.summary.get('best_val'))} | "
                          f"{_settings(side.summary.get('best_params') or {})} | {_seconds(side.metrics.get('train_seconds'))} | {floor_text} | {box_text} |")
         cells[dataset] = f"{mean:.4f}"
-    lines = ["**Your starting point: the laptop baseline.** The bake-off's tuning, repeated on this laptop: 10 settings tried on "
-             "the validation fold, the best one tested once. Test NDCG@10 with its 95% interval; random methods are averaged over "
-             "3 seeds.", "",
+    lines = ["**Your starting point: the lab baseline.** The bake-off's tuning, repeated with the lab's machine profile: 10 settings "
+             "tried on the validation fold, the best one tested once. Test NDCG@10 with its 95% interval; random methods are averaged "
+             "over 3 seeds.", "",
              "| Dataset | Test NDCG@10 | Validation | Best settings found | Train time | Floor (MostPopular) | Bake-off (box) |",
              "|---|---|---|---|---|---|---|", *base_rows, ""]
 
@@ -136,6 +136,17 @@ def method_fragment(method: str, datasets: list[str], tier: str, floor: dict[str
     return "\n".join(lines), cells
 
 
+def _titles() -> dict[str, str]:
+    """Display names from dictionary/catalog.yaml (ItemKNN, not itemknn)."""
+    try:
+        from recbench.dictionary.build import load_catalog
+        from recbench.paths import repo_root
+
+        return {name: entry.get("title", name) for name, entry in load_catalog(repo_root())["methods"].items()}
+    except Exception:  # noqa: BLE001 - the names are a nicety
+        return {}
+
+
 def build(docs_dir: Path | None = None, out_dir: Path | None = None) -> dict[str, str]:
     """Write reports/lab/scoreboard.md (and the docs fragments with docs_dir); returns {name: markdown}."""
     use_workspace("lab")
@@ -152,14 +163,15 @@ def build(docs_dir: Path | None = None, out_dir: Path | None = None) -> dict[str
     floor_cells = [f"{floor[d]:.4f}" if d in floor else "–" for d in datasets]
     rows.append(f"| [MostPopular](../dictionary/algorithms/most-popular.md) (the floor) | " + " | ".join(floor_cells) + " | |")
     any_result = bool(floor)
+    titles = _titles()
     for week, method in enumerate(folders, start=1):
         text, cells = method_fragment(method, datasets, tier, floor)
         fragments[method] = text
         any_result = any_result or any(cell[:1].isdigit() for cell in cells.values())
         promoted = [label for label, entry in ex.load_experiments(method).items() if entry.get("promoted")]
-        rows.append(f"| {week}. [{method}]({folders[method].name}.md) | " + " | ".join(cells.get(d, "–") for d in datasets)
+        rows.append(f"| {week}. [{titles.get(method, method)}]({folders[method].name}.md) | " + " | ".join(cells.get(d, "–") for d in datasets)
                     + f" | {', '.join(promoted)} |")
-    intro = ("Test NDCG@10 of each lab method on the quick tier, tuned on this laptop. A cell reads *baseline → best experiment "
+    intro = ("Test NDCG@10 of each lab method on the quick tier, tuned with the lab's settings. A cell reads *baseline → best experiment "
              "verdict (experiment)* once you have experiments. The floor row is MostPopular: a method below it has not learned more "
              "than \"what is popular now\".\n\n")
     table = "\n".join(["| Method | " + " | ".join(datasets) + " | Promoted |", "|" + "---|" * (len(datasets) + 2), *rows])

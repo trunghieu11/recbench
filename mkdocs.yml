@@ -89,6 +89,37 @@ nav:
           - 5d. Finish: start/box-4-finish.md
       - 6. The full tier on a GPU machine: start/full-tier-gpu.md
       - 7. Deploy to Cloud Run: start/deploy-cloud-run.md
+  - Developer handbook:
+      - handbook/index.md
+      - Set up: handbook/setup.md
+      - Run one method: handbook/run-one-method.md
+      - Run experiments: handbook/run-experiments.md
+      - Compare results: handbook/compare-results.md
+      - Test: handbook/test.md
+      - Debug: handbook/debug.md
+      - Git workflow: handbook/git-workflow.md
+      - Update the docs: handbook/update-docs.md
+      - Promote a winner: handbook/promote.md
+  - Labs:
+      - labs/index.md
+      - Scoreboard: labs/scoreboard.md
+      - Primers:
+          - Sparse matrices: labs/primer-sparse-matrices.md
+          - Comparing methods fairly: labs/primer-comparing.md
+          - Linear algebra: labs/primer-linear-algebra.md
+          - Learning by optimisation: labs/primer-optimisation.md
+          - Trees and learning to rank: labs/primer-trees-and-ranking.md
+      - 1. ItemKNN: labs/01-itemknn.md
+      - 2. RP3beta: labs/02-rp3beta.md
+      - 3. EASE: labs/03-ease.md
+      - 4. SLIM: labs/04-slim.md
+      - 5. SANSA: labs/05-sansa.md
+      - 6. PureSVD: labs/06-puresvd.md
+      - 7. GF-CF: labs/07-gfcf.md
+      - 8. iALS: labs/08-ials.md
+      - 9. BPR-MF: labs/09-bpr-mf.md
+      - 10. V-SKNN: labs/10-vsknn.md
+      - 11. LightGBM re-ranker: labs/11-lgbm-rerank.md
   - How-to:
       - Add a method: how-to/add-a-method.md
       - Add a metric: how-to/add-a-metric.md

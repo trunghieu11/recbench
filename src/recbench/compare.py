@@ -217,7 +217,7 @@ def promotion(frame: pd.DataFrame, n_datasets: int = 5) -> str:
     verdicts = list(frame.get("verdict", pd.Series(dtype=str)))
     better, worse = verdicts.count("better"), verdicts.count("worse")
     compared = sum(v in ("better", "worse", "no clear difference") for v in verdicts)
-    head = f"better on {better} of {compared} datasets, worse on {worse}"
+    head = f"better on {better}, worse on {worse}, out of {compared} compared"
     if compared < n_datasets:
         return f"{head}. Compare on all {n_datasets} datasets before deciding."
     if worse:

@@ -20,9 +20,23 @@ PROTOCOL_VERSION = "2"
 EVAL_VERSION = "1"
 PROTOCOL_NOTE = (
     "Protocol v2: one global time cutoff (UTC); models are fitted only on events before the test cutoff; "
-    "warm test users are ranked against the full catalog (sampled 1+100 is kept as a secondary check); "
-    "training is budget-capped and untuned, so these numbers are not paper SOTA."
+    "warm test users are ranked against the full catalog (sampled 1+100 is kept as a secondary check)."
 )
+
+# The order in which datasets are run and shown: the most studied first, then contrasting regimes, the flagship
+# shop, and the statistically weakest last (configs/benchmarks/quick.yaml uses the same order).
+DATASET_ORDER = ("movielens-25m", "retailrocket", "steam", "hm", "lastfm")
+
+
+def dataset_sort_key(name: str) -> tuple[int, str]:
+    return (DATASET_ORDER.index(name) if name in DATASET_ORDER else len(DATASET_ORDER), name)
+
+
+TUNING_NOTES = {
+    "defaults": "Every method ran with its default settings (no tuning), so methods with many settings are understated.",
+    "tuned": "Each method's settings were tuned on a validation fold with the same budget for every method, then tested once.",
+    None: "Default-settings and tuned runs are mixed here; build with --tuning defaults or --tuning tuned to separate them.",
+}
 
 N_NEGATIVES = 100
 K_VALUES = (10, 20, 50)
@@ -67,7 +81,10 @@ class MethodSpec:
     # How the evaluator gets scores: "scores" = score_users over the catalog,
     # "pairs" = score_pairs in item chunks (pointwise models), "list" = topk only (remote APIs).
     output: str = "scores"
+    # uses_history: scoring reads the user's past items (as a set or a sequence).
+    # sequence_aware: the model reads them IN ORDER (sequential and session models).
     uses_history: bool = False
+    sequence_aware: bool = False
     scores_cold_items: bool = False
     handles_cold_users: bool = False
     requires_side_features: bool = False

@@ -64,6 +64,7 @@ class TigerLiteNet(nn.Module):
 class TigerLite(EmbeddingRecommender):
     spec = MethodSpec(
         name="tiger_lite",
+        sequence_aware=True,
         tasks={Task.topn, Task.sequential},
         uses_history=True,
         needs_torch=True,

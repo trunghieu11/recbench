@@ -81,7 +81,12 @@ nav:
       - 2. Your first smoke run: start/first-smoke-run.md
       - 3. Reading the results: start/reading-results.md
       - 4. Your first new method: start/your-first-method.md
-      - 5. The quick-tier bake-off on a rented GPU: start/quick-tier-box.md
+      - 5. The quick-tier bake-off on a rented GPU:
+          - start/quick-tier-box.md
+          - 5a. Before you rent: start/box-1-before-you-rent.md
+          - 5b. Rent and set up: start/box-2-rent-and-set-up.md
+          - 5c. Run and monitor: start/box-3-run-and-monitor.md
+          - 5d. Finish: start/box-4-finish.md
       - 6. The full tier on a GPU machine: start/full-tier-gpu.md
       - 7. Deploy to Cloud Run: start/deploy-cloud-run.md
   - How-to:

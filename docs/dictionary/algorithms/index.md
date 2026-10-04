@@ -59,7 +59,10 @@ How to read the columns:
 - **Tasks**: `topn` means "a ranked list for a user". `sequential` means the method is also scored on
   predicting the very next item. `similar_items` means it can produce "more like this" lists. `ctr` means
   it outputs a click probability for one (user, item) pair.
-- **Uses order**: the model reads the history as a *sequence*, not as a set.
+- **Uses history**: scoring reads the user's past items. Methods that use only global statistics, such as
+  MostPopular, do not.
+- **Order-aware**: the model reads that history as a *sequence* (what came first, what came last), not as a
+  set. Sequential and session models are order-aware; EASE, ItemKNN and matrix factorisation are not.
 - **New items**: the model can score items that had no interactions before the cutoff (it understands
   items from their content). Pure ID models cannot; the evaluator removes such items from their lists.
 - **Needs content**: the model needs item text or categories.

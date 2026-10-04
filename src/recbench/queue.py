@@ -2,7 +2,7 @@
 
     python -m recbench.queue run --config configs/benchmarks/quick.yaml
     python -m recbench.queue run --config ... --datasets movielens-25m --stop-after-dataset --deadline-hours 3
-    python -m recbench.queue status --config configs/benchmarks/quick.yaml
+    python -m recbench.queue status --config configs/benchmarks/quick.yaml [--html reports/queue/quick.html]
 
 How jobs are scheduled:
 - A job is one method on one dataset: a tuning job (recbench.tuning.run_job), or a confirmation job
@@ -14,6 +14,9 @@ How jobs are scheduled:
 - CPU jobs run on CPU workers, each with a thread cap. GPU jobs run in GPU slots (`jobs_per_gpu` per GPU),
   with CUDA_VISIBLE_DEVICES set per job. Without CUDA, GPU jobs run on CPU workers.
 - No job starts after --deadline-hours. --stop-after-dataset never starts a job of a later dataset.
+- While it runs, the queue rewrites runs/queue/<tier>.json when a job starts or ends and once a minute (a heartbeat),
+  and writes the same picture as a self-refreshing page, reports/queue/<tier>.html (see recbench.queue_status).
+  With --price-per-hour, both also show the cost of the session so far.
 - When a dataset's tuning jobs are all done, its report is written. If `confirm` is set, its top methods
   are queued for the full-data check right away, ahead of the next dataset.
 Everything resumes: a finished job (its summary in runs/tuning/) is not run again.
@@ -24,17 +27,19 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import socket
 import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from recbench import queue_status
 from recbench.runner import repo_root
 from recbench.tuning.__main__ import load_benchmark
 from recbench.tuning.job import JobSettings, read_summary, run_confirm, run_job
 
-DONE = {"finished", "over_budget", "failed", "missing_split", "skipped"}
+DONE = {"finished", "over_budget", "failed", "unsupported", "missing_split", "skipped"}
 RETRY_ON_RESUME = {"missing_split"}  # the splits may have been prepared since
 
 
@@ -73,11 +78,19 @@ def state_path(tier: str) -> Path:
     return path
 
 
+def status_page(tier: str) -> Path:
+    return repo_root() / "reports" / "queue" / f"{tier}.html"
+
+
 class Queue:
     def __init__(self, config: Path, *, datasets: list[str] | None = None, methods: list[str] | None = None,
                  hardware: str | None = None, deadline_hours: float | None = None, stop_after_dataset: bool = False,
-                 retry_failed: bool = False, isolate: bool = True, gpus: int | None = None, cpu_workers: int | None = None):
+                 retry_failed: bool = False, isolate: bool = True, gpus: int | None = None, cpu_workers: int | None = None,
+                 price_per_hour: float | None = None):
         self.benchmark, self.resolved, self.spaces, self.settings = load_benchmark(config, hardware)
+        self.price_per_hour = price_per_hour
+        self.session_started = time.time()
+        self.finished = False
         queue_cfg = self.benchmark.get("queue") or {}
         self.confirm_cfg = self.benchmark.get("confirm") or {}
         self.datasets = datasets or list(self.benchmark.get("datasets") or [])
@@ -104,7 +117,8 @@ class Queue:
                 self.jobs.append(Job(dataset, entry["name"], "tune", entry.get("resource", "cpu"), (d, 0, m), list(entry.get("after") or [])))
         for job in self.jobs:  # resume: finished jobs keep their summary
             self._load_done(job)
-        self.active_dataset = next((j.dataset for j in sorted(self.jobs, key=lambda j: j.priority) if j.status == "pending"), None)
+        self.active_dataset: str | None = None
+        self._refresh_active()
 
     # ----- bookkeeping -----
     def _load_done(self, job: Job) -> None:
@@ -116,6 +130,11 @@ class Queue:
             job.retry = True
             return
         job.status, job.result = summary["status"], summary
+
+    def _refresh_active(self) -> None:
+        """The dataset being worked on: the first one with a pending job, tuning or confirmation."""
+        pending = [j for j in sorted(self.jobs, key=lambda j: j.priority) if j.status == "pending"]
+        self.active_dataset = pending[0].dataset if pending else self.active_dataset
 
     def _deps_done(self, job: Job) -> bool:
         return all(any(j.dataset == job.dataset and j.method == dep and j.kind == "tune" and j.status in DONE for j in self.jobs)
@@ -138,6 +157,8 @@ class Queue:
     def save_state(self) -> None:
         state = {
             "tier": self.settings.tier, "updated": time.time(), "deadline": self.deadline,
+            "session_started": self.session_started, "price_per_hour": self.price_per_hour, "finished": self.finished,
+            "host": socket.gethostname(), "pid": os.getpid(), "datasets": self.datasets,
             "cpu_workers": self.cpu_workers, "cpu_threads": self.cpu_threads, "gpu_slots": len(self.gpu_slots),
             "jobs": [{"key": j.key, "dataset": j.dataset, "method": j.method, "kind": j.kind, "resource": j.resource,
                       "status": j.status, "started": j.started, "ended": j.ended, "slot": j.slot,
@@ -147,6 +168,15 @@ class Queue:
         tmp = path.with_suffix(".tmp")
         tmp.write_text(json.dumps(state, indent=2, default=str))
         tmp.replace(path)
+        try:  # the status page must never stop the queue
+            queue_status.write_html(queue_status.collect(self.benchmark, self.settings.tier, state), status_page(self.settings.tier))
+        except Exception as exc:  # noqa: BLE001
+            print(f"[queue] status page not written: {type(exc).__name__}: {exc}", flush=True)
+
+    def _heartbeat(self, stop: threading.Event) -> None:
+        while not stop.wait(queue_status.HEARTBEAT_SECONDS):
+            with self.lock:
+                self.save_state()
 
     # ----- dataset completion -----
     def _dataset_done(self, dataset: str, kind: str) -> bool:
@@ -166,11 +196,13 @@ class Queue:
         return all(self._tuning_state(dataset, m)[0] in DONE - RETRY_ON_RESUME for m in self.all_methods)
 
     def _top_methods(self, dataset: str, n: int) -> list[str]:
-        """The dataset's best methods by quick-tier test NDCG@10, over all configured methods (Random excluded)."""
+        """The dataset's best methods by their VALIDATION score (best_val: NDCG@10 of the best setting on the same
+        quick-val users), over all configured methods (Random excluded). The choice of what to confirm must not use
+        test data: the full test split contains the quick test users."""
         scored = []
         for method in self.all_methods:
             status, result = self._tuning_state(dataset, method)
-            value = ((result or {}).get("test") or {}).get("ndcg_at_10")
+            value = (result or {}).get("best_val")
             if status == "finished" and value is not None and method != "random":
                 scored.append((-float(value), method))
         return [method for _, method in sorted(scored)[:n]]
@@ -194,8 +226,8 @@ class Queue:
             self._queue_confirmations(job.dataset)
         if job.kind == "confirm" and self._dataset_done(job.dataset, "confirm"):
             self._report(job.dataset, confirm=True)
-        pending = [j for j in sorted(self.jobs, key=lambda j: j.priority) if j.status == "pending"]
-        self.active_dataset = pending[0].dataset if pending and not self.stop_after_dataset else self.active_dataset
+        if not self.stop_after_dataset:
+            self._refresh_active()
 
     def _report(self, dataset: str, confirm: bool = False) -> None:
         try:
@@ -258,41 +290,33 @@ class Queue:
             for dataset in self.datasets:  # datasets finished in an earlier session: make sure their confirmations exist
                 if self._tuning_done(dataset):
                     self._queue_confirmations(dataset)
+            self._refresh_active()  # an interrupted confirmation of an earlier dataset comes first
             self.save_state()
         threads = [threading.Thread(target=self._worker, args=(slot,), daemon=True) for slot in slots]
+        stop = threading.Event()
+        heartbeat = threading.Thread(target=self._heartbeat, args=(stop,), daemon=True)
+        heartbeat.start()
         for thread in threads:
             thread.start()
         for thread in threads:
             thread.join()
+        stop.set()
         with self.lock:
+            self.finished = True
             self.save_state()
         return self.jobs
 
 
-def print_status(config: Path) -> None:
-    """Jobs per dataset, and each dataset's provisional quick-tier leaderboard (best test NDCG@10 so far)."""
+def print_status(config: Path, *, state_file: Path | None = None, html: Path | None = None) -> None:
+    """Liveness, time and cost of the session, every job (tuning and confirmation) with its status, and each
+    dataset's provisional leaderboard (best test NDCG@10 so far). `state_file` reads another machine's copied state
+    (for example runs/queue-box/quick.json after fetch_results.sh); `html` also writes the page there."""
     benchmark, _, _, settings = load_benchmark(config)
-    path = state_path(settings.tier)
-    state = json.loads(path.read_text()) if path.exists() else {"jobs": []}
-    running = {j["key"]: j for j in state["jobs"] if j["status"] == "running"}
-    methods = [e["name"] for e in (benchmark.get("queue") or {}).get("methods") or []]
-    for dataset in benchmark.get("datasets") or []:
-        rows = []
-        for method in methods:
-            summary = read_summary(settings.tier, dataset, method)
-            key = f"tune:{dataset}:{method}"
-            status = "running" if key in running else (summary or {}).get("status", "pending")
-            if status == "running" and key not in running:
-                status = "interrupted"  # started in an earlier session; resumes when the queue runs again
-            test = ((summary or {}).get("test") or {}).get("ndcg_at_10") if summary else None
-            rows.append((method, status, test, (summary or {}).get("best_val")))
-        done = sum(r[1] in DONE for r in rows)
-        print(f"\n== {dataset}: {done}/{len(rows)} jobs done")
-        for method, status, test, val in sorted(rows, key=lambda r: -(r[2] if r[2] is not None else -1)):
-            print(f"  {method:20s} {status:12s} test NDCG@10={'%.4f' % test if test is not None else '   -  '}"
-                  f"  val={'%.4f' % val if val is not None else '-'}")
-    if state.get("updated"):
-        print(f"\nstate updated {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(state['updated']))}")
+    state = queue_status.load_state(state_file or state_path(settings.tier))
+    view = queue_status.collect(benchmark, settings.tier, state)
+    print(queue_status.render_text(view))
+    if html:
+        print(f"\nstatus page: {queue_status.write_html(view, html)}")
 
 
 def main() -> None:
@@ -307,16 +331,19 @@ def main() -> None:
     run.add_argument("--stop-after-dataset", action="store_true")
     run.add_argument("--retry-failed", action="store_true")
     run.add_argument("--cpu-workers", type=int, default=None)
+    run.add_argument("--price-per-hour", type=float, default=None, help="the box's $/hour, to show the session's cost so far")
     status = sub.add_parser("status")
     status.add_argument("--config", type=Path, required=True)
+    status.add_argument("--state", type=Path, default=None, help="another machine's copied state file, e.g. runs/queue-box/quick.json")
+    status.add_argument("--html", type=Path, default=None, help="also write the status page to this file")
     args = parser.parse_args()
     if args.command == "status":
-        print_status(args.config)
+        print_status(args.config, state_file=args.state, html=args.html)
         return
     queue = Queue(args.config, datasets=[d for d in args.datasets.split(",") if d] or None,
                   methods=[m for m in args.methods.split(",") if m] or None, hardware=args.hardware,
                   deadline_hours=args.deadline_hours, stop_after_dataset=args.stop_after_dataset,
-                  retry_failed=args.retry_failed, cpu_workers=args.cpu_workers)
+                  retry_failed=args.retry_failed, cpu_workers=args.cpu_workers, price_per_hour=args.price_per_hour)
     queue.run()
     print_status(args.config)
 

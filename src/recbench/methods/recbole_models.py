@@ -251,6 +251,7 @@ class BERT4Rec(_FullSortMethod):
     model_name = "BERT4Rec"
     spec = MethodSpec(
         name="bert4rec",
+        sequence_aware=True,
         tasks=SEQ_TASKS,
         uses_history=True,
         needs_torch=True,
@@ -268,6 +269,7 @@ class S3Rec(_FullSortMethod):
     uses_categories = True
     spec = MethodSpec(
         name="s3rec",
+        sequence_aware=True,
         tasks=SEQ_TASKS,
         uses_history=True,
         requires_side_features=True,

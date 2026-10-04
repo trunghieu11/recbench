@@ -1,0 +1,29 @@
+# Breadth pass: every dataset, every method except HSTU.
+# Each pair may train for up to 2 hours. timeout_minutes is not part of the run id,
+# so finished pairs from the 45-minute pass are still skipped.
+tier: full
+hardware: configs/hardware/gpu.yaml
+seed: 42
+resume: true
+continue_on_error: true
+timeout_minutes: 120
+managed_services: false
+export_bundles: true
+datasets: [movielens-25m, retailrocket, hm, lastfm, steam]
+methods:
+  - random
+  - most_popular
+  - itemknn
+  - ease
+  - bpr_mf
+  - ials
+  - lightgcn
+  - xsimgcl
+  - sasrec
+  - bert4rec
+  - s3rec
+  - din
+  - dcnv2
+  - text_hash_tower
+  - multimodal_tower
+  - tiger_lite

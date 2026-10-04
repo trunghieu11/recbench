@@ -197,14 +197,18 @@ def run_single(split_dir: Path, method_name: str, resolved: dict[str, Any]) -> d
             with tempfile.TemporaryDirectory() as tmp:
                 for path in save_result(result, Path(tmp)):
                     mlflow.log_artifact(str(path))
+            bundle = None
             if resolved.get("export_bundles") and method.spec.ranked and not method.spec.managed:
-                bundle = _export_bundle(method, data, split, cfg)
+                bundle = _export_bundle(method, data, split, cfg, run_id=mlflow.active_run().info.run_id, run_hash=run_hash)
                 if bundle is not None:
                     mlflow.set_tag("bundle", str(bundle))
             mlflow.set_tag("status", "finished")
             summary = {k: result.metrics[k] for k in ("ndcg_at_10", "recall_at_10") if k in result.metrics}
-            return {"status": "finished", "metrics": summary, "train_seconds": train_seconds,
-                    "fit": {k: v for k, v in fit_info.items() if isinstance(v, (int, float, str, bool))}}
+            outcome = {"status": "finished", "metrics": summary, "train_seconds": train_seconds,
+                       "fit": {k: v for k, v in fit_info.items() if isinstance(v, (int, float, str, bool))}}
+            if bundle is not None:
+                outcome["bundle"] = str(bundle)
+            return outcome
         except Unsupported as exc:
             mlflow.set_tags({"status": "unsupported", "reason": str(exc)[:500]})
             return {"status": "unsupported", "reason": str(exc)}
@@ -227,13 +231,14 @@ def _skip_reason(method, data: TrainView, resolved: dict[str, Any]) -> str | Non
     return None
 
 
-def _export_bundle(method, data: TrainView, split, cfg: dict[str, Any]) -> Path | None:
+def _export_bundle(method, data: TrainView, split, cfg: dict[str, Any], *, run_id: str = "", run_hash: str = "") -> Path | None:
     try:
         from recbench.serving.bundle import export_bundle
     except ImportError:
         return None
     out = data_root() / "bundles" / data.dataset / data.tier / method.spec.name
-    return export_bundle(method, data, out, k=int(cfg.get("bundle_k", 100)), max_users=int(cfg.get("bundle_users", 20_000)))
+    extra = {"run_id": run_id, "config_hash": run_hash, "stage": str(cfg.get("stage", "benchmark")), "tuning": str(cfg.get("tuning", "defaults"))}
+    return export_bundle(method, data, out, k=int(cfg.get("bundle_k", 100)), max_users=int(cfg.get("bundle_users", 20_000)), extra=extra)
 
 
 def run_pair(split_dir: Path, method_name: str, resolved: dict[str, Any], *, isolate: bool = True) -> dict[str, Any]:

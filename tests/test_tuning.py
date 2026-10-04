@@ -77,6 +77,12 @@ def test_retry_starts_a_fresh_attempt_after_failed_trials(workspace):
     assert resumed["test"]["ndcg_at_10"] == pytest.approx(fixed["test"]["ndcg_at_10"]) and set(fixed["test"]) <= set(resumed["test"])
 
 
+def test_job_whose_trials_are_all_unsupported_is_unsupported(workspace):
+    # The toy data has no item images, so the multimodal tower refuses to run: that is "unsupported", not "failed".
+    summary = run_job("toy", "multimodal_tower", dict(RESOLVED), JobSettings(tier="full", trials=2), None, isolate=False)
+    assert summary["status"] == "unsupported" and "images" in summary["reason"]
+
+
 def test_job_without_time_for_one_trial_is_over_budget(workspace):
     spaces, _ = load_spaces(ROOT / "configs" / "tuning" / "quick.yaml")
     settings = JobSettings(tier="full", trials=3, search_users=50, cap_minutes=0.5)

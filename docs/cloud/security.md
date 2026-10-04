@@ -12,6 +12,7 @@ information. This page lists what the project already does and what you must do 
 | Recombee private token | the Recombee benchmark | `RECBENCH_RECOMBEE_TOKEN` in your shell or a `.env` file |
 | Google credentials | `gcloud` | managed by `gcloud auth login`, outside the repository |
 | identity tokens | calling the private service | printed on demand, valid for about an hour |
+| SSH private key | reaching a rented GPU box | `~/.ssh/id_ed25519` on your laptop only; vast.ai gets the **public** key (`.pub`) |
 
 Built-in protections:
 
@@ -22,6 +23,19 @@ Built-in protections:
 !!! danger "If a token leaks"
     Rotate it immediately in the provider's console (Recombee: database settings; Kaggle: account settings).
     Deleting the commit is not enough: anything pushed to a public repository should be considered copied.
+
+### On a rented machine
+
+A rented box belongs to someone else. Treat it as untrusted, and keep secrets off it:
+
+- **Upload the prepared splits** ([5c](../start/box-3-run-and-monitor.md)) instead of preparing data there, so your
+  Kaggle token never leaves your laptop. If you must prepare on the box, copy `kaggle.json` there, then delete it
+  (`rm ~/.kaggle/kaggle.json ~/.kaggle/access_token`) before you destroy the box.
+- Do not copy the SSH **private** key, Google credentials or any `.env` file to the box.
+- The monitoring pages (MLflow, the status page) listen on the box's 127.0.0.1 only. Reach them through the SSH
+  tunnel ([5c, step 6](../start/box-3-run-and-monitor.md#step-6-watch-it-level-3-two-pages-in-your-browser));
+  never open those ports to the internet.
+- **Destroy** the box when you are done: that also deletes its disk with your data on it.
 
 Before every commit, check what you are adding:
 
@@ -72,9 +86,12 @@ The essentials:
 
 ## Third-party code
 
-Two research repositories are fetched by `scripts/fetch_third_party.sh` at **pinned commits** (SELFRec and Meta's
-generative-recommenders), and libraries are installed from PyPI with version ranges. Pinning means an upstream
-change cannot silently alter the code you run. Review a commit before changing a pin.
+Three research repositories are fetched by `scripts/fetch_third_party.sh` at **pinned commits**: SELFRec, Meta's
+generative-recommenders, and the authors' official GRU4Rec. Libraries are installed from PyPI with version ranges.
+Pinning means an upstream change cannot silently alter the code you run. Review a commit before changing a pin.
+
+The official GRU4Rec code allows research and education only; commercial use needs its author's permission.
+recbench fetches it, never copies it into this repository. Check its licence before you serve GRU4Rec in a product.
 
 ## Data licences
 

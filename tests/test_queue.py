@@ -80,12 +80,49 @@ def test_confirmations_rank_every_method_even_in_a_filtered_session(workspace):
     methods = [{"name": "random", "resource": "cpu"}, {"name": "most_popular", "resource": "cpu"}, {"name": "itemknn", "resource": "cpu"}]
     config = write_config(workspace / "q.yaml", ["toy"], methods, confirm_top=1)
     jobs = Queue(config, isolate=False, gpus=0, cpu_workers=1).run()
-    tuned = {j.method: j.result["test"]["ndcg_at_10"] for j in jobs if j.kind == "tune" and j.method != "random"}
+    # Confirmations are chosen by the validation score, never by test results.
+    tuned = {j.method: j.result["best_val"] for j in jobs if j.kind == "tune" and j.method != "random"}
     best, weaker = max(tuned, key=tuned.get), min(tuned, key=tuned.get)
     assert [j.method for j in jobs if j.kind == "confirm"] == [best]
     # Re-running only the weaker method must not confirm it: the ranking covers every method's summary on disk.
     filtered = Queue(config, methods=[weaker], isolate=False, gpus=0, cpu_workers=1).run()
     assert [j for j in filtered if j.kind == "confirm"] == []
+
+
+def test_interrupted_confirmation_resumes_even_with_stop_after_dataset(workspace):
+    from recbench.tuning.job import _write_summary, read_summary
+
+    methods = [{"name": "random", "resource": "cpu"}, {"name": "most_popular", "resource": "cpu"}]
+    config = write_config(workspace / "q.yaml", ["toy", "toy2"], methods, confirm_top=1)
+    Queue(config, datasets=["toy"], isolate=False, gpus=0, cpu_workers=1).run()
+    done = read_summary("full", "toy", "most_popular", "confirm")
+    assert done["status"] == "finished"
+    _write_summary({**done, "status": "running"})  # as if the box disappeared during the confirmation
+    queue = Queue(config, isolate=False, gpus=0, cpu_workers=1, stop_after_dataset=True)
+    jobs = queue.run()
+    confirm = [j for j in jobs if j.kind == "confirm" and j.dataset == "toy"]
+    assert confirm and confirm[0].status == "finished"  # the stranded confirmation ran again
+    assert all(j.status == "pending" for j in jobs if j.dataset == "toy2")  # and the queue stopped after toy
+
+
+def test_status_shows_liveness_cost_confirmations_and_writes_a_page(workspace, capsys):
+    from recbench import queue_status
+
+    methods = [{"name": "random", "resource": "cpu"}, {"name": "most_popular", "resource": "cpu"}]
+    config = write_config(workspace / "q.yaml", ["toy"], methods, confirm_top=1)
+    Queue(config, isolate=False, gpus=0, cpu_workers=1, price_per_hour=0.5).run()
+    page = workspace / "reports" / "queue" / "full.html"
+    assert page.exists() and "refresh" in page.read_text() and "finished" in page.read_text()
+    print_status(config)
+    out = capsys.readouterr().out
+    assert "queue: finished" in out and "about $" in out and "confirm most_popular" in out
+    # A state whose heartbeat stopped long ago, with a job still marked running: the queue is gone.
+    state = json.loads((workspace / "runs" / "queue" / "full.json").read_text())
+    state.update(updated=state["updated"] - 3600, finished=False)
+    state["jobs"][0]["status"] = "running"
+    view = queue_status.collect(yaml.safe_load(config.read_text()), "full", state)
+    text = queue_status.render_text(view)
+    assert "STOPPED?" in text and "interrupted" in text
 
 
 def test_jobs_without_splits_run_again_on_resume(workspace):
@@ -121,6 +158,19 @@ def test_confirmation_rechecks_the_size_setting_on_full_data(tmp_path, monkeypat
     lambdas = sorted(c["params"]["ease_lambda"] for c in confirmed["checks"])
     assert lambdas[1] == pytest.approx(2 * lambdas[0]) and lambdas[2] == pytest.approx(2 * lambdas[1])
     assert len(confirmed["finals"]) == 1  # EASE is deterministic: one seed is enough
+    bundle = Path(confirmed["bundle"])  # the first final run wrote the serving bundle
+    manifest = json.loads((bundle / "manifest.json").read_text())
+    assert manifest["tier"] == "full" and manifest["stage"] == "final" and manifest["run_id"]
+    assert (bundle / "item_popularity.npy").exists()
+    import numpy as np
+
+    from recbench.export import export
+
+    first = np.load(bundle / "topk.npy")
+    config = write_config(tmp_path / "q.yaml", ["toy"], [{"name": "ease"}])
+    again = export("toy", "ease", config=config, tier="full", from_confirm=True)  # rewrites the same folder
+    assert json.loads((again / "manifest.json").read_text())["settings_from"] == "confirmation on full"
+    assert np.array_equal(np.load(again / "topk.npy"), first)  # same settings, same lists
     from recbench.tuning.job import read_summary
 
     assert read_summary("full", "toy", "ease", "confirm")["stage"] == "confirm"

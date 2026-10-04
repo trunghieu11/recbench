@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from recbench.protocol import PROTOCOL_NOTE
+from recbench.protocol import PROTOCOL_NOTE, TUNING_NOTES, dataset_sort_key
 from recbench.results import fmt, latest_status, leaderboard, load_runs
 
 
@@ -124,14 +124,14 @@ def docs_label(tier: str, tuning: str | None) -> str:
 def build(tier: str, out_dir: Path, *, docs_dir: Path | None = None, data_dir: Path | None = None, tuning: str | None = None) -> Path:
     data_dir = data_dir or Path(os.environ.get("DATA_DIR", "data"))
     frame = load_runs(tier, tuning=tuning)
-    status = latest_status(tier)
+    status = latest_status(tier, tuning=tuning)
     out_dir.mkdir(parents=True, exist_ok=True)
-    datasets = sorted(set(frame["tags.dataset"])) if not frame.empty else []
+    datasets = sorted(set(frame["tags.dataset"]), key=dataset_sort_key) if not frame.empty else []
     title = f"{tier} tier" + (f", {tuning}" if tuning else "")
-    header = [f"# Results — {title}", "", f"> {PROTOCOL_NOTE}", ""]
+    header = [f"# Results — {title}", "", f"> {PROTOCOL_NOTE} {TUNING_NOTES.get(tuning, '')}", ""]
     if tier == "smoke":
         header += ["> Smoke splits are small user samples (about 50K events, at most 2,000 eval users), so confidence "
-                   "intervals are wide. Use them to check the pipeline, and the full tier to choose a method.", ""]
+                   "intervals are wide. Use them to check the pipeline; the quick-tier bake-off chooses methods.", ""]
     body: list[str] = []
     for dataset in datasets:
         section = dataset_section(frame, dataset, tier, data_dir, status)

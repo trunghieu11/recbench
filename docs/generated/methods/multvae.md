@@ -25,4 +25,4 @@
 | tuning | 3 / 5 | higher = more work | Layer sizes, dropout, KL cap, annealing, learning rate. |
 | data_hunger | 3 / 5 | higher = needs more data | Strongest on dense histories; weaker for users with very few items. |
 | controllability | 2 / 5 | higher = easier to steer | Latent codes; little to steer directly. |
-| explainability | 2 / 5 | higher = clearer reasons | Post-hoc only. |
+| explainability | 2 / 5 | higher = clearer reasons | Post-hoc only. recbench does not generate these explanations yet. |

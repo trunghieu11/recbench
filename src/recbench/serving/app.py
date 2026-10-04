@@ -21,7 +21,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from pydantic import BaseModel, Field
 
@@ -76,8 +76,12 @@ def available() -> list[dict]:
 
 
 @app.get("/health")
-def health() -> dict:
-    return {"ok": True, "version": __version__, "bundles": len(available())}
+def health():
+    """Ready when at least one bundle can be served for this tier; otherwise 503, so Cloud Run's probe and an uptime
+    check notice a deployment without bundles."""
+    n = len(available())
+    body = {"ok": n > 0, "version": __version__, "tier": tier(), "bundles": n}
+    return body if n else JSONResponse(body, status_code=503)
 
 
 @app.get("/methods")
@@ -97,18 +101,22 @@ def recommend(body: RecommendRequest) -> dict:
 
 
 @app.get("/")
-def root():
-    return RedirectResponse("/dashboard")
+def root() -> dict:
+    return {"service": "recbench", "version": __version__, "tier": tier(),
+            "endpoints": {"GET /health": "ready check", "GET /methods": "what can be served", "POST /recommend": "top-K for one user",
+                          "GET /dashboard": "leaderboards (only where MLflow results are available)"}}
 
 
 @app.get("/dashboard", response_class=HTMLResponse)
-def dashboard(tier_name: str | None = None):
+def dashboard(tier_name: str | None = None, tuning: str | None = None):
+    """Leaderboards from MLflow. Needs MLflow and a results store, so it works locally but not in the serving image."""
     try:
         from recbench.results import TASK_BOARDS, latest_status, leaderboard, load_runs
-    except ImportError:
-        raise HTTPException(status_code=404, detail="The dashboard needs MLflow (pip install 'recbench[bench]')") from None
-    chosen = tier_name or tier()
-    frame = load_runs(chosen)
+
+        chosen = tier_name or tier()
+        frame = load_runs(chosen, tuning=tuning)
+    except Exception as exc:  # noqa: BLE001 - no MLflow in the image, or no results store
+        raise HTTPException(status_code=404, detail=f"The dashboard needs MLflow results here ({type(exc).__name__})") from None
     boards = []
     if not frame.empty:
         for dataset in sorted(frame["tags.dataset"].unique()):
@@ -128,7 +136,7 @@ def dashboard(tier_name: str | None = None):
                     for _, r in board.iterrows()
                 ]
                 boards.append({"dataset": dataset, "task": task, "title": title, "metric": metric, "rows": rows})
-    status = latest_status(chosen)
+    status = latest_status(chosen, tuning=tuning)
     problems = [] if status.empty else status[status["status"] != "finished"].to_dict(orient="records")
     html = _TEMPLATES.get_template("leaderboard.html").render(
         title=f"recbench results — {chosen} tier", protocol=PROTOCOL_NOTE, boards=boards, problems=problems

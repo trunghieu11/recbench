@@ -83,8 +83,8 @@ def method_facts(name: str, entry: dict[str, Any], spec: Any, ladder: dict[int, 
     )
 
 
-def method_results(name: str, frames: dict[str, Any]) -> str:
-    rows = []
+def method_results(name: str, frames: dict[str, Any], impl_version: str = "1") -> str:
+    rows, older = [], set()
     for tier, frame in frames.items():
         if frame is None or frame.empty:
             continue
@@ -97,10 +97,19 @@ def method_results(name: str, frames: dict[str, Any]) -> str:
             ci = ""
             if r.get("metrics.ndcg_at_10_ci_low") == r.get("metrics.ndcg_at_10_ci_low"):
                 ci = f" [{m('ndcg_at_10_ci_low')}, {m('ndcg_at_10_ci_high')}]"
-            rows.append([tier, r["tags.dataset"], m("ndcg_at_10") + ci, m("next_ndcg_at_10"), m("coverage_at_10", 3), m("train_seconds", 1)])
+            run_version = str(r.get("tags.impl_version") if isinstance(r.get("tags.impl_version"), str) else "1")
+            label = tier
+            if run_version != str(impl_version):  # produced by an earlier version of this method's code
+                older.add(run_version)
+                label = f"{tier} †"
+            rows.append([label, r["tags.dataset"], m("ndcg_at_10") + ci, m("next_ndcg_at_10"), m("coverage_at_10", 3), m("train_seconds", 1)])
     if not rows:
         return "<!-- generated -->\n\n_No finished runs yet._\n"
-    return "<!-- generated -->\n\n" + _table(["Tier", "Dataset", "NDCG@10 [95% CI]", "Next NDCG@10", "Coverage@10", "Train s"], rows)
+    text = "<!-- generated -->\n\n" + _table(["Tier", "Dataset", "NDCG@10 [95% CI]", "Next NDCG@10", "Coverage@10", "Train s"], rows)
+    if older:
+        text += (f"\n† Run with an earlier version of this method's code (implementation version {', '.join(sorted(older))}; "
+                 f"the code is now at version {impl_version}). Running it again updates the row.\n")
+    return text
 
 
 def dataset_facts(name: str, entry: dict[str, Any], spec: Any, data_dir: Path) -> str:
@@ -161,15 +170,16 @@ def build(root: Path | None = None, data_dir: Path | None = None, with_results: 
     for name in sorted(reg.methods, key=lambda n: (catalog["methods"][n]["rung"], n)):
         spec, entry = reg.methods[name].spec, catalog["methods"][name]
         (out / "methods" / f"{name}.md").write_text(method_facts(name, entry, spec, ladder))
-        (out / "methods" / f"{name}-results.md").write_text(method_results(name, frames))
+        (out / "methods" / f"{name}-results.md").write_text(method_results(name, frames, spec.impl_version))
         capability.append([
             f"[{entry['title']}]({name.replace('_', '-')}.md)", str(entry["rung"]), entry["family"],
-            ", ".join(t for t in TASK_ORDER if Task(t) in spec.tasks), _yes(spec.uses_history), _yes(spec.scores_cold_items),
-            _yes(spec.requires_side_features), entry["fidelity"], _yes(spec.ranked),
+            ", ".join(t for t in TASK_ORDER if Task(t) in spec.tasks), _yes(spec.uses_history), _yes(spec.sequence_aware),
+            _yes(spec.scores_cold_items), _yes(spec.requires_side_features), entry["fidelity"], _yes(spec.ranked),
         ])
     (out / "capability.md").write_text(
         "<!-- generated -->\n\n"
-        + _table(["Method", "Rung", "Family", "Tasks", "Uses order", "New items", "Needs content", "Fidelity", "Ranked"], capability)
+        + _table(["Method", "Rung", "Family", "Tasks", "Uses history", "Order-aware", "New items", "Needs content", "Fidelity", "Ranked"],
+                 capability)
     )
     metric_rows = []
     for name, cls in sorted(reg.metrics.items(), key=lambda kv: (kv[1].spec.kind, kv[0])):

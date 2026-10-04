@@ -25,4 +25,4 @@
 | tuning | 1 / 5 | higher = more work | One setting: the number of factors. |
 | data_hunger | 2 / 5 | higher = needs more data | Works on small data; too few factors collapse to popularity. |
 | controllability | 2 / 5 | higher = easier to steer | Latent directions are hard to steer. |
-| explainability | 2 / 5 | higher = clearer reasons | Post-hoc only: items close in the factor space. |
+| explainability | 2 / 5 | higher = clearer reasons | Post-hoc only: items close in the factor space. recbench does not generate these explanations yet. |

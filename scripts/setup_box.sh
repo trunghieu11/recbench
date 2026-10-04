@@ -13,11 +13,16 @@ source "$ROOT/scripts/_common.sh"
 [[ "$(uname -s)" == "Linux" ]] || { echo "setup_box.sh is for the rented Linux box; on the laptop use install.md." >&2; exit 1; }
 command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L || echo "warning: no NVIDIA GPU visible; GPU jobs will run on the CPU" >&2
 
-# SuiteSparse and a C compiler for SANSA (scikit-sparse builds from source), plus tmux and rsync.
-# The box usually runs as root, otherwise sudo is used.
-if ! ldconfig -p 2>/dev/null | grep -q libcholmod || ! command -v gcc >/dev/null 2>&1 || ! command -v tmux >/dev/null 2>&1; then
+# SuiteSparse and a C compiler for SANSA (scikit-sparse builds from source); tmux to keep runs alive; rsync for the
+# copy scripts; htop and nvtop to watch CPU, RAM and GPU. The box usually runs as root, otherwise sudo is used.
+missing=()
+ldconfig -p 2>/dev/null | grep -q libcholmod || missing+=(libsuitesparse-dev)
+for tool in gcc:build-essential tmux:tmux rsync:rsync htop:htop nvtop:nvtop; do
+  command -v "${tool%%:*}" >/dev/null 2>&1 || missing+=("${tool##*:}")
+done
+if (( ${#missing[@]} )); then
   SUDO=""; [[ "$(id -u)" -eq 0 ]] || SUDO="sudo"
-  $SUDO apt-get update -qq && $SUDO apt-get install -y -qq libsuitesparse-dev build-essential tmux rsync >/dev/null
+  $SUDO apt-get update -qq && $SUDO apt-get install -y -qq "${missing[@]}" >/dev/null || echo "warning: could not install: ${missing[*]}" >&2
 fi
 
 command -v uv >/dev/null 2>&1 || { curl -LsSf https://astral.sh/uv/install.sh | sh; export PATH="$HOME/.local/bin:$PATH"; }
@@ -46,9 +51,15 @@ python -c "from sentence_transformers import SentenceTransformer; SentenceTransf
   && echo "Sentence-transformer model cached." || echo "warning: could not download the text model; text_knn will fail" >&2
 python -c "import lightgbm, optuna; print('lightgbm', lightgbm.__version__, '| optuna', optuna.__version__)"
 python -c "import sansa, sksparse; print('sansa ready')" 2>/dev/null || echo "SANSA not available." >&2
+ensure_kaggle_token   # only needed if you prepare the data here instead of uploading it
 mkdir -p runs/logs
 pip_log="runs/logs/pip-freeze-$(date -u +%Y%m%dT%H%M%SZ).txt"
 uv pip freeze > "$pip_log"
 echo "Environment recorded in $pip_log"
 echo "Threads per process: OPENBLAS=$OPENBLAS_NUM_THREADS OMP=$OMP_NUM_THREADS MKL=$MKL_NUM_THREADS (cores: $(nproc))"
-echo "Next: put the splits in data/splits, then: tmux new -s quick ./scripts/run_quick_box.sh (docs/start/quick-tier-box.md)."
+if [[ -n "${TMUX:-}" ]]; then
+  echo "Note: this SSH session already runs inside tmux (vast.ai starts one for you). Use it as your run window:"
+  echo "      Ctrl-b c opens a second window, Ctrl-b d detaches. See docs/start/box-2-rent-and-set-up.md."
+fi
+echo "Next: copy the splits from the laptop (./scripts/upload_splits.sh), then ./scripts/run_quick_box.sh inside tmux"
+echo "      (docs/start/box-3-run-and-monitor.md)."

@@ -25,4 +25,4 @@
 | tuning | 4 / 5 | higher = more work | Loss, hidden size, batch size, learning rate, momentum, dropouts, sampling. |
 | data_hunger | 3 / 5 | higher = needs more data | Needs many sequences; short histories give little to learn from. |
 | controllability | 2 / 5 | higher = easier to steer | A hidden state; little to steer directly. |
-| explainability | 2 / 5 | higher = clearer reasons | Post-hoc only. |
+| explainability | 2 / 5 | higher = clearer reasons | Post-hoc only. recbench does not generate these explanations yet. |

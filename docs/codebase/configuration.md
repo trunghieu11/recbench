@@ -35,12 +35,18 @@ Quick-tier files (`quick.yaml`, `quick-smoke.yaml`) add four sections, read by `
 | `tuning.trials` | 10 | settings tried per job (a method's space may change it, e.g. Random tries 1) |
 | `tuning.search_users` | 3,000 | validation users that score each trial (the same seeded sample every time) |
 | `tuning.cap_minutes` | 180 | wall-clock limit per job, tuning and final run included |
+| `tuning.force` | {} | settings that win over the search spaces, e.g. `{max_epochs: 3}` in the laptop dry run (`quick-smoke.yaml`) |
 | `queue.methods` | [] | job order inside a dataset: `{name, resource: cpu or gpu, after: [methods of the same dataset]}` |
 | `queue.jobs_per_gpu` | 3 | GPU jobs that share one GPU |
 | `queue.cpu_workers` | cores ÷ 16 (1 to 8) | parallel CPU jobs; `--cpu-workers` overrides it |
 | `queue.max_threads_per_job` | 32 | BLAS/OpenMP threads per CPU job |
 | `confirm.top`, `confirm.tier`, `confirm.seeds` | 0, full, [] | how many of a dataset's best methods are re-checked, on which tier, with which seeds |
 | `write_docs` | true | write docs fragments when a dataset finishes (`quick.yaml` turns it off: the box's checkout stays clean) |
+
+Queue command-line options (`python -m recbench.queue run`): `--datasets`, `--methods`, `--hardware`,
+`--deadline-hours`, `--stop-after-dataset`, `--retry-failed`, `--cpu-workers`, and `--price-per-hour` (shown as the
+session's cost by `status` and on the status page `reports/queue/<tier>.html`). `python -m recbench.queue status`
+takes `--state` (another machine's copied state file) and `--html` (write the page there too).
 
 ### Search spaces (`configs/tuning/quick.yaml`)
 

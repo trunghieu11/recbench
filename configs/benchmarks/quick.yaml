@@ -1,5 +1,5 @@
 # Quick-tier bake-off: every low-budget method, tuned with the same budget, dataset by dataset.
-#   python -m recbench.pipeline.prepare --config configs/benchmarks/quick.yaml --tier quick,quick-val
+#   python -m recbench.pipeline.prepare --config configs/benchmarks/quick.yaml --tier quick,quick-val,full,full-val
 #   python -m recbench.queue run --config configs/benchmarks/quick.yaml
 #   python -m recbench.queue status --config configs/benchmarks/quick.yaml
 # Each job (one method on one dataset) searches `trials` configurations on the validation fold, then runs

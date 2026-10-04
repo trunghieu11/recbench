@@ -23,7 +23,7 @@ TASK_BOARDS = {
 }
 LOWER_IS_BETTER = {"gini_at_10", "popularity_percentile_at_10", "calibration_kl_at_10", "user_group_ndcg_gap_at_10",
                    "train_seconds", "score_seconds_per_1k_users", "peak_rss_mb", "peak_gpu_mb", "sampled_logloss",
-                   "served_p50_ms", "served_p95_ms", "served_p99_ms"}
+                   "served_p50_ms", "served_p95_ms", "served_p99_ms", "served_error_rate"}
 
 
 def tracking_uri() -> str:
@@ -76,9 +76,10 @@ def load_runs(tier: str | None = None, *, include_unfinished: bool = False, tuni
     return latest.reset_index(drop=True)
 
 
-def latest_status(tier: str | None = None) -> pd.DataFrame:
-    """The latest run of every (dataset, method), whatever its status, with the reason when it did not finish."""
-    frame = load_runs(tier, include_unfinished=True)
+def latest_status(tier: str | None = None, tuning: str | None = None) -> pd.DataFrame:
+    """The latest run of every (dataset, method), whatever its status, with the reason when it did not finish.
+    `tuning` keeps only default-settings or tuned runs, as in load_runs."""
+    frame = load_runs(tier, include_unfinished=True, tuning=tuning)
     if frame.empty:
         return frame
     cols = ["tags.dataset", "tags.method", "tags.status", "tags.reason"]

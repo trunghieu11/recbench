@@ -29,6 +29,7 @@ def job_settings(benchmark: dict[str, Any], space_settings: dict[str, Any]) -> J
         cap_minutes=float(tuning.get("cap_minutes", 180)),
         seed=int(benchmark.get("seed", 42)),
         space_version=int(space_settings.get("version", 1)),
+        force=dict(tuning.get("force") or {}),
     )
 
 

@@ -25,4 +25,4 @@
 | tuning | 1 / 5 | higher = more work | Two settings: alpha and the number of singular vectors. |
 | data_hunger | 2 / 5 | higher = needs more data | Works on sparse data; needs co-occurring items. |
 | controllability | 3 / 5 | higher = easier to steer | Fixed formulas, but the low-rank part is not item-by-item. |
-| explainability | 3 / 5 | higher = clearer reasons | The linear part is an item-item sum; the low-rank part is abstract. |
+| explainability | 3 / 5 | higher = clearer reasons | The linear part is an item-item sum; the low-rank part is abstract. recbench does not generate these explanations yet. |

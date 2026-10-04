@@ -5,7 +5,8 @@
 #   ./scripts/run_full_gpu.sh --datasets hm --methods sasrec,hstu
 #
 # The model-size preset is picked from the GPU memory: 24gb (>= 23 GB) or 48gb (>= 46 GB).
-# Copy results back to your laptop with: rsync -a gpu-box:recommendation_benchmark/runs/mlflow/ runs/mlflow/
+# Copy results back to your laptop NEXT TO your own store, then import them (never copy over runs/mlflow):
+#   rsync -a gpu-box:recommendation_benchmark/runs/mlflow/ runs/mlflow-gpu/ && python -m recbench.import_runs runs/mlflow-gpu
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
@@ -40,6 +41,6 @@ python -c "import torch; assert torch.cuda.is_available(), 'PyTorch cannot see t
 
 python -m recbench.pipeline.prepare --config "$CONFIG" ${DATASETS:+--datasets "$DATASETS"}
 python -m recbench.runner --config "$CONFIG" --preset "$PRESET" ${DATASETS:+--datasets "$DATASETS"} ${METHODS:+--methods "$METHODS"}
-python -m recbench.report.build --tier full --out "$ROOT/reports/full-$STAMP" --docs
+python -m recbench.report.build --tier full --tuning defaults --out "$ROOT/reports/full-$STAMP" --docs
 python -m recbench.dictionary.build
 echo "Report: $ROOT/reports/full-$STAMP/report.md"

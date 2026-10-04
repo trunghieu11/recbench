@@ -40,6 +40,7 @@ class JobSettings:
     final_factor: float = 1.5  # until measured, the final run is assumed to take this many typical trials
     seed: int = 42
     space_version: int = 1
+    force: dict[str, Any] | None = None  # settings that win over the search spaces (dry runs: {max_epochs: 3})
 
 
 def tuning_dir() -> Path:
@@ -184,7 +185,7 @@ def run_job(
         # Training stops (keeping its best epoch) once this trial has used its fair share of the time left, so one
         # slow setting cannot eat the budget of the others. The hard timeout stays at everything that is left.
         fair_share = remaining / (n_trials - len(done) + settings.final_factor)
-        cfg = {**base, **params, "stage": "search", "trial": trial.number, "max_eval_users": settings.search_users,
+        cfg = {**base, **params, **(settings.force or {}), "stage": "search", "trial": trial.number, "max_eval_users": settings.search_users,
                "timeout_minutes": trial_budget / 60, "fit_deadline": time.time() + 0.8 * min(fair_share, trial_budget)}
         t0 = time.time()
         outcome = run_pair(val_dir, method, cfg, isolate=isolate)
@@ -210,8 +211,12 @@ def run_job(
     if not completed:
         failed = [t for t in study.trials if t.state == TrialState.FAIL]
         timeouts = [t for t in failed if t.user_attrs.get("status") == "timeout"]
-        summary.update(status="over_budget" if (stop_reason == "time" or timeouts) else "failed",
-                       reason=(failed[-1].user_attrs.get("reason") if failed else "no trial fitted in the time cap"), ended=time.time())
+        if failed and all(t.user_attrs.get("status") == "unsupported" for t in failed):
+            status = "unsupported"  # e.g. an optional package is missing, or the data cannot train this method
+        else:
+            status = "over_budget" if (stop_reason == "time" or timeouts) else "failed"
+        summary.update(status=status, reason=(failed[-1].user_attrs.get("reason") if failed else "no trial fitted in the time cap"),
+                       ended=time.time())
         _write_summary(summary)
         return summary
 
@@ -219,7 +224,7 @@ def run_job(
     best_params = {**space.fixed, **best.params}
     summary.update(best_trial=best.number, best_params=best_params, best_val=best.value, best_epoch=best.user_attrs.get("best_epoch"))
     remaining = deadline - time.time()
-    final_cfg = {**base, **best_params, "stage": "final", "timeout_minutes": max(remaining, 60) / 60}
+    final_cfg = {**base, **best_params, **(settings.force or {}), "stage": "final", "timeout_minutes": max(remaining, 60) / 60}
     if best.user_attrs.get("best_epoch"):
         final_cfg["epochs"] = int(best.user_attrs["best_epoch"])
     t0 = time.time()
@@ -232,7 +237,7 @@ def run_job(
     if test_value is not None:
         summary["status"] = "finished"
     else:
-        summary["status"] = "over_budget" if final.get("status") == "timeout" else "failed"
+        summary["status"] = {"timeout": "over_budget", "unsupported": "unsupported"}.get(str(final.get("status")), "failed")
         summary["reason"] = final.get("reason", final.get("status"))
     summary["ended"] = time.time()
     _write_summary(summary)
@@ -282,6 +287,8 @@ def run_confirm(
         summary.update(status="missing_split", reason=f"prepare these splits first: {missing}", ended=time.time())
         _write_summary(summary)
         return summary
+    summary["status"] = "running"
+    _write_summary(summary)  # an interrupted confirmation stays visible and runs again on resume
     quick_val = root / "splits" / dataset / f"{settings.tier}-val"
     scale = TrainView(val_dir).n_users / max(TrainView(quick_val).n_users, 1)
     base = _base_cfg(resolved, method, set(quick["best_params"]))
@@ -293,7 +300,8 @@ def run_confirm(
         remaining = deadline - time.time()
         if remaining < 120:
             break
-        cfg = {**base, **params, "stage": "confirm", "timeout_minutes": remaining / 60 * 0.5, "fit_deadline": time.time() + remaining * 0.4}
+        cfg = {**base, **params, **(settings.force or {}), "stage": "confirm", "timeout_minutes": remaining / 60 * 0.5,
+               "fit_deadline": time.time() + remaining * 0.4}
         t0 = time.time()
         outcome = run_pair(val_dir, method, cfg, isolate=isolate)
         checks.append({"params": params, "value": _outcome_value(outcome, dataset, method, cfg, val_dir), "status": outcome.get("status"),
@@ -301,8 +309,13 @@ def run_confirm(
     good = [c for c in checks if c["value"] is not None]
     summary["checks"] = checks
     if not good:
-        summary.update(status="over_budget" if checks and all(c["status"] == "timeout" for c in checks) else "failed",
-                       reason="no confirmation run finished", ended=time.time())
+        if checks and all(c["status"] == "timeout" for c in checks):
+            status = "over_budget"
+        elif checks and all(c["status"] == "unsupported" for c in checks):
+            status = "unsupported"
+        else:
+            status = "failed"
+        summary.update(status=status, reason="no confirmation run finished", ended=time.time())
         _write_summary(summary)
         return summary
     best = max(good, key=lambda c: c["value"])
@@ -310,15 +323,20 @@ def run_confirm(
     spec = ensure_loaded().methods[method].spec
     run_seeds = [int(resolved.get("seed", 42))] if spec.deterministic else list(seeds or [int(resolved.get("seed", 42))])
     finals = []
-    for seed in run_seeds:
+    for i, seed in enumerate(run_seeds):
         remaining = deadline - time.time()
         if remaining < 60:
             break
-        cfg = {**base, **best["params"], "seed": seed, "stage": "final", "max_eval_users": resolved.get("max_eval_users"),
-               "timeout_minutes": remaining / 60}
+        # The first final run also writes the serving bundle (data/bundles/<dataset>/<tier>/<method>), so the API can
+        # serve every confirmed method. A run that finished in an earlier session is not repeated: use
+        # `python -m recbench.export --from-confirm` for it.
+        cfg = {**base, **best["params"], **(settings.force or {}), "seed": seed, "stage": "final", "max_eval_users": resolved.get("max_eval_users"),
+               "timeout_minutes": remaining / 60, "export_bundles": i == 0}
         if best["best_epoch"]:
             cfg["epochs"] = int(best["best_epoch"])
         outcome = run_pair(test_dir, method, cfg, isolate=isolate)
+        if outcome.get("bundle"):
+            summary["bundle"] = outcome["bundle"]
         finals.append({"seed": seed, "status": outcome.get("status"), "value": _outcome_value(outcome, dataset, method, cfg, test_dir)})
     values = [f["value"] for f in finals if f["value"] is not None]
     summary["finals"] = finals

@@ -33,7 +33,7 @@ export CUDA_VISIBLE_DEVICES=""
 
 python -m recbench.pipeline.prepare --config "$CONFIG" ${DATASETS:+--datasets "$DATASETS"}
 python -m recbench.runner --config "$CONFIG" ${DATASETS:+--datasets "$DATASETS"} ${METHODS:+--methods "$METHODS"}
-python -m recbench.report.build --tier smoke --out "$ROOT/reports/smoke-$STAMP" --docs
+python -m recbench.report.build --tier smoke --tuning defaults --out "$ROOT/reports/smoke-$STAMP" --docs
 python -m recbench.dictionary.build
 
 echo "Report:  $ROOT/reports/smoke-$STAMP/report.md"

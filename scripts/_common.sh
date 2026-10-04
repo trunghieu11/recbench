@@ -58,3 +58,10 @@ check_disk() {
     exit 1
   fi
 }
+
+# The datasets of the quick-tier bake-off, in run order, read from configs/benchmarks/quick.yaml (one line:
+# "datasets: [a, b, c]"), so the scripts follow the config instead of a second hard-coded list.
+quick_datasets() {
+  local config="${1:-$ROOT/configs/benchmarks/quick.yaml}"
+  sed -n 's/^datasets: *\[\(.*\)\].*/\1/p' "$config" | tr -d ' ' | tr ',' ' '
+}

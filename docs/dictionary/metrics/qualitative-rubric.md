@@ -66,6 +66,10 @@ across settings.
 
 Automated proxy: `personal_explanation_rate` (see [explainability](../concepts/explainability.md)).
 
+The score describes what the **method** can explain. Whether recbench already produces those explanations shows in
+the reports' "Personal expl." column: "–" means the method has no `explain()` yet, which its rubric reason then
+says.
+
 ## Changing a score
 
 Edit the method's `rubric` block in `dictionary/catalog.yaml`. Keep the format `[score, "reason"]`, and give a

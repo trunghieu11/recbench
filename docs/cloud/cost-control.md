@@ -1,16 +1,19 @@
 # Cost control
 
 Your limit is **under $50 a month**. recbench is designed so that the expensive part, training, happens on
-machines you already own, and the cloud part, serving precomputed lists, is small and scales to zero.
+machines you own or rent by the hour for a few hours (a GPU box from vast.ai, destroyed afterwards), and the cloud
+part, serving precomputed lists, is small and scales to zero.
 
 ## Where the money goes
 
 ```mermaid
 flowchart LR
     subgraph Free["Your machines (no cloud bill)"]
-        L[Laptop: smoke tier, docs, tests]
-        G[GPU machine: full tier]
+        L[Laptop: smoke tier, dry runs, docs, tests]
         M[MLflow folder]
+    end
+    subgraph Rent["Rented by the hour"]
+        G[vast.ai GPU box: quick-tier bake-off]
     end
     subgraph GCP["Google Cloud (billed)"]
         CB[Cloud Build: per deploy]
@@ -21,7 +24,8 @@ flowchart LR
     subgraph Ext["Third party"]
         RC[Recombee: free plan]
     end
-    G -->|bundles| CS
+    G -->|results and bundles| L
+    L -->|bundles| CS
     L -->|source| CB --> AR --> CR
     CS --> CR
 ```
@@ -36,7 +40,9 @@ flowchart LR
 | private by default | `deploy/cloud_run.sh` | strangers generating traffic |
 | budget alert | `deploy/budget_alert.sh` | not noticing spending (it notifies; it does not stop) |
 | teardown script | `deploy/teardown.sh` | forgotten resources |
-| no GPUs in the cloud | design decision | the most expensive resource type |
+| no GPUs in the cloud; short rentals instead | design decision ([step 5](../start/quick-tier-box.md)) | the most expensive resource type running for weeks |
+| destroy, not stop, the rented box | [step 5d](../start/box-4-finish.md) | paying for its disk after the run |
+| the 3-hour job cap, `--stop-after-dataset`, `--deadline-hours` | `python -m recbench.queue` | a rental that runs much longer than planned |
 | Recombee request budget | `recombee_max_requests` (90,000) | exceeding the free plan |
 | Recombee non-empty check | `src/recbench/methods/recombee.py` | overwriting a database with real data |
 
@@ -46,6 +52,7 @@ Exact prices change and differ by region; check the pricing pages before relying
 
 | Item | Usage in a typical month | Expected cost |
 |---|---|---|
+| vast.ai GPU box | one quick-tier bake-off: about 9–14 hours at $0.5–1 per hour | about $5–12 |
 | Cloud Run | a few thousand demo and load-test requests | within or near the monthly free allowance |
 | Cloud Storage | a few GB of bundles at most | cents |
 | Artifact Registry | a few hundred MB of images | cents (deleted by teardown) |

@@ -336,7 +336,7 @@ methods:
       tuning: [1, "One setting: the number of factors."]
       data_hunger: [2, "Works on small data; too few factors collapse to popularity."]
       controllability: [2, "Latent directions are hard to steer."]
-      explainability: [2, "Post-hoc only: items close in the factor space."]
+      explainability: [2, "Post-hoc only: items close in the factor space. recbench does not generate these explanations yet."]
 
   slim:
     title: SLIM (ElasticNet)
@@ -368,7 +368,7 @@ methods:
       tuning: [2, "Neighbours, sample size, and position weighting."]
       data_hunger: [2, "Needs session patterns that repeat across users, not long histories."]
       controllability: [3, "Neighbour sessions can be filtered; the weights are heuristics."]
-      explainability: [4, "'Sessions like yours also contained this item.'"]
+      explainability: [4, "'Sessions like yours also contained this item.' recbench does not generate these explanations yet."]
 
   sansa:
     title: SANSA
@@ -384,7 +384,7 @@ methods:
       tuning: [2, "lambda and the weight density."]
       data_hunger: [2, "Like EASE: memory, not data, used to be the limit."]
       controllability: [4, "Sparse item-item weights (stored as two factors)."]
-      explainability: [4, "Additive in the history, but the weights are a product of two sparse factors."]
+      explainability: [4, "Additive in the history, but the weights are a product of two sparse factors. recbench does not generate these explanations yet."]
 
   gfcf:
     title: GF-CF
@@ -400,7 +400,7 @@ methods:
       tuning: [1, "Two settings: alpha and the number of singular vectors."]
       data_hunger: [2, "Works on sparse data; needs co-occurring items."]
       controllability: [3, "Fixed formulas, but the low-rank part is not item-by-item."]
-      explainability: [3, "The linear part is an item-item sum; the low-rank part is abstract."]
+      explainability: [3, "The linear part is an item-item sum; the low-rank part is abstract. recbench does not generate these explanations yet."]
 
   turbocf:
     title: Turbo-CF
@@ -416,7 +416,7 @@ methods:
       tuning: [2, "Normalisation, power, and the choice of filter."]
       data_hunger: [2, "Works on sparse data; the item cap is set by memory."]
       controllability: [3, "Interpretable filter shape, but no item-level weights to edit."]
-      explainability: [3, "Scores are item-item sums through a filtered graph, but the filter mixes many paths."]
+      explainability: [3, "Scores are item-item sums through a filtered graph, but the filter mixes many paths. recbench does not generate these explanations yet."]
 
   simplex:
     title: SimpleX
@@ -480,7 +480,7 @@ methods:
       tuning: [3, "Layer sizes, dropout, KL cap, annealing, learning rate."]
       data_hunger: [3, "Strongest on dense histories; weaker for users with very few items."]
       controllability: [2, "Latent codes; little to steer directly."]
-      explainability: [2, "Post-hoc only."]
+      explainability: [2, "Post-hoc only. recbench does not generate these explanations yet."]
 
   recvae:
     title: RecVAE
@@ -496,7 +496,7 @@ methods:
       tuning: [3, "gamma, layer sizes, dropout, learning rate."]
       data_hunger: [3, "Strongest on dense histories."]
       controllability: [2, "Latent codes; little to steer directly."]
-      explainability: [2, "Post-hoc only."]
+      explainability: [2, "Post-hoc only. recbench does not generate these explanations yet."]
 
   gru4rec:
     title: GRU4Rec
@@ -512,7 +512,7 @@ methods:
       tuning: [4, "Loss, hidden size, batch size, learning rate, momentum, dropouts, sampling."]
       data_hunger: [3, "Needs many sequences; short histories give little to learn from."]
       controllability: [2, "A hidden state; little to steer directly."]
-      explainability: [2, "Post-hoc only."]
+      explainability: [2, "Post-hoc only. recbench does not generate these explanations yet."]
 
   text_knn:
     title: Text-embedding kNN

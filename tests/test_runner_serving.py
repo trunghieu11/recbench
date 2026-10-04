@@ -113,6 +113,23 @@ def test_api_serves_bundles(toy_split, tmp_path, monkeypatch):
     assert client.post("/recommend", json={"dataset": "toy", "method": "ease", "user_id": "u1"}).status_code == 404
 
 
+def test_api_without_bundles_or_results_says_so(tmp_path, monkeypatch):
+    monkeypatch.setenv("RECBENCH_BUNDLES", str(tmp_path / "empty"))
+    monkeypatch.setenv("RECBENCH_TIER", "full")
+    from recbench import results
+    from recbench.serving import app as app_module
+
+    def no_mlflow(*args, **kwargs):
+        raise ModuleNotFoundError("No module named 'mlflow'")  # as in the serving image
+
+    monkeypatch.setattr(results, "load_runs", no_mlflow)
+    client = TestClient(app_module.app)
+    health = client.get("/health")
+    assert health.status_code == 503 and health.json() == {**health.json(), "ok": False, "bundles": 0, "tier": "full"}
+    assert client.get("/").json()["service"] == "recbench"  # an index, not a redirect to a page that may fail
+    assert client.get("/dashboard").status_code == 404
+
+
 def test_serving_does_not_import_torch():
     code = "import sys, recbench.serving.app; print('torch' in sys.modules)"
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, env={**os.environ, "PYTHONWARNINGS": "ignore"})

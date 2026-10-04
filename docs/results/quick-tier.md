@@ -30,26 +30,36 @@ comparison affordable: smaller data, the same budget for everyone, and a full-da
 1. **Same data.** Each dataset's `quick` split keeps about one million events, sampled by user, with the same
    test window as the full data. Its `quick-val` fold has the same users with every test event deleted; the
    validation window plays the role of the test window.
-2. **Same budget.** Every method tries 10 settings (Random tries 1), drawn by Optuna's seeded TPE sampler (the
-   first 5 at random) from the search spaces in `configs/tuning/quick.yaml`. The spaces follow published
-   tuning recipes; the file names the source for each method.
-3. **Time-aware settings for everyone.** Every method may train on only the last 30, 90 or 365 days, or on all
-   history (`train_window_days`; each user keeps their last 10 events). Popularity and neighbourhood methods also
-   tune a recency decay.
+2. **Same budget.** Every method tries 10 settings (Random tries 1), taken from the search spaces in
+   `configs/tuning/quick.yaml`. The spaces follow published tuning recipes; the file names the source for each
+   method. The settings are chosen by Optuna's **TPE sampler**: the first 5 at random, then each new setting near
+   the ones that scored well so far. A fixed seed makes the sequence repeatable.
+3. **Time-aware settings.**
+   - Every method except Random, MostPopular, text kNN and the two re-rankers may train on only the last 30, 90 or
+     365 days, or on all history (`train_window_days`; each user keeps their last 10 events). MostPopular has its
+     own window instead.
+   - MostPopular, ItemKNN, EASE, iALS, RP3beta, PureSVD, SLIM, SANSA, GF-CF and Turbo-CF also tune a recency
+     **decay**: an interaction counts half as much after a "half-life" of 30, 90 or 365 days (MostPopular: 3 to
+     30 days).
 4. **Validation, then one test.** Settings are scored on the same 3,000 validation users. The neural models stop
-   early on the validation fold, within each method's epoch limit from its paper (200 for SASRec and MultVAE, for
-   example) and a patience of 5 to 10 epochs. GRU4Rec, iALS and BPR-MF tune their number of epochs or iterations
-   instead. The best setting then runs **once** on the test split, with the best epoch count. The test split
-   never influences a choice.
+   early on the validation fold ("early stopping": training ends once the validation score has not improved for a
+   number of epochs, the **patience**). Each uses its paper's epoch limit: 200 for SASRec and MultVAE (patience
+   10), 100 for SimpleX, DirectAU and UltraGCN (patience 5), 50 for RecVAE (patience 5), and 30 for the DCN-V2
+   re-ranker (patience 3). GRU4Rec, iALS and BPR-MF tune their number of epochs or iterations instead. The best
+   setting then runs **once** on the test split, with the best epoch count. The test split never influences a
+   choice: even the methods to confirm (rule 7) are picked by validation score.
 5. **3 hours per job**, tuning included. Each setting may train for its fair share of the time left (the time left
    divided by the settings still to try plus the final run); training then stops and keeps its best epoch. A job
    stops searching when one more setting and the final run would not fit. If no setting finishes in time, the job
    is `over_budget`.
 6. **The best pick** is the highest test NDCG@10 on the dataset. "≈" marks methods whose 95% confidence interval
    overlaps the best one's: they are tied, not beaten. Training time is shown but does not affect the ranking.
-7. **Confirmation on full data.** A dataset's top 3 re-check their size-sensitive setting (for example EASE's λ at
-   ×0.5, ×1 and ×2 after scaling by the number of users) on `full-val`, then run the final test on `full`, three
-   times with different seeds when training is random.
+7. **Confirmation on full data.** The dataset's top 3 by **validation** score are re-checked on the full data:
+   - EASE, iALS and SANSA re-check the setting that depends on data size (EASE's and SANSA's λ, iALS's
+     regularisation) at ×0.5, ×1 and ×2 on `full-val`. The value is first scaled by the number of users, because
+     regularisation must grow with the amount of data it balances. The other methods re-check their quick-tier best.
+   - The final test runs on `full`, three times with different seeds when training is random.
+   - The first final run also writes the **serving bundle** that [step 7](../start/deploy-cloud-run.md) can deploy.
 8. **The gate.** A method added later, heavy ones included, runs a quick-tier job on every dataset first. It is
    confirmed on full data only if it reaches a dataset's top 3.
 
@@ -57,11 +67,11 @@ comparison affordable: smaller data, the same budget for everyone, and a full-da
 
 | Runs on | Methods |
 |---|---|
-| CPU (11) | [Random](../dictionary/algorithms/random.md), [MostPopular](../dictionary/algorithms/most-popular.md), [ItemKNN](../dictionary/algorithms/itemknn.md), [iALS](../dictionary/algorithms/ials.md), [BPR-MF](../dictionary/algorithms/bpr-mf.md), [RP3beta](../dictionary/algorithms/rp3beta.md), [PureSVD](../dictionary/algorithms/puresvd.md), [SLIM](../dictionary/algorithms/slim.md), [V-SKNN](../dictionary/algorithms/vsknn.md), [SANSA](../dictionary/algorithms/sansa.md), [LightGBM re-ranker](../dictionary/algorithms/lgbm-rerank.md) |
-| GPU (12) | [EASE](../dictionary/algorithms/ease.md), [SASRec](../dictionary/algorithms/sasrec.md), [DCN-V2 re-ranker](../dictionary/algorithms/dcnv2-rerank.md), [GF-CF](../dictionary/algorithms/gfcf.md), [Turbo-CF](../dictionary/algorithms/turbocf.md), [SimpleX](../dictionary/algorithms/simplex.md), [DirectAU](../dictionary/algorithms/directau.md), [UltraGCN](../dictionary/algorithms/ultragcn.md), [MultVAE](../dictionary/algorithms/multvae.md), [RecVAE](../dictionary/algorithms/recvae.md), [GRU4Rec](../dictionary/algorithms/gru4rec.md), [Text-embedding kNN](../dictionary/algorithms/text-knn.md) |
+| CPU (12) | [Random](../dictionary/algorithms/random.md), [MostPopular](../dictionary/algorithms/most-popular.md), [ItemKNN](../dictionary/algorithms/itemknn.md), [RP3beta](../dictionary/algorithms/rp3beta.md), [PureSVD](../dictionary/algorithms/puresvd.md), [GF-CF](../dictionary/algorithms/gfcf.md), [iALS](../dictionary/algorithms/ials.md), [BPR-MF](../dictionary/algorithms/bpr-mf.md), [SLIM](../dictionary/algorithms/slim.md), [V-SKNN](../dictionary/algorithms/vsknn.md), [SANSA](../dictionary/algorithms/sansa.md), [LightGBM re-ranker](../dictionary/algorithms/lgbm-rerank.md) |
+| GPU (11) | [EASE](../dictionary/algorithms/ease.md), [Turbo-CF](../dictionary/algorithms/turbocf.md), [SimpleX](../dictionary/algorithms/simplex.md), [DirectAU](../dictionary/algorithms/directau.md), [UltraGCN](../dictionary/algorithms/ultragcn.md), [MultVAE](../dictionary/algorithms/multvae.md), [RecVAE](../dictionary/algorithms/recvae.md), [GRU4Rec](../dictionary/algorithms/gru4rec.md), [SASRec](../dictionary/algorithms/sasrec.md), [Text-embedding kNN](../dictionary/algorithms/text-knn.md), [DCN-V2 re-ranker](../dictionary/algorithms/dcnv2-rerank.md) |
 
-GF-CF is listed with the GPU methods in the plan but runs on the CPU: it only needs sparse products and a
-truncated SVD. EASE runs on a CPU worker when the machine has no GPU.
+This is the order of `queue.methods` in `configs/benchmarks/quick.yaml`. GF-CF needs only sparse products and a
+truncated SVD, so it runs on the CPU. EASE runs on a CPU worker when the machine has no GPU.
 
 Held back for later, because they are heavy or never finished: LightGCN, XSimGCL, BERT4Rec, S3-Rec, HSTU, DIN,
 full-catalog DCN-V2, the text and multimodal towers, and TIGER-lite. They come back through this gate.

@@ -138,9 +138,11 @@ class VSKNN(Recommender):
 
     spec = MethodSpec(
         name="vsknn",
+        sequence_aware=True,
         tasks={Task.topn, Task.sequential, Task.session},
         uses_history=True,
         upstream="in-repo numpy/scipy, after Ludewig & Jannach's session-rec VSKNN",
+        fidelity="simplified",  # see docs/dictionary/algorithms/vsknn.md: no dwell time, user-level next item
         cost_band="low",
         deterministic=True,
     )

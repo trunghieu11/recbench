@@ -103,6 +103,7 @@ class HSTUNet(nn.Module):
 class HSTU(EmbeddingRecommender):
     spec = MethodSpec(
         name="hstu",
+        sequence_aware=True,
         tasks=SEQ_TASKS,
         uses_history=True,
         needs_torch=True,

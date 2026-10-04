@@ -42,6 +42,7 @@ def _official():
 class GRU4Rec(Recommender):
     spec = MethodSpec(
         name="gru4rec",
+        sequence_aware=True,
         tasks={Task.topn, Task.sequential, Task.session},
         uses_history=True,
         needs_torch=True,

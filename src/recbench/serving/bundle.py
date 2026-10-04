@@ -7,6 +7,8 @@ A bundle for one (dataset, tier, method) is a folder with:
     scores.npy         float32 [n_users, k] model scores for those items
     items.parquet      item_idx -> item_id, text (for display)
     popular.npy        int32 [k] fallback list for unknown users (recent popularity)
+    item_popularity.npy  int64 [n_items + 1] pre-test interactions per item (bundle version 2; used by /stats to
+                       measure the popularity bias of what is served)
 
 Trade-off: lookups are fast and cheap (a numpy row read), but lists are as fresh
 as the last export. Real-time models would score online instead.
@@ -26,8 +28,11 @@ import pandas as pd
 from recbench.protocol import NEG_INF, PROTOCOL_VERSION, top_k
 
 
-def export_bundle(method: Any, data: Any, out: Path, k: int = 100, max_users: int = 20_000, batch: int = 512) -> Path:
-    """Score the most recently active warm users and write a bundle folder (replacing any old one)."""
+def export_bundle(method: Any, data: Any, out: Path, k: int = 100, max_users: int = 20_000, batch: int = 512,
+                  extra: dict[str, Any] | None = None) -> Path:
+    """Score the most recently active warm users and write a bundle folder (replacing any old one).
+
+    `extra` adds fields to manifest.json, e.g. the MLflow run id and config hash of the run that made it."""
     out = Path(out)
     tmp = out.with_name(out.name + ".tmp")
     shutil.rmtree(tmp, ignore_errors=True)
@@ -58,6 +63,7 @@ def export_bundle(method: Any, data: Any, out: Path, k: int = 100, max_users: in
     np.save(tmp / "topk.npy", lists)
     np.save(tmp / "scores.npy", values)
     np.save(tmp / "popular.npy", popular)
+    np.save(tmp / "item_popularity.npy", np.asarray(data.item_pop, dtype=np.int64))
     pd.DataFrame({"user_id": data.user_ids[users].astype(str), "row": np.arange(len(users), dtype=np.int32)}).to_parquet(tmp / "users.parquet", index=False)
     pd.DataFrame({"item_idx": np.arange(data.n_items + 1), "item_id": data.item_ids.astype(str), "text": data.item_text.astype(str)}).to_parquet(
         tmp / "items.parquet", index=False
@@ -74,6 +80,9 @@ def export_bundle(method: Any, data: Any, out: Path, k: int = 100, max_users: in
         "export_seconds": round(time.perf_counter() - began, 3),
         "exported_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "freshness": f"lists reflect events before {data.meta.get('test_start', '?')} UTC",
+        "data_cutoff": str(data.meta.get("test_start", "")),
+        "bundle_version": 2,
+        **(extra or {}),
     }
     (tmp / "manifest.json").write_text(json.dumps(manifest, indent=2))
     shutil.rmtree(out, ignore_errors=True)
@@ -90,6 +99,8 @@ class Bundle:
         self.topk = np.load(self.folder / "topk.npy", mmap_mode="r")
         self.scores = np.load(self.folder / "scores.npy", mmap_mode="r")
         self.popular = np.load(self.folder / "popular.npy")
+        pop_path = self.folder / "item_popularity.npy"  # bundle version 2 and later
+        self.item_popularity = np.load(pop_path) if pop_path.exists() else None
         users = pd.read_parquet(self.folder / "users.parquet")
         self.row_of = dict(zip(users["user_id"].astype(str), users["row"].astype(int)))
         items = pd.read_parquet(self.folder / "items.parquet")

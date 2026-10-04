@@ -25,4 +25,4 @@
 | tuning | 2 / 5 | higher = more work | lambda and the weight density. |
 | data_hunger | 2 / 5 | higher = needs more data | Like EASE: memory, not data, used to be the limit. |
 | controllability | 4 / 5 | higher = easier to steer | Sparse item-item weights (stored as two factors). |
-| explainability | 4 / 5 | higher = clearer reasons | Additive in the history, but the weights are a product of two sparse factors. |
+| explainability | 4 / 5 | higher = clearer reasons | Additive in the history, but the weights are a product of two sparse factors. recbench does not generate these explanations yet. |

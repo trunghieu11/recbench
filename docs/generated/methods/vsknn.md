@@ -25,4 +25,4 @@
 | tuning | 2 / 5 | higher = more work | Neighbours, sample size, and position weighting. |
 | data_hunger | 2 / 5 | higher = needs more data | Needs session patterns that repeat across users, not long histories. |
 | controllability | 3 / 5 | higher = easier to steer | Neighbour sessions can be filtered; the weights are heuristics. |
-| explainability | 4 / 5 | higher = clearer reasons | 'Sessions like yours also contained this item.' |
+| explainability | 4 / 5 | higher = clearer reasons | 'Sessions like yours also contained this item.' recbench does not generate these explanations yet. |

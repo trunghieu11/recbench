@@ -25,4 +25,4 @@
 | tuning | 2 / 5 | higher = more work | Normalisation, power, and the choice of filter. |
 | data_hunger | 2 / 5 | higher = needs more data | Works on sparse data; the item cap is set by memory. |
 | controllability | 3 / 5 | higher = easier to steer | Interpretable filter shape, but no item-level weights to edit. |
-| explainability | 3 / 5 | higher = clearer reasons | Scores are item-item sums through a filtered graph, but the filter mixes many paths. |
+| explainability | 3 / 5 | higher = clearer reasons | Scores are item-item sums through a filtered graph, but the filter mixes many paths. recbench does not generate these explanations yet. |

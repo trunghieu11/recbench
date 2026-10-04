@@ -7,11 +7,10 @@
 extends: configs/benchmarks/quick.yaml
 tier: smoke
 hardware: configs/hardware/local-cpu.yaml
-overrides:
-  max_epochs: 3
 eval:
   max_eval_users: 2000
 tuning:
+  force: {max_epochs: 3}   # wins over the search spaces' epoch limits (up to 200), to keep the dry run short
   trials: 2
   search_users: 500
   cap_minutes: 20

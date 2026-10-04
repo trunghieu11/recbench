@@ -63,6 +63,7 @@ class SASRecNet(nn.Module):
 class SASRec(EmbeddingRecommender):
     spec = MethodSpec(
         name="sasrec",
+        sequence_aware=True,
         tasks=SEQ_TASKS,
         uses_history=True,
         needs_torch=True,

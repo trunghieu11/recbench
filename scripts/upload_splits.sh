@@ -10,8 +10,10 @@
 set -euo pipefail
 HOST="${1:?usage: upload_splits.sh <ssh-host> [remote repository path]}"
 REMOTE="${2:-recbench}"
-cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DATASETS=(movielens-25m retailrocket steam hm lastfm)
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+source "$ROOT/scripts/_common.sh"
+read -r -a DATASETS <<< "$(quick_datasets)"
 
 for d in "${DATASETS[@]}"; do
   for t in quick quick-val full full-val; do

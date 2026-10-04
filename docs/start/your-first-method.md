@@ -97,10 +97,12 @@ What each part does:
 
 ## Step 3: register it
 
-Add the module to the imports in `src/recbench/methods/__init__.py`:
+Add the module's name to the `MODULES` tuple in `src/recbench/methods/__init__.py` (alphabetical order):
 
 ```python
-from recbench.methods import baselines, category_popular, content, dcnv2, graph, hstu, implicit_mf, recbole_models, recombee, sasrec, tiger
+MODULES = (
+    "baselines", "category_popular", "content", "dcnv2", ...
+)
 ```
 
 Check that it is registered:
@@ -135,7 +137,7 @@ The docs and the tests require one. Add this under `methods:` in `dictionary/cat
 
 ```bash
 python -m recbench.runner --config configs/benchmarks/smoke-cpu.yaml --datasets movielens-25m --methods most_popular,category_popular
-python -m recbench.report.build --tier smoke --out reports/smoke-latest --docs
+python -m recbench.report.build --tier smoke --tuning defaults --out reports/smoke-latest --docs
 ```
 
 When this tutorial was written, `category_popular` clearly beat MostPopular on the synthetic test data (where
@@ -160,6 +162,13 @@ pytest -q tests/test_methods.py -k category_popular
    (start with `--8<-- "generated/methods/category_popular.md"`).
 3. Add it to the `nav` in `mkdocs.yml`.
 4. Run `pytest -q tests/test_docs.py` and `mkdocs build --strict`.
+
+## Step 8: put it through the gate
+
+To compare it fairly with everything else, give it a search space and a queue entry, then dry-run it: see
+[add a method, step 8](../how-to/add-a-method.md#8-put-it-through-the-gate-the-quick-tier-bake-off). For
+`category_popular`, a space could search `category_boost` and `pop_window_days`. Until you do that, add it to
+`held_back:` in `configs/benchmarks/quick.yaml`, or the docs test will remind you.
 
 **You now know the full path** from an idea to a benchmarked, documented method. The same steps apply to
 complex models; see [add a method](../how-to/add-a-method.md) for the checklist.

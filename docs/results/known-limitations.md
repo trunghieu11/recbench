@@ -8,21 +8,23 @@ travel. Items that are planned to change are also on the [roadmap](roadmap.md).
 | Limitation | Effect | Mitigation |
 |---|---|---|
 | **Offline only** | measures how well past behaviour is predicted, not how users react to new recommendations | treat results as hypotheses; validate with an A/B test ([offline vs online](../dictionary/concepts/offline-vs-online.md)) |
-| **One seed per run** | training randomness is not measured; confidence intervals cover user sampling only | multi-seed runs are planned; meanwhile treat small differences as ties |
-| **No hyperparameter tuning** | every method uses fixed defaults per preset; a tuned method could rank higher | the validation window exists for tuning (planned); see [fair baselines](../dictionary/concepts/fair-baselines-and-tuning.md) |
-| **One global temporal cutoff** | results describe one test week per dataset; seasonal effects are not averaged out | rolling-window evaluation would fix this; not planned |
+| **Few seeds** | the untuned tiers and the quick-tier jobs run one seed, so their training randomness is not measured; confidence intervals cover user sampling only | full-data confirmations of each dataset's top 3 use 3 seeds for methods with random training; treat small differences as ties |
+| **Tuning only in the bake-off** | the smoke and full tiers run default settings, so tuned methods could rank differently; held-back methods are not tuned yet | the [quick-tier bake-off](quick-tier.md) tunes the 23 low-budget methods with the same budget; see [fair baselines](../dictionary/concepts/fair-baselines-and-tuning.md) |
+| **Quick tier is a sample** | about 1M events per dataset; validation folds are small on some datasets (about 850 warm users on MovieLens, 220 on Last.fm), so close settings are effectively tied; quick-tier training times were measured with 3 jobs sharing a GPU | each dataset's top 3 are confirmed on full data |
+| **One global temporal cutoff** | results describe one test window per dataset (the last 10% of events; H&M: the last 7 days); seasonal effects are not averaged out | rolling-window evaluation would fix this; not planned |
 | **At most 10,000 eval users** (2,000 in the smoke config) | slightly wider intervals on big datasets | raise `max_eval_users` if you have time |
 | **CTR, rating, and session tasks are diagnostic only** | there are no real impressions (shown but not clicked items) in these datasets | `sampled_auc` and `sampled_logloss` are reported, never ranked |
 | **Cold users are not ranked** | the leaderboards describe warm users only | the split box reports how many cold users there are; they get the popularity fallback |
-| **Smoke tier is tiny** | many ties; untrained deep models | use the full tier for decisions |
+| **Smoke tier is tiny** | many ties; under-trained deep models | use the quick-tier bake-off and its full-data confirmations for decisions |
 
 ## Methods
 
 | Limitation | Details |
 |---|---|
 | **Simplified methods** | HSTU (small dense version of Meta's model), TIGER-lite (no content-based semantic IDs, no generation; unranked), text-hash tower (hashed bag of words, not an LLM), multimodal tower (15 colour features per image, not a vision model). Each algorithm page has a "Fidelity" box. |
-| **Library implementations** | BERT4Rec, S3-Rec, and DIN run through RecBole; iALS and BPR-MF through `implicit`; LightGCN and XSimGCL follow SELFRec. Their behaviour includes those libraries' choices (for example, RecBole's BERT4Rec ignores the oldest item of every history when recommending). |
-| **EASE item cap** | EASE uses at most 20,000 (laptop) or 30,000 (GPU) of the most recently popular items; the rest cannot be recommended by EASE |
+| **Library implementations** | BERT4Rec, S3-Rec, and DIN run through RecBole; iALS and BPR-MF through `implicit`; LightGCN and XSimGCL follow SELFRec; GRU4Rec is the authors' official code; SANSA uses the `sansa` package; the re-rankers use LightGBM and FuxiCTR; text kNN uses sentence-transformers. Their behaviour includes those libraries' choices (for example, RecBole's BERT4Rec ignores the oldest item of every history when recommending). |
+| **Item caps** | EASE and Turbo-CF keep dense item × item matrices, so they use at most 20,000 (laptop) or 30,000 (GPU) of the most popular items, fewer if GPU memory is short; the rest cannot be recommended by them. SANSA has no cap. |
+| **Some methods cannot explain yet** | PureSVD, SANSA, GF-CF, Turbo-CF, V-SKNN, MultVAE, RecVAE and GRU4Rec have no `explain()`, so "Personal expl." shows "–" for them |
 | **XSimGCL under-trained at smoke defaults** | its contrastive loss needs more steps than the smoke preset gives (the algorithm page explains the settings that close the gap) |
 | **DIN not in the smoke config** | full-catalog scoring with a pointwise network is too slow on a laptop CPU; run it with `--methods din` or on the GPU |
 | **S3-Rec needs categories** | unsupported where items have fewer than two category values (Last.fm) |

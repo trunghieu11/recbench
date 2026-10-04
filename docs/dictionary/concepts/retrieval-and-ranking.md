@@ -24,8 +24,13 @@ flowchart LR
 | Stage | Goal | Typical models | recbench examples |
 |---|---|---|---|
 | Retrieval (candidate generation) | do not miss good items (high recall@100+) | embedding dot products with approximate nearest-neighbour search, co-occurrence, popularity | [EASE](../algorithms/ease.md), [iALS](../algorithms/ials.md), [SASRec](../algorithms/sasrec.md), [ItemKNN](../algorithms/itemknn.md) |
-| Ranking | order candidates precisely | feature-rich pointwise models | [DIN](../algorithms/din.md), [DCN-V2](../algorithms/dcnv2.md) |
-| Re-ranking | apply rules: diversity, freshness, business constraints | rules, small models | (not implemented) |
+| Ranking | order candidates precisely | feature-rich pointwise models | the [LightGBM re-ranker](../algorithms/lgbm-rerank.md) and the [DCN-V2 re-ranker](../algorithms/dcnv2-rerank.md) (on EASE, ItemKNN and trending candidates); [DIN](../algorithms/din.md) and [DCN-V2](../algorithms/dcnv2.md) run over the full catalog |
+| Business re-ranking | apply rules after ranking: diversity, freshness, stock, business constraints | rules, small models | (not implemented) |
+
+!!! note "Two meanings of \"re-ranker\""
+    In recbench, a "re-ranker" is the **ranking stage** above: a model that re-orders candidates from cheaper models.
+    The rule-based last step that many companies also call "re-ranking" (diversify, remove out-of-stock items) is
+    called *business re-ranking* here.
 
 ## A small example: why pointwise rankers are expensive
 
@@ -41,7 +46,10 @@ As a ranker over 200 retrieved candidates, the same model would need 400,000 eva
 - A method declares how it scores: `output="scores"` (whole catalog at once, embedding models),
   `output="pairs"` (one pair at a time, DIN and DCN-V2), or `output="list"` (a remote service returns a list).
   See `src/recbench/protocol.py::Recommender.full_scores`.
-- A two-stage pipeline (for example "EASE top-200 → DIN") is on the [roadmap](../../results/roadmap.md).
+- Two two-stage pipelines are implemented as methods, so they are evaluated like everything else:
+  [LightGBM re-ranker](../algorithms/lgbm-rerank.md) and [DCN-V2 re-ranker](../algorithms/dcnv2-rerank.md). Stage 1
+  merges about 200 candidates from tuned EASE, ItemKNN and trending items; stage 2 orders them with learned
+  features. Their `candidate_recall` metric shows the ceiling stage 1 sets: items it misses can never be ranked.
 
 ## Pitfalls
 

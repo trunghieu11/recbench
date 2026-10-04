@@ -140,6 +140,82 @@ def dataset_facts(name: str, entry: dict[str, Any], spec: Any, data_dir: Path) -
     return text
 
 
+README_START = "<!-- generated:methods (python -m recbench.dictionary.build writes this block; do not edit) -->"
+README_END = "<!-- /generated:methods -->"
+
+
+def _ladder_order(catalog: dict[str, Any], names: Any) -> list[str]:
+    """By rung, then year (oldest first), then the catalog's own order (Random before MostPopular)."""
+    position = {n: i for i, n in enumerate(catalog["methods"])}
+    return sorted(names, key=lambda n: (catalog["methods"][n]["rung"], catalog["methods"][n].get("year") or 0, position[n]))
+
+
+def _page(name: str) -> str:
+    return f"{name.replace('_', '-')}.md"
+
+
+def quick_methods(root: Path) -> list[str]:
+    """The methods queued in the quick-tier bake-off (configs/benchmarks/quick.yaml), in queue order."""
+    path = root / "configs" / "benchmarks" / "quick.yaml"
+    if not path.exists():
+        return []
+    return [e["name"] for e in ((yaml.safe_load(path.read_text()) or {}).get("queue") or {}).get("methods") or []]
+
+
+def ladder_table(catalog: dict[str, Any], reg: Any) -> str:
+    ladder, ideas = catalog["ladder"], catalog.get("ladder_ideas") or {}
+    rows = []
+    for rung in sorted(int(r) for r in ladder):
+        names = [n for n in _ladder_order(catalog, reg.methods) if catalog["methods"][n]["rung"] == rung]
+        links = [f"[{catalog['methods'][n]['title']}]({_page(n)})" for n in names]
+        if rung == 7:
+            links.append("[other services](managed-services.md)")
+        rows.append([f"{rung} — {ladder[rung]}", str(ideas.get(rung, "")), ", ".join(links)])
+    return "<!-- generated -->\n\n" + _table(["Rung", "Idea it adds", "Methods"], rows)
+
+
+def glance_table(catalog: dict[str, Any], reg: Any, quick: list[str]) -> str:
+    rows = []
+    for n in _ladder_order(catalog, reg.methods):
+        entry = catalog["methods"][n]
+        where = "bake-off" if n in quick else ("managed" if reg.methods[n].spec.managed else "held back")
+        rows.append([f"[{entry['title']}]({_page(n)})", str(entry["rung"]), where, entry.get("one_liner", "")])
+    rows.append(["[Other managed services](managed-services.md)", "7", "docs only",
+                 "Amazon Personalize, Google's commerce recommender, Azure Personalizer (retired)."])
+    return ("<!-- generated -->\n\n" + _table(["Method", "Rung", "Status", "One-line idea"], rows)
+            + "\n**Status:** *bake-off* = in the quick-tier bake-off, tuned with the same budget as every other method; "
+              "*held back* = heavier, waiting for its turn through the same gate; *managed* = a hosted service.\n")
+
+
+def readme_block(catalog: dict[str, Any], reg: Any, quick: list[str]) -> str:
+    ladder = catalog["ladder"]
+    lines = [README_START, "",
+             f"**{len(reg.methods)} methods** on a ladder from simplest to most complex; the {len(quick)} in **bold** are in the "
+             "quick-tier bake-off, the others are held back (heavier) or a managed service.", "",
+             "| Rung | Methods |", "|---|---|"]
+    for rung in sorted(int(r) for r in ladder):
+        names = [n for n in _ladder_order(catalog, reg.methods) if catalog["methods"][n]["rung"] == rung]
+        shown = [f"**{catalog['methods'][n]['title']}**" if n in quick else catalog["methods"][n]["title"] for n in names]
+        lines.append(f"| {rung} {ladder[rung]} | {', '.join(shown)} |")
+    return "\n".join(lines + ["", README_END])
+
+
+def update_readme(root: Path, block: str) -> bool:
+    """Replace the generated block of README.md; returns True when the file changed."""
+    path = root / "README.md"
+    if not path.exists():
+        return False
+    text = path.read_text()
+    if README_START not in text or README_END not in text:
+        return False
+    head, rest = text.split(README_START, 1)
+    _, tail = rest.split(README_END, 1)
+    new = head + block + tail
+    if new != text:
+        path.write_text(new)
+    return new != text
+
+
 def build(root: Path | None = None, data_dir: Path | None = None, with_results: bool = True) -> Path:
     root = (root or Path.cwd()).resolve()
     data_dir = data_dir or Path(os.environ.get("DATA_DIR", root / "data"))
@@ -176,6 +252,10 @@ def build(root: Path | None = None, data_dir: Path | None = None, with_results: 
             ", ".join(t for t in TASK_ORDER if Task(t) in spec.tasks), _yes(spec.uses_history), _yes(spec.sequence_aware),
             _yes(spec.scores_cold_items), _yes(spec.requires_side_features), entry["fidelity"], _yes(spec.ranked),
         ])
+    quick = quick_methods(root)
+    (out / "ladder.md").write_text(ladder_table(catalog, reg))
+    (out / "glance.md").write_text(glance_table(catalog, reg, quick))
+    update_readme(root, readme_block(catalog, reg, quick))
     (out / "capability.md").write_text(
         "<!-- generated -->\n\n"
         + _table(["Method", "Rung", "Family", "Tasks", "Uses history", "Order-aware", "New items", "Needs content", "Fidelity", "Ranked"],

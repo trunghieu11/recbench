@@ -3,6 +3,12 @@
 > Recommends the items you reach most often by "walking" from items you liked, to people who liked them, to
 > what else those people liked, with a penalty that stops every walk from ending at the bestsellers.
 
+!!! abstract "In plain words"
+    Suppose you liked a book. RP3beta asks: who else read that book, and what else did those readers read? Items
+    that many such short "walks" reach get high scores. Walks tend to end at bestsellers, because everyone reads those,
+    so each score is divided by the item's popularity raised to a power β. β is a dial: 0 leaves popularity alone, and
+    larger values turn it down.
+
 --8<-- "generated/methods/rp3beta.md"
 
 !!! tip "When to use it"
@@ -53,7 +59,7 @@ A new user D has interacted only with item 2. Walk from item 2 (alpha = 1):
 | item 3 | 0 (nobody has both 2 and 3) | 0 | 0 |
 
 With beta = 0, D gets the bestseller (item 1) first. With beta = 1, the niche item 4 that co-occurs with item 2
-wins. The tuner picks the beta that predicts the validation week best.
+wins. The tuner picks the beta that predicts the validation window best.
 
 ## 3. How it works
 
@@ -130,6 +136,8 @@ $$
 
 - **Tuning only alpha.** Beta usually matters more, because it decides how much the bestsellers dominate.
 - **Comparing with an untuned ItemKNN.** Both deserve the same tuning budget.
+- **Keeping every neighbour.** Without a top-k per item (`rp3_neighbors`), the item × item matrix is dense: slow,
+  memory-hungry, and full of tiny weights that add noise.
 
 ## 11. Check your understanding
 
@@ -140,6 +148,11 @@ $$
 ??? question "Why is RP3beta called a 'graph' method when it has no neural network?"
     It works directly on the user-item graph: its scores are random-walk probabilities on that graph.
     LightGCN also uses the graph, but learns embeddings by gradient descent.
+
+??? question "A very large β fills the lists with rare items. Where does the overall comparison show the problem?"
+    Accuracy (NDCG@10) drops, while the beyond-accuracy table shows coverage and long-tail share going up and the
+    popularity percentile going down. Tuning on the validation fold picks the β that balances the two for each
+    dataset.
 
 ## 12. Further reading
 

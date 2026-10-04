@@ -3,6 +3,11 @@
 > Recommends the items that got the most interactions recently, the same list for everyone (minus what
 > each user already has).
 
+!!! abstract "In plain words"
+    MostPopular recommends the items most people used recently, the same list for everyone, like a bestseller shelf.
+    It is surprisingly hard to beat when tastes follow trends (games, fashion), and it is the fallback for users the
+    system knows nothing about.
+
 --8<-- "generated/methods/most_popular.md"
 
 !!! tip "When to use it"

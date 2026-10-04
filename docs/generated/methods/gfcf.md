@@ -3,7 +3,7 @@
 | Fact | Value |
 |---|---|
 | Family | Graph filter (training-free) |
-| Ladder rung | 3 — Graph neural networks |
+| Ladder rung | 3 — Graph methods |
 | Paper | [How Powerful is Graph Convolution for Recommendation?](https://arxiv.org/abs/2108.07567) (CIKM 2021) |
 | Reference code | [https://github.com/yshenaw/GF_CF](https://github.com/yshenaw/GF_CF) |
 | What recbench runs | in-repo scipy implementation of Shen et al. 2021 (GF-CF) |

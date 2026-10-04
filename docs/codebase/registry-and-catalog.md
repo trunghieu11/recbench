@@ -19,12 +19,14 @@ packages, whose `__init__.py` files import every module:
 
 | Package | Registers |
 |---|---|
-| `src/recbench/methods/__init__.py` | all methods |
+| `src/recbench/methods/__init__.py` | all methods, listed by module name in its `MODULES` tuple (a run's child process imports only its own method's module, named in `RECBENCH_METHOD_MODULES`) |
 | `src/recbench/metrics/__init__.py` | all metrics (through `catalog.py`) |
 | `src/recbench/datasets/__init__.py` | all dataset adapters |
 
 Everything else (runner, evaluator, reports, docs generator) iterates over the registry, so adding a class and
-importing it is enough for it to appear everywhere.
+listing its module is enough for it to appear in the docs and the smoke runs. The quick-tier bake-off is the
+exception: it runs only what `configs/benchmarks/quick.yaml` queues, with the search space from
+`configs/tuning/quick.yaml` ([add a method, step 8](../how-to/add-a-method.md#8-put-it-through-the-gate-the-quick-tier-bake-off)).
 
 ```python
 from recbench.registry import ensure_loaded
@@ -54,10 +56,13 @@ A rubric entry is `dimension: [score, "reason"]` for the five dimensions; see th
 | File | Built from |
 |---|---|
 | `methods/<name>.md` | catalog entry + the method's `MethodSpec` (facts and rubric) |
-| `methods/<name>-results.md` | the latest MLflow runs of that method (smoke and full) |
+| `methods/<name>-results.md` | the latest MLflow runs of that method: smoke and full with default settings, quick and full tuned; a † marks results from an earlier `impl_version` |
 | `capability.md` | all methods' specs |
+| `ladder.md`, `glance.md` | the ladder table and "all methods at a glance" of the algorithms index, from the catalog's `ladder`, `ladder_ideas` and each method's `one_liner` |
 | `metrics.md` | all registered metrics |
-| `datasets/<name>.md` | catalog entry + `meta.json` of every split on this machine |
+| `datasets/<name>.md` | catalog entry + `meta.json` of every split on this machine (validation folds are left out) |
+
+It also rewrites the block between the `generated:methods` markers in `README.md` (the method table).
 | `services.md` | the `services` section |
 
 The report builder adds `leaderboards/<tier>/<dataset>.md` (with `--docs`). Hand-written pages embed these

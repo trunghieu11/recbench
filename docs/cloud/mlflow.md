@@ -1,8 +1,10 @@
 # MLflow
 
 **MLflow** is an open-source tool for tracking machine-learning experiments. recbench uses its **tracking**
-component only: every (dataset, method) pair becomes one MLflow **run** with tags, parameters, metrics, and
-artifacts. Reports, the dashboard, and the generated docs all read their numbers back from MLflow, so it is the
+component only: every training-and-evaluation of a method on a split becomes one MLflow **run** with tags,
+parameters, metrics, and artifacts. A benchmark pair is one run; a quick-tier job is up to 10 runs on the
+validation fold (`tags.stage = "search"`) plus one test run (`stage = "final"`), and a confirmation adds a few
+`confirm` and `final` runs on full data. Reports, the dashboard, and the generated docs all read their numbers back from MLflow, so it is the
 single source of truth for results.
 
 ## Vocabulary
@@ -51,7 +53,7 @@ Useful UI actions:
 import mlflow
 from recbench.results import load_runs, leaderboard, tracking_uri
 
-frame = load_runs("smoke")                       # latest finished protocol-v2 run per (dataset, method)
+frame = load_runs("smoke", tuning="defaults")    # latest finished protocol-v2 run per (dataset, method)
 board = leaderboard(frame, "movielens-25m", "ndcg_at_10")
 print(board[["rank", "tags.method", "metrics.ndcg_at_10", "tied_with_best"]])
 
@@ -95,6 +97,10 @@ only one, so half the results silently disappear. Copy it elsewhere and import i
 rsync -a gpu-box:recommendation_benchmark/runs/mlflow/ runs/mlflow-gpu/
 python -m recbench.import_runs runs/mlflow-gpu
 ```
+
+For the rented box of the quick-tier bake-off, `./scripts/fetch_results.sh vast-gpu` does this for you: it copies the
+box's store to `runs/mlflow-box/` and imports it ([5d](../start/box-4-finish.md)). To watch the box's runs **while**
+it works, open its MLflow UI through an SSH tunnel ([5c, step 6](../start/box-3-run-and-monitor.md#step-6-watch-it-level-3-two-pages-in-your-browser)).
 
 `src/recbench/import_runs.py::import_runs` re-creates each run in your store with the same tags, parameters,
 metrics, start and end times, and artifact files, and tags it `imported_from`. Running it again skips runs it

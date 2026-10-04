@@ -3,6 +3,10 @@
 > Gives every item a random score. It learns nothing, which is exactly why it is useful: any method that does
 > not clearly beat it has learned nothing either.
 
+!!! abstract "In plain words"
+    Random gives every item a random score, so every user gets a random list. Nobody would ship it. It is the
+    floor: any method that cannot beat Random clearly has learned nothing, or has a bug.
+
 --8<-- "generated/methods/random.md"
 
 !!! tip "When to use it"

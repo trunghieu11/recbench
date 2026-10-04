@@ -3,7 +3,7 @@
 | Fact | Value |
 |---|---|
 | Family | Content-based two-tower with images |
-| Ladder rung | 6 — Content and multimodal towers |
+| Ladder rung | 6 — Content-based methods |
 | Paper | — |
 | Reference code | in-repo |
 | What recbench runs | in-repo two-tower over hashed text + colour image features + id residual |

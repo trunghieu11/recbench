@@ -35,7 +35,10 @@ the top on NDCG while covering well under 1% of the catalog.
 ## In recbench
 
 - [MostPopular](../algorithms/most-popular.md) is the pure-popularity reference.
-- [XSimGCL](../algorithms/xsimgcl.md) is designed to reduce popularity concentration (more uniform embeddings).
+- [XSimGCL](../algorithms/xsimgcl.md) and [DirectAU](../algorithms/directau.md) spread embeddings more uniformly,
+  which reduces popularity concentration.
+- [RP3beta](../algorithms/rp3beta.md) divides scores by popularity to the power β: β is a direct "popularity
+  dial", and tuning picks it per dataset.
 - Popularity is always computed from **pre-test** interactions only (`TrainView.item_pop`).
 - Metric code: `src/recbench/metrics/catalog.py::gini` and the beyond-accuracy metrics in the same file.
 

@@ -18,8 +18,12 @@ The ≈ mark means a method's 95% interval overlaps the best method's interval. 
 candidate. Ranking positions inside the tied group are noise.
 
 **3. Did each method get a fair budget?**
-Compare `max_steps`, `dim`, and training time in MLflow. A neural model trained for 400 steps on a laptop is not
-the same model as one trained for 30,000 on a GPU. See [fair baselines and tuning](../dictionary/concepts/fair-baselines-and-tuning.md).
+Check whether the results come from tuned runs (the quick tier) or default settings (the smoke and full tiers): the
+report's header says which. In MLflow, compare `dim`, training time, and how long each model trained: `max_steps` for
+the older methods, or `fit.epochs_run`, `fit.best_epoch` and `fit.stopped` (why training ended: early stopping, the
+epoch limit, or the time limit) for epoch-trained ones, with the validation curve `curve/val_ndcg_at_10`. A neural
+model trained for 400 steps on a laptop is not the same model as one trained for 30,000 on a GPU. See
+[fair baselines and tuning](../dictionary/concepts/fair-baselines-and-tuning.md).
 
 **4. What does the method give up?**
 Read the beyond-accuracy table: a popularity-heavy method can be tied on NDCG while covering a tiny part of the
@@ -101,8 +105,9 @@ Random is a useful anchor: it shows what a method with no information scores on 
 - **Cold users** are not in the leaderboards. They get the popularity fallback; the split box shows how many
   there are. On datasets with many cold users, the fallback matters as much as the model. See
   [cold start](../dictionary/concepts/cold-start.md).
-- **Item cap.** EASE uses only the most recently popular items up to a cap (20,000 on the laptop, 30,000 on the
-  GPU machine). MLflow logs the share of pre-test interactions those items cover as `fit.item_cap_coverage`.
+- **Item cap.** EASE and Turbo-CF use only the most popular items up to a cap (20,000 on the laptop, 30,000 on the
+  GPU machine, fewer if GPU memory is short). MLflow logs the share of pre-test interactions those items cover as
+  `fit.item_cap_coverage`. SANSA computes the same kind of model without a cap.
 
 ## "Did not run" is a result too
 

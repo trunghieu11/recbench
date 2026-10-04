@@ -3,7 +3,7 @@
 | Fact | Value |
 |---|---|
 | Family | CTR ranker with feature crosses |
-| Ladder rung | 5 — CTR-style rankers |
+| Ladder rung | 5 — CTR-style rankers and re-rankers |
 | Paper | [DCN V2: Improved Deep & Cross Network and Practical Lessons for Web-scale Learning to Rank Systems](https://arxiv.org/abs/2008.13535) (WWW 2021) |
 | Reference code | [https://github.com/reczoo/FuxiCTR](https://github.com/reczoo/FuxiCTR) |
 | What recbench runs | FuxiCTR 2.3 CrossNetV2 inside an in-repo DCN-V2 (ids + category tokens) |

@@ -8,7 +8,8 @@ flowchart LR
 ```
 
 Command: `python -m recbench.pipeline.prepare --config <benchmark.yaml> [--datasets a,b] [--tier smoke]`
-(`src/recbench/pipeline/prepare.py::prepare_one`).
+(`src/recbench/pipeline/prepare.py::prepare_one`). `--tier` takes a comma-separated list, for example
+`--tier quick,quick-val,full,full-val`; the datasets are then prepared one after another, all tiers each.
 
 ## 1. Download and clean (adapters)
 
@@ -37,15 +38,32 @@ If a dataset fails, the traceback goes to `data/unavailable/<name>-<tier>.txt` a
     |---|---|---|---|
     | smoke | ~50,000 | 300 most recent pre-test, first 50 test | 30 / 10,000 |
     | standard | ~1,000,000 | 1,000 / 200 | 200 / 10,000 |
+    | quick | ~1,000,000, filled to the target | 1,000 / 200 | 200 / 10,000 |
     | slice | ~40,000, ≤ 10,000 items | 200 / 50 | 100 / 1,000 |
     | full | all | none | 500 / 10,000 |
 
     Users are sampled with a fixed seed: 80% of the event budget goes to users who have both pre-test and test
-    events. Because the cutoffs come from the full data, a smoke split is a true subset of the full one.
+    events. In the quick tier, the budget those users leave unused goes to the other users (`fill_to_target`), so a
+    dataset with few returning users, such as RetailRocket, still gets about a million events. Because the cutoffs
+    come from the full data, a smoke split is a true subset of the full one.
 4. **Sessions:** a gap of more than 30 minutes starts a new session (unless the source has session ids).
 5. **Ids:** `user_idx` and `item_idx` are assigned in sorted id order, starting at **1**. Index 0 is padding.
 6. **Parts:** `train` (before `valid_start`), `valid` (until `test_start`), `test` (after). "Pre-test" = train + valid.
 7. **Outputs** (below), then a guard: fewer warm evaluation users than the tier's minimum raises `SplitError`.
+
+### Validation folds (`<tier>-val`)
+
+`materialize(..., fold="valid")` builds the fold that tuning uses (`quick-val`, `full-val`, `smoke-val`):
+
+1. Users are sampled exactly as for the tier itself, against the **real** test cutoff, so the fold has the same
+   users.
+2. Every event at or after the real test cutoff is **deleted**. Tuning cannot see the test window, not even by
+   mistake.
+3. The cutoffs move one window earlier (`src/recbench/pipeline/materialize.py::fold_cutoffs`): the fold's test
+   window is the real validation window (the 80th–90th percentile of events; H&M: the 7 days before the test
+   week), and its validation window is the one before that (re-rankers train their labels there).
+4. `meta.json` gains `fold: valid` and `base_tier`, and the split hash gains the fold. The runner attaches the
+   early-stopping monitor only on a fold.
 
 ## 3. The split files (`data/splits/<dataset>/<tier>/`)
 

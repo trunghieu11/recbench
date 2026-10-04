@@ -3,6 +3,12 @@
 > Reads a user's whole history, squeezes it into a small random code, and decodes that code into a probability
 > for every item. Items with high probability that the user has not seen yet are the recommendations.
 
+!!! abstract "In plain words"
+    MultVAE squeezes a user's whole history (which items they used, out of the full catalogue) into a short code, then
+    tries to rebuild the history from that code. To rebuild well from so little, it must learn the general patterns of
+    taste. The items it "rebuilds" that the user has not used yet are its recommendations. A penalty (the KL term) keeps
+    the codes simple, so the model cannot just memorise each user.
+
 --8<-- "generated/methods/multvae.md"
 
 !!! tip "When to use it"
@@ -89,6 +95,7 @@ $$
 | `vae_beta_cap` | maximum KL weight | 0.2 | 0.05–1.0 |
 | `vae_anneal_epochs` | epochs for β to reach the cap | 10 | 5–20 |
 | `lr` | Adam learning rate | 0.001 | 1e-4–1e-2 |
+| `max_epochs`, `patience` | early stopping on the validation fold; an epoch is one pass over the users | 30, 3 | fixed: 200, 10 (the paper trains 200 epochs) |
 
 ## 7. In recbench
 
@@ -114,6 +121,8 @@ $$
 
 - **No KL annealing:** with the full β from the start, the code can collapse (it carries no information).
 - **Forgetting input dropout:** the model learns to copy the input and recommends what the user already has.
+- **A KL weight that is too high from the start.** The codes then carry no information and every user gets the
+  same list. KL annealing raises β gradually over `vae_anneal_epochs` to prevent this.
 
 ## 11. Check your understanding
 
@@ -124,6 +133,10 @@ $$
 ??? question "Why can MultVAE score users it never saw in training?"
     Its parameters describe items and the mapping from histories to codes, not individual users. A new user's
     history goes through the same encoder and decoder.
+
+??? question "Why does MultVAE use one softmax over all items instead of one probability per item?"
+    A user's interactions are a limited budget spread over the catalogue. The multinomial (softmax) likelihood makes
+    items compete for that budget, which fits ranking the top items better than independent yes/no guesses.
 
 ## 12. Further reading
 

@@ -3,7 +3,7 @@
 | Fact | Value |
 |---|---|
 | Family | Graph collaborative filtering |
-| Ladder rung | 3 — Graph neural networks |
+| Ladder rung | 3 — Graph methods |
 | Paper | [LightGCN: Simplifying and Powering Graph Convolution Network for Recommendation](https://arxiv.org/abs/2002.02126) (SIGIR 2020) |
 | Reference code | [https://github.com/Coder-Yu/SELFRec](https://github.com/Coder-Yu/SELFRec) |
 | What recbench runs | SELFRec LGCN_Encoder @ 5b022942 |

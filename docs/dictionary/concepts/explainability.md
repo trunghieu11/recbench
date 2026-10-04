@@ -31,7 +31,10 @@ User history: *Toy Story*, *Up*. Recommended: *Inside Out*.
 
 - Every method can return `Explanation` objects (`src/recbench/protocol.py::Explanation`) with a `kind`, a
   `text`, and `evidence`. An explanation is **personal** when its evidence cites one of the user's own history items.
-- Exact explanations: `src/recbench/methods/_explain.py::contribution_explanations` (ItemKNN, EASE).
+- Exact explanations: `src/recbench/methods/_explain.py::contribution_explanations` (ItemKNN, EASE, RP3beta, SLIM:
+  every score is a sum over the user's history items, so each item's share is the reason).
+- The re-rankers cite a co-visit with the user's last item when there is one; text kNN cites the history items with
+  the most similar text.
 - Post-hoc: `src/recbench/methods/_explain.py::embedding_explanations` (embedding models). TIGER-lite cites
   shared semantic-ID prefixes.
 - Metric: `personal_explanation_rate`, the share of sampled recommendations (top 3 for 50 users) with a

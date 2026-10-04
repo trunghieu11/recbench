@@ -3,6 +3,12 @@
 > Turns every item's description into a vector with a pretrained language model, then recommends items whose
 > descriptions are closest to what the user looked at recently. No interaction data is needed to score an item.
 
+!!! abstract "In plain words"
+    Every item gets a vector from its description, made by a pretrained language model that has read a lot of text:
+    "two-person dome tent" lands close to "lightweight camping tent". A user's taste is the average vector of their
+    latest items. Recommendations are the items whose descriptions point the same way. It needs no interaction data to
+    score an item, so it can recommend brand-new items on day one.
+
 --8<-- "generated/methods/text_knn.md"
 
 !!! tip "When to use it"
@@ -109,6 +115,9 @@ $$
   frequent new arrivals.
 - **Encoding text written after the cutoff.** recbench builds item texts from catalog metadata, never from
   reviews (see the [Steam](../datasets/steam.md) adapter).
+- **Treating category codes as text.** Some datasets only have hashed ids for categories, not words (RetailRocket).
+  The encoder then compares meaningless strings; check `fit.items_with_text` and read its results with that in
+  mind.
 
 ## 11. Check your understanding
 
@@ -118,6 +127,10 @@ $$
 ??? question "How does this differ from the text hash tower?"
     The text hash tower learns its own text representation from interactions, using hashed words. Text kNN uses
     a pretrained encoder and no training at all.
+
+??? question "Text kNN scores well on cold items but poorly overall. How could you still use it?"
+    As a feature or a candidate source rather than the whole recommender: the LightGBM re-ranker can add text similarity
+    as a feature (`rerank_text`), and a production system can use it only for items too new for collaborative models.
 
 ## 12. Further reading
 

@@ -3,6 +3,12 @@
 > Learns, for every item, a small set of non-negative weights saying which other items predict it, by solving
 > one regularised regression per item.
 
+!!! abstract "In plain words"
+    For every item, SLIM learns a short list of other items that predict it, like "people who own a tent and a
+    sleeping bag usually buy a camping stove too". Every weight is positive, and most are exactly zero. A user's score
+    for the stove is the sum of the weights of the items they already own, so every recommendation comes with its
+    reasons.
+
 --8<-- "generated/methods/slim.md"
 
 !!! tip "When to use it"
@@ -119,7 +125,11 @@ This is scikit-learn's ElasticNet with `positive=True` and no intercept.
 
 - **Letting an item predict itself.** Without $w_{jj} = 0$ the model learns the identity and recommends
   nothing new.
-- **A too-strong penalty.** All weights become 0 and every score is 0. The sensitivity plots show this edge.
+- **A too-strong penalty.** All weights become 0 and every score is 0. A job's tuning summary
+  (`runs/tuning/quick/<dataset>/slim.json`) shows it: settings with a very large `slim_alpha` score near zero.
+- **Running the regressions one after another on a big catalog.** Each item is its own regression, so time grows
+  with the number of items. recbench runs them in parallel (joblib) and limits each one to the item's most
+  similar items (`slim_neighbors`).
 
 ## 11. Check your understanding
 
@@ -131,6 +141,11 @@ This is scikit-learn's ElasticNet with `positive=True` and no intercept.
     Both learn an item × item matrix that predicts each item from the others, with a zero diagonal. EASE uses
     an L2 penalty and no sign constraint, which gives a closed-form, dense solution. SLIM adds L1 and
     non-negativity, which gives a sparse solution but needs one regression per item.
+
+??? question "SLIM and ItemKNN both produce item-to-item weights. How do they get them differently?"
+    ItemKNN computes a similarity with a fixed formula (cosine). SLIM **learns** the weights by regression, so that
+    together they rebuild each item's column. Two nearly identical items then share the credit instead of each
+    getting a full similarity.
 
 ## 12. Further reading
 

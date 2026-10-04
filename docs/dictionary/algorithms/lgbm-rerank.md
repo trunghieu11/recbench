@@ -4,6 +4,12 @@
 > gradient-boosted tree model re-orders them using features no single model sees: popularity trends, item age,
 > user activity, category affinity, and what usually follows the user's last item.
 
+!!! abstract "In plain words"
+    Cheap models first propose about 200 candidate items per user. Then a ranking model, gradient-boosted trees,
+    re-orders that short list using many signals at once: how each proposer ranked the item, whether it is trending,
+    how new it is, how active the user is, which categories they like. It learns those rules from what users actually
+    picked in the weeks before the test, the same way a shop manager learns from last month's sales.
+
 --8<-- "generated/methods/lgbm_rerank.md"
 
 !!! tip "When to use it"
@@ -128,6 +134,9 @@ The trees are fitted to these "lambda" gradients, so mistakes near the top of th
 - **Computing features with future data.** Here, features for training come strictly from before the validation
   cutoff, and features for scoring from before the test cutoff.
 - **Judging the ranker without candidate recall.** A low NDCG may simply mean the right items never reached it.
+- **Too few recent users to learn from.** The training labels come from one validation window. On small data,
+  few users take a candidate item there, and the method stops with "too few recent users with a reachable next
+  item" (`unsupported`) rather than learning from noise.
 
 ## 11. Check your understanding
 
@@ -137,6 +146,10 @@ The trees are fitted to these "lambda" gradients, so mistakes near the top of th
 
 ??? question "What limits a re-ranker's best possible recall?"
     The candidate list: items not proposed in stage 1 can never be ranked.
+
+??? question "Why is the re-ranker's NDCG capped by `candidate_recall`?"
+    It can only re-order the candidates stage 1 proposed. If a user's test items are not among them, no ordering can
+    put them in the top 10, so the share of test items present in the list is an upper bound.
 
 ## 12. Further reading
 

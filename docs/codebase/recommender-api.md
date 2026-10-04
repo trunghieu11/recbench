@@ -25,7 +25,8 @@ the docs generator talk to methods only through this interface.
 | `name` | registry key, used in configs, MLflow, and bundle paths |
 | `tasks` | which metrics apply (a metric is computed only if its tasks overlap) |
 | `output` | `"scores"`, `"pairs"`, or `"list"`, as described above |
-| `uses_history` | documentation: the model reads order |
+| `uses_history` | the method reads the user's past items when scoring |
+| `sequence_aware` | it reads them in order (shown as "Order-aware" in the capability matrix) |
 | `scores_cold_items` | if False, the evaluator and bundle export remove items with no pre-test events |
 | `handles_cold_users` | if True, the method is also evaluated on cold users (`cold_users/*`) |
 | `requires_side_features` | the runner skips datasets without text or categories |
@@ -33,7 +34,10 @@ the docs generator talk to methods only through this interface.
 | `outputs_probability` | enables `sampled_logloss` |
 | `managed` | a remote service: skipped unless `managed_services: true`; no bundle export |
 | `ranked` | False = reported as experimental, not on leaderboards |
-| `needs_torch`, `upstream`, `fidelity`, `cost_band` | facts shown in the docs |
+| `needs_torch`, `upstream`, `fidelity`, `cost_band` | facts shown in the docs (`fidelity` must match the catalog) |
+| `feedback` | the feedback kinds it accepts (implicit and explicit by default) |
+| `impl_version` | part of every run's identity: bump it when a code change changes the method's results, so old runs stop counting as done |
+| `deterministic` | True when fitting has no randomness (closed forms, counting): the full-data confirmation then runs one seed instead of three |
 
 ## HistoryBatch
 
@@ -63,6 +67,9 @@ the docs generator talk to methods only through this interface.
 | `item_pop`, `item_recent_pop` | pre-test counts (all, and the last 28 days) |
 | `warm_users()`, `warm_item_mask()` | users and items that have pre-test events |
 | `cache_dir` | a per-split cache folder for expensive features |
+| `restrict(window_days, keep_last)` | a view with only the last `window_days` of events, plus each user's last `keep_last` (the runner uses it for `train_window_days`) |
+| `before(cutoff_us)` | a view of the events before a time (the re-rankers build their training labels with it) |
+| `weighted_matrix(half_life_days)`, `event_weights(…)`, `event_age_days()` | interactions weighted by age: an event `half_life_days` old counts half (`decay_half_life_days`) |
 
 It has no attribute pointing at test files; `tests/test_leakage.py` checks that.
 
@@ -87,6 +94,18 @@ class MyModel(EmbeddingRecommender):
 ```
 
 `score_users`, `item_embeddings`, and `explain` (citing similar history items) come for free.
+
+## Training in epochs
+
+Neural methods train with `src/recbench/methods/_torch.py::train_epochs` (Adam, bf16 autocast on CUDA), or with
+`src/recbench/methods/_torch.py::early_stopping_loop` around their own epoch function. Pass `owner=self`:
+
+- on a validation fold, the runner attaches `self.monitor` (a `ValidationMonitor`). After each epoch the loop scores
+  the fold's monitor users, keeps the best weights, and stops after `patience` epochs without improvement;
+- `epochs` in the config trains exactly that many epochs and never looks at validation data (the final test run);
+- `fit_deadline` stops before an epoch that would end after it (the tuning job's time share);
+- the loop fills `fit_info` (`epochs_run`, `best_epoch`, `stopped`, logged as `fit.*`) and `fit_curve` (logged as
+  `curve/*` metrics, one point per epoch).
 
 ## A minimal method
 

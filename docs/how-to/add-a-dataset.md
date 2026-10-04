@@ -70,7 +70,20 @@ Check `n_eval_warm` (warm evaluation users), `repeat_share`, and the cutoff date
 `SplitError: only N warm eval users`, the sample is too small: use a bigger tier, or adjust `tier_overrides` in
 the config.
 
-## 4. Docs
+## 4. Add it to the bake-off
+
+1. Add the name to `datasets:` in `configs/benchmarks/quick.yaml`. The list order is the run order.
+2. Prepare its four tiers:
+
+    ```bash
+    python -m recbench.pipeline.prepare --config configs/benchmarks/quick.yaml --datasets myshop --tier quick,quick-val,full,full-val
+    ```
+
+3. Dry-run it on the smoke tier: `python -m recbench.queue run --config configs/benchmarks/quick-smoke.yaml --datasets myshop`.
+   The box scripts (`upload_splits.sh`, `run_quick_box.sh`) read the dataset list from `quick.yaml`, so nothing else
+   changes.
+
+## 5. Docs
 
 Write `docs/dictionary/datasets/<name>.md` (start with `--8<-- "generated/datasets/<name>.md"`) and add it to the nav.
 

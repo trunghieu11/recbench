@@ -40,12 +40,14 @@ about *Coco* was needed. Retrieval (which produced the three candidates) still c
 |---|---|
 | [HSTU](../algorithms/hstu.md) | a small, faithful-in-spirit generative recommender (attention verified against Meta's code) |
 | [TIGER-lite](../algorithms/tiger-lite.md) | semantic IDs via residual quantisation, without generative retrieval (unranked) |
+| [Text-embedding kNN](../algorithms/text-knn.md) | the "encoder" pattern with a real pretrained sentence encoder (all-MiniLM-L6-v2): items are embedded from their text, users by their recent items, no training on interactions |
 | [Text hash tower](../algorithms/text-hash-tower.md) | the "encoder" pattern with a hashed bag of words instead of an LLM |
 
 ## What is on the roadmap
 
 - An LLM zero-shot re-ranker on top of a retriever (for example EASE top-50 → LLM).
-- Replacing hashed text with pretrained sentence or LLM embeddings in the content towers.
+- Using the pretrained sentence embeddings of text kNN inside the trained content towers (text kNN already uses
+  them without training, and the LightGBM re-ranker can use their similarity as a feature).
 - A faithful TIGER (RQ-VAE on item content, encoder-decoder, beam search).
 
 See the [roadmap](../../results/roadmap.md).

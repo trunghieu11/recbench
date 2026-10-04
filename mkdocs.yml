@@ -2,7 +2,7 @@
 # Uses only Material built-ins and PyMdown extensions, so Zensical (Material's successor,
 # which reads mkdocs.yml) can build it after Material for MkDocs reaches end of life (2026-11-05).
 site_name: RecBench
-site_description: A recommender-systems dictionary, learned by benchmarking 18 methods honestly.
+site_description: A recommender-systems dictionary, learned by benchmarking 34 methods honestly.
 site_author: Hieu Nguyen
 copyright: Copyright &copy; 2026 Hieu Nguyen — MIT License
 docs_dir: docs

@@ -46,7 +46,7 @@ def test_code_pointers_resolve():
 
 def test_snippets_point_at_generated_fragments():
     reg = ensure_loaded()
-    allowed = {"generated/capability.md", "generated/metrics.md", "generated/services.md"}
+    allowed = {"generated/capability.md", "generated/metrics.md", "generated/services.md", "generated/ladder.md", "generated/glance.md"}
     allowed |= {f"generated/methods/{n}.md" for n in reg.methods} | {f"generated/methods/{n}-results.md" for n in reg.methods}
     allowed |= {f"generated/datasets/{n}.md" for n in reg.datasets}
     tiers = ("smoke", "full", "quick-tuned", "full-tuned")

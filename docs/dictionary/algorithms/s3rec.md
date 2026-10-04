@@ -5,6 +5,11 @@
 
 --8<-- "generated/methods/s3rec.md"
 
+!!! note "Held back from the quick-tier bake-off"
+    This method is not in the [quick-tier bake-off](../../results/quick-tier.md) yet, because it is heavier or did
+    not finish on the full data. Its results below use default settings, without tuning. It joins the
+    comparison later, through the same gate as every other method.
+
 !!! tip "When to use it"
     - When items have meaningful attributes (genres, product types) and interaction data is limited.
       Attributes give extra training signal.

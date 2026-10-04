@@ -43,9 +43,10 @@ How to read it:
 - EASE, MostPopular, and ItemKNN are **tied**: their intervals overlap EASE's. Do not claim EASE "wins".
 - MostPopular is tied on accuracy but covers ten times less of the catalog than EASE: every user gets nearly
   the same list. If discovery matters, EASE is the better choice.
-- SASRec's interval ends (0.049) below EASE's start (0.059), so it is genuinely worse *here*. But this is a
-  400-step untuned laptop run. Check its training budget before concluding anything (see
-  [fair baselines](../dictionary/concepts/fair-baselines-and-tuning.md)).
+- SASRec's interval ends (0.049) below EASE's start (0.059), so it is genuinely worse *here*. But this is a small,
+  untuned laptop run with default settings. Check its training budget before concluding anything (see
+  [fair baselines](../dictionary/concepts/fair-baselines-and-tuning.md)), and compare tuned results from the
+  [quick-tier bake-off](../results/quick-tier.md).
 
 ## In MLflow
 
@@ -73,6 +74,8 @@ print(values.mean(), (values > 0).mean())   # mean NDCG, and the share of users 
   ordinary. Compare within one dataset.
 - **Ignoring ties.** With hundreds of users, small differences are noise.
 - **Trusting sampled metrics.** They are much higher and can reorder methods.
-- **Treating smoke results as final.** Smoke runs are small and untuned; use the full tier to choose a method.
+- **Treating smoke results as final.** Smoke runs are small and untuned. Choose with the tuned quick-tier bake-off and
+  its full-data confirmations, and see which methods are good everywhere on the
+  [overall comparison](../results/overall-comparison.md).
 
 **Next:** [your first new method](your-first-method.md).

@@ -3,6 +3,11 @@
 > Learns a vector for every user and every item so that, for each user, items they interacted with score
 > higher than items picked at random.
 
+!!! abstract "In plain words"
+    BPR-MF also describes users and items with vectors, but learns them by comparison: for a user, an item they used
+    should score higher than a random item they did not. Training repeats that comparison millions of times, nudging
+    the vectors a little each time.
+
 --8<-- "generated/methods/bpr_mf.md"
 
 !!! tip "When to use it"
@@ -85,12 +90,13 @@ vectors small. Rendle et al. (2009) show this is a smooth stand-in for the AUC.
 
 ## 6. Hyperparameters
 
-| Name in recbench config | What it does | Default | Typical range | Tip |
+| Name in recbench config | What it does | Default | Searched in the [quick tier](../../results/quick-tier.md) | Tip |
 |---|---|---|---|---|
-| `dim` | number of factors $d$ | from the preset (32 laptop, 64/128 GPU) | 16–256 | more factors need more data |
-| `bpr_lr` | learning rate | 0.01 | 0.001–0.1 | too high diverges, too low barely moves |
-| `bpr_reg` | L2 regularisation $\lambda$ | 0.01 | 0.0001–0.1 | raise if it overfits |
-| `bpr_iterations` | passes over the data | 100 | 50–500 | watch validation metrics |
+| `dim` | number of factors $d$ | from the preset (32 laptop, 64/128 GPU) | 64, 128, 256 | more factors need more data |
+| `bpr_lr` | learning rate | 0.01 | 0.001–0.1 (log scale) | too high diverges, too low barely moves |
+| `bpr_reg` | L2 regularisation $\lambda$ | 0.01 | 0.00001–0.1 (log scale) | raise if it overfits |
+| `bpr_iterations` | passes over the data | 100 | 50, 100, 200 | watch validation metrics |
+| `train_window_days` | train on the last N days only | none | none, 30, 90, 365 | |
 
 ## 7. In recbench
 

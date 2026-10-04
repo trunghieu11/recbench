@@ -3,7 +3,7 @@
 | Fact | Value |
 |---|---|
 | Family | CTR ranker with target attention |
-| Ladder rung | 5 — CTR-style rankers |
+| Ladder rung | 5 — CTR-style rankers and re-rankers |
 | Paper | [Deep Interest Network for Click-Through Rate Prediction](https://arxiv.org/abs/1706.06978) (KDD 2018) |
 | Reference code | [https://github.com/RUCAIBox/RecBole](https://github.com/RUCAIBox/RecBole) |
 | What recbench runs | RecBole 1.2 DIN (attention over the history, BCE with sampled negatives) |

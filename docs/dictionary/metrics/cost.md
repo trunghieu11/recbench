@@ -45,7 +45,11 @@ A **cost = runtime × price table** (an editable file of machine prices, turned 
 
 ## In recbench's setup
 
-- The laptop runs the smoke tier for free; the full tier runs on your own GPU machine (no cloud GPU bill).
+- The laptop runs the smoke tier and the bake-off's dry run for free. The quick-tier bake-off runs on a GPU box
+  rented by the hour (about $5–12 for all five datasets, [step 5](../../start/quick-tier-box.md)); the full tier runs
+  on your own GPU machine. No GPU runs in the cloud for weeks.
+- The [overall comparison](../../results/overall-comparison.md) shows each method's training time next to its
+  accuracy, with the Pareto front.
 - The API runs on Cloud Run with `min-instances 0` and `max-instances 1`, so it cannot scale into a large bill.
 - A budget alert script warns at 50%, 90%, and 100% of a monthly budget (alerts do not stop spending):
   [cost control](../../cloud/cost-control.md).

@@ -1,10 +1,12 @@
 # 6. The full tier on a GPU machine
 
-**Goal:** run the benchmark on the complete datasets with larger models on your Ubuntu NVIDIA machine.
+!!! abstract "In plain words"
+    This page runs the original methods once each, with their **default settings**, on the complete datasets, on a
+    GPU machine you own. That is how the first (untuned) results were made. To **choose** a method, use the
+    [quick-tier bake-off](quick-tier-box.md) instead, which tunes every method with the same budget. This page is
+    for the heavy methods held back from the bake-off, and for repeating the original run.
 
-!!! tip "Start with the quick tier"
-    To compare methods fairly on a small budget, run the [quick-tier bake-off](quick-tier-box.md) first. This
-    page runs every method once with default settings on the full data, which is how the first results were made.
+**Goal:** run the benchmark on the complete datasets with larger models on your Ubuntu NVIDIA machine.
 **Time:** setup about an hour; the run takes several hours to a day, depending on the GPU.
 **You need:** an NVIDIA GPU with at least 24 GB of memory, 64 GB of RAM (128 GB recommended for the 48 GB
 preset), and about 80 GB of free disk.
@@ -16,8 +18,12 @@ preset), and about 80 GB of free disk.
 | Data | ~50,000 events per dataset (sampled users) | complete datasets (up to 31.8 million events) |
 | Eval users | at most 2,000 | at most 10,000 warm users per dataset |
 | Model preset | `cpu`: dim 32, 400 steps | `24gb`: dim 64, 10,000 steps; `48gb`: dim 128, 3 layers, length 200, 30,000 steps |
-| Methods | DIN excluded | all, including DIN |
-| Purpose | check the pipeline | choose a method |
+| Methods | the 16 original methods (DIN excluded) | the 17 original methods, including DIN |
+| Settings | defaults | defaults |
+| Purpose | check the pipeline | the untuned reference run; heavy methods |
+
+Steps apply to the older methods. The newer, epoch-trained ones (SASRec since its third version, and the
+bake-off's new methods) train for at most `max_epochs` (30 by default) instead. Add new methods with `--methods`.
 
 ## Step 1: GPU driver and CUDA PyTorch
 
@@ -73,7 +79,7 @@ only one of them. Copy it next to yours and import it instead:
 # on the laptop
 rsync -a gpu-box:recommendation_benchmark/runs/mlflow/ runs/mlflow-gpu/
 python -m recbench.import_runs runs/mlflow-gpu      # re-creates the GPU runs in runs/mlflow
-python -m recbench.report.build --tier full --out reports/full-latest --docs
+python -m recbench.report.build --tier full --tuning defaults --out reports/full-latest --docs
 python -m recbench.dictionary.build
 ```
 
@@ -93,7 +99,9 @@ The documentation's leaderboards then include the full tier.
 
 - `torch.cuda.is_available()` is False: wrong PyTorch build (CPU-only) or a driver mismatch; reinstall from the
   PyTorch site's command.
-- Out of GPU memory: use the `24gb` preset (`--preset 24gb` in the runner), or lower `batch_size` in
+- Out of GPU memory: use the `24gb` preset by calling the runner directly
+  (`python -m recbench.runner --config configs/benchmarks/gpu-full.yaml --preset 24gb`; the script does not take
+  `--preset`), or lower `batch_size` in
   `configs/benchmarks/gpu-full.yaml` under `method_params`.
 - More in [troubleshooting](../how-to/troubleshooting.md).
 

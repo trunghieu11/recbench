@@ -11,11 +11,22 @@ ladder:
   0: Baselines
   1: Neighbourhood and linear models
   2: Matrix factorisation
-  3: Graph neural networks
+  3: Graph methods
   4: Sequential models
-  5: CTR-style rankers
-  6: Content and multimodal towers
+  5: CTR-style rankers and re-rankers
+  6: Content-based methods
   7: Managed services
+
+# The one idea each rung adds (shown in the ladder table of docs/dictionary/algorithms/index.md).
+ladder_ideas:
+  0: "\"no learning\" reference points"
+  1: items that co-occur are related
+  2: users and items as learned vectors
+  3: neighbours of neighbours carry signal
+  4: the *order* of a user's history matters
+  5: score one (user, item) pair at a time with rich features
+  6: understand items from their text and images
+  7: rent a recommender instead of building one
 
 methods:
   random:
@@ -27,6 +38,7 @@ methods:
     code: null
     fidelity: faithful
     summary: Scores every item at random. The floor every other method must beat.
+    one_liner: "Random scores: the floor."
     rubric:
       implementation: [1, "Three lines of numpy."]
       tuning: [1, "Nothing to tune."]
@@ -43,6 +55,7 @@ methods:
     code: null
     fidelity: faithful
     summary: Recommends the items with the most interactions in the last few weeks to everyone.
+    one_liner: "Recently popular items for everyone."
     rubric:
       implementation: [1, "A count and a sort."]
       tuning: [1, "One knob: the recency window (28 days by default)."]
@@ -59,6 +72,7 @@ methods:
     code: null
     fidelity: faithful
     summary: Recommends items that co-occur with what the user already interacted with (cosine similarity between item columns).
+    one_liner: "Items similar (by co-occurrence) to what you used."
     rubric:
       implementation: [2, "A sparse matrix product plus top-k pruning."]
       tuning: [2, "Number of neighbours and a shrinkage term."]
@@ -75,6 +89,7 @@ methods:
     code: "https://github.com/hasteck/EASE_WWW19"
     fidelity: faithful
     summary: Learns one item-to-item weight matrix in closed form (a single matrix inverse). Often the strongest simple baseline.
+    one_liner: "One learned item-to-item weight matrix, solved in closed form."
     rubric:
       implementation: [2, "About 20 lines, but the item x item matrix must fit in memory (catalog cap)."]
       tuning: [1, "One hyperparameter, lambda."]
@@ -91,6 +106,7 @@ methods:
     code: "https://github.com/benfred/implicit"
     fidelity: faithful
     summary: Learns user and item vectors so that items a user interacted with score higher than random items.
+    one_liner: "User and item vectors trained so that used items outrank random ones."
     rubric:
       implementation: [2, "One library call (implicit)."]
       tuning: [3, "Factors, learning rate, regularisation, iterations."]
@@ -107,6 +123,7 @@ methods:
     code: "https://github.com/benfred/implicit"
     fidelity: faithful
     summary: Treats every user-item pair as 'interacted or not' with a confidence weight and solves for vectors by alternating least squares.
+    one_liner: "User and item vectors fitted by weighted least squares."
     rubric:
       implementation: [2, "One library call (implicit)."]
       tuning: [3, "Factors, regularisation, confidence alpha, iterations."]
@@ -123,6 +140,7 @@ methods:
     code: "https://github.com/Coder-Yu/SELFRec"
     fidelity: faithful
     summary: Smooths user and item embeddings over the user-item graph (neighbours of neighbours) and trains with BPR.
+    one_liner: "Vectors smoothed over the user-item graph."
     rubric:
       implementation: [3, "Graph construction plus a training loop (SELFRec encoder)."]
       tuning: [3, "Layers, embedding size, regularisation, steps."]
@@ -139,6 +157,7 @@ methods:
     code: "https://github.com/Coder-Yu/SELFRec"
     fidelity: faithful
     summary: LightGCN plus a contrastive loss between two noise-perturbed views, which spreads embeddings more evenly (less popularity bias).
+    one_liner: "LightGCN plus a contrastive loss that spreads vectors out."
     rubric:
       implementation: [3, "Graph encoder plus a contrastive loss (SELFRec encoder)."]
       tuning: [4, "Noise eps, contrastive weight lambda, temperature tau, contrast layer, plus graph settings."]
@@ -155,6 +174,7 @@ methods:
     code: "https://github.com/kang205/SASRec"
     fidelity: faithful
     summary: A small Transformer reads the user's recent items in order and predicts the next one. Trained here with full cross-entropy, the stronger modern recipe.
+    one_liner: "A causal Transformer reads your sequence and predicts the next item."
     rubric:
       implementation: [3, "A Transformer plus a sequence sampler (in-repo, ~100 lines)."]
       tuning: [3, "Layers, heads, dimension, dropout, sequence length, steps."]
@@ -171,6 +191,7 @@ methods:
     code: "https://github.com/RUCAIBox/RecBole"
     fidelity: faithful
     summary: Like BERT for text, it hides random items in the sequence and learns to fill them in; at inference it fills in a [mask] placed after the last item.
+    one_liner: "Fill-in-the-blank training on sequences, like BERT for text."
     rubric:
       implementation: [3, "RecBole model plus an id-mapping adapter."]
       tuning: [4, "Mask ratio, layers, heads, dropout, length; known to need long training."]
@@ -187,6 +208,7 @@ methods:
     code: "https://github.com/RUCAIBox/RecBole"
     fidelity: faithful
     summary: Pre-trains a sequence encoder with four self-supervised tasks that tie items to their attributes, then fine-tunes it for next-item prediction.
+    one_liner: "Self-supervised pre-training with item attributes, then fine-tuning."
     rubric:
       implementation: [4, "Two training stages and item attributes through RecBole."]
       tuning: [4, "Four auxiliary loss weights plus Transformer settings and a stage split."]
@@ -203,6 +225,7 @@ methods:
     code: "https://github.com/meta-recsys/generative-recommenders"
     fidelity: simplified
     summary: Meta's sequence architecture with pointwise (SiLU) attention, a gating vector U, and learned position/time-gap biases. Small single-GPU version here.
+    one_liner: "Meta's generative sequence model with pointwise attention and time-aware bias."
     rubric:
       implementation: [4, "Custom attention, relative position and time biases (in-repo, verified against Meta's op)."]
       tuning: [4, "Layers, dimension, sequence length, time buckets, steps; designed for huge data."]
@@ -219,6 +242,7 @@ methods:
     code: null
     fidelity: simplified
     summary: Experimental and unranked. A GRU next-item model plus TIGER-style residual-quantised semantic IDs, used only for explanations; it does not generate IDs like real TIGER.
+    one_liner: "A next-item model with semantic-ID codes (experimental)."
     rubric:
       implementation: [4, "Sequence model plus a residual codebook."]
       tuning: [4, "Codebook levels and size, loss weight, GRU settings."]
@@ -235,6 +259,7 @@ methods:
     code: "https://github.com/RUCAIBox/RecBole"
     fidelity: faithful
     summary: For each candidate item, attends over the user's history to build a candidate-specific interest vector, then predicts click probability.
+    one_liner: "Attention over your history, conditioned on the candidate item."
     rubric:
       implementation: [3, "RecBole model plus pairwise scoring over the catalog."]
       tuning: [3, "Embedding size, MLP sizes, negatives per positive."]
@@ -251,6 +276,7 @@ methods:
     code: "https://github.com/reczoo/FuxiCTR"
     fidelity: faithful
     summary: Combines a cross network (explicit feature interactions) with a deep MLP over user id, item id, and category features; outputs a click probability.
+    one_liner: "Learned feature crosses for click prediction, over the whole catalog."
     rubric:
       implementation: [3, "Feature pipeline plus a pairwise scorer over the catalog."]
       tuning: [3, "Cross layers, MLP sizes, negatives, regularisation."]
@@ -267,6 +293,7 @@ methods:
     code: null
     fidelity: simplified
     summary: Builds item vectors from item text and categories (hashed words), so brand-new items can be recommended. A tiny stand-in for LLM-based text understanding.
+    one_liner: "Items understood from their words; can recommend brand-new items."
     rubric:
       implementation: [2, "Hashing plus two small linear towers."]
       tuning: [2, "Hash size, dimension, steps."]
@@ -283,6 +310,7 @@ methods:
     code: null
     fidelity: simplified
     summary: Text features plus simple colour features from real item images and an item-id residual. Runs only when images are on disk (H&M with the image archive).
+    one_liner: "Text plus image colour features."
     rubric:
       implementation: [3, "Image loading plus a two-tower model."]
       tuning: [3, "Hash size, dimension, image features, steps."]
@@ -299,6 +327,7 @@ methods:
     code: "https://github.com/recombee/python-api-client"
     fidelity: faithful
     summary: A hosted recommendation API. recbench uploads the pre-test interactions to a dedicated database and asks it for top-K lists for eval users.
+    one_liner: "A managed recommendation API, benchmarked like the rest."
     rubric:
       implementation: [2, "SDK calls for upload and recommendation requests."]
       tuning: [1, "Managed; scenario settings in the admin UI."]
@@ -315,6 +344,7 @@ methods:
     code: "https://github.com/MaurizioFD/RecSys2019_DeepLearning_Evaluation"
     fidelity: faithful
     summary: Item-to-item scores from two-step random walks (item, user, item), divided by popularity to the power beta. A strong, cheap baseline.
+    one_liner: "Two-step random walks between items, with popular items turned down."
     rubric:
       implementation: [2, "Two sparse matrix products and a top-k per item; about 40 lines."]
       tuning: [2, "alpha, beta, and the number of neighbours."]
@@ -331,6 +361,7 @@ methods:
     code: null
     fidelity: faithful
     summary: Projects a user's history onto the top-k singular vectors of the interaction matrix. The simplest learned-factor model.
+    one_liner: "A truncated SVD of the interaction matrix: the simplest factorisation."
     rubric:
       implementation: [1, "One randomized SVD call."]
       tuning: [1, "One setting: the number of factors."]
@@ -347,6 +378,7 @@ methods:
     code: "https://github.com/MaurizioFD/RecSys2019_DeepLearning_Evaluation"
     fidelity: faithful
     summary: One non-negative ElasticNet regression per item learns a sparse item-to-item weight matrix (fsSLIM with neighbour pre-selection).
+    one_liner: "A sparse, non-negative item-to-item weight matrix learned by regression."
     rubric:
       implementation: [3, "A regression per item; needs parallelism and neighbour pre-selection to be fast."]
       tuning: [2, "Penalty strength, L1 share, and candidate neighbours."]
@@ -363,6 +395,7 @@ methods:
     code: "https://github.com/rn5l/session-rec"
     fidelity: simplified
     summary: Scores items by the past sessions most similar to the user's latest session, weighting recent clicks more.
+    one_liner: "Past sessions similar to your current one, with recent items counting more."
     rubric:
       implementation: [2, "Session reconstruction and a sparse neighbour search."]
       tuning: [2, "Neighbours, sample size, and position weighting."]
@@ -379,6 +412,7 @@ methods:
     code: "https://github.com/glami/sansa"
     fidelity: faithful
     summary: EASE's closed form computed with a sparse factorisation and a sparse approximate inverse, so the whole catalog fits.
+    one_liner: "EASE's weights approximated sparsely, so it scales to large catalogs."
     rubric:
       implementation: [2, "One library call, but SuiteSparse must be installed."]
       tuning: [2, "lambda and the weight density."]
@@ -395,6 +429,7 @@ methods:
     code: "https://github.com/yshenaw/GF_CF"
     fidelity: faithful
     summary: Smooths a user's history over the normalised item-item graph and adds a low-rank "ideal low-pass" part. No training.
+    one_liner: "A training-free graph filter: normalised co-occurrence plus a low-pass part."
     rubric:
       implementation: [2, "A sparse product and a truncated SVD; about 30 lines."]
       tuning: [1, "Two settings: alpha and the number of singular vectors."]
@@ -411,6 +446,7 @@ methods:
     code: "https://github.com/jindeok/Turbo-CF"
     fidelity: faithful
     summary: Applies a small polynomial filter to the dense normalised item-item graph; only matrix products, so it is fast on a GPU.
+    one_liner: "A training-free polynomial graph filter, computed on a GPU."
     rubric:
       implementation: [2, "A normalisation and a few dense matrix products."]
       tuning: [2, "Normalisation, power, and the choice of filter."]
@@ -427,6 +463,7 @@ methods:
     code: "https://github.com/reczoo/RecZoo"
     fidelity: faithful
     summary: MF with cosine similarity, many negatives with a margin (CCL loss), and user vectors that mix in the average of the history.
+    one_liner: "Matrix factorisation with a cosine contrastive loss and many negatives."
     rubric:
       implementation: [2, "An embedding model, a history average, and a margin loss; about 60 lines."]
       tuning: [4, "Negatives, margin, negative weight, gamma, and the usual learning settings interact."]
@@ -443,6 +480,7 @@ methods:
     code: "https://github.com/THUwangcy/DirectAU"
     fidelity: faithful
     summary: MF trained to align users with their items and to spread embeddings evenly over the sphere; no negative sampling.
+    one_liner: "Vectors trained to align used pairs and spread everything else out."
     rubric:
       implementation: [2, "Two short loss functions on top of an embedding model."]
       tuning: [2, "gamma matters most; weight decay and batch size second."]
@@ -459,6 +497,7 @@ methods:
     code: "https://github.com/reczoo/RecZoo"
     fidelity: faithful
     summary: MF whose loss weights encode what infinitely many graph-convolution layers converge to, plus an item-item neighbour term; no message passing.
+    one_liner: "The effect of infinite graph convolutions, as a weighted loss without message passing."
     rubric:
       implementation: [3, "Degree weights, an item-neighbour table, and a three-part loss."]
       tuning: [5, "w1-w4, negatives, negative weight, gamma, lambda, and the learning settings; sensitive to them."]
@@ -475,6 +514,7 @@ methods:
     code: "https://github.com/dawenl/vae_cf"
     fidelity: faithful
     summary: Encodes a user's whole history into a small random code and decodes a softmax over all items (multinomial likelihood, KL annealing).
+    one_liner: "A variational autoencoder that rebuilds a user's whole history."
     rubric:
       implementation: [3, "A small encoder-decoder network plus KL annealing."]
       tuning: [3, "Layer sizes, dropout, KL cap, annealing, learning rate."]
@@ -491,6 +531,7 @@ methods:
     code: "https://github.com/ilya-shenbin/RecVAE"
     fidelity: faithful
     summary: MultVAE with a deeper dense-residual encoder, a composite prior, a KL weight scaled by user activity, and alternating encoder and decoder updates.
+    one_liner: "MultVAE with a stronger encoder and a composite prior."
     rubric:
       implementation: [3, "A deeper encoder, a mixture prior, and two alternating optimisers."]
       tuning: [3, "gamma, layer sizes, dropout, learning rate."]
@@ -507,6 +548,7 @@ methods:
     code: "https://github.com/hidasib/GRU4Rec_PyTorch_Official"
     fidelity: faithful
     summary: A GRU reads the user's clicks in order and scores every item as the next click; the authors' official PyTorch code.
+    one_liner: "A recurrent network reads your clicks in order (the authors' official code)."
     rubric:
       implementation: [2, "An adapter around the official code; the stepping for scoring is ours."]
       tuning: [4, "Loss, hidden size, batch size, learning rate, momentum, dropouts, sampling."]
@@ -523,6 +565,7 @@ methods:
     code: "https://github.com/UKPLab/sentence-transformers"
     fidelity: faithful
     summary: Encodes every item's text with a pretrained sentence-transformer, then recommends items whose text is closest to the user's recent items. Scores brand-new items too.
+    one_liner: "Items whose descriptions (encoded by a pretrained model) match your recent items."
     rubric:
       implementation: [1, "One library call to encode, then a weighted mean and a dot product."]
       tuning: [1, "Profile window and recency decay."]
@@ -539,6 +582,7 @@ methods:
     code: "https://github.com/microsoft/LightGBM"
     fidelity: faithful
     summary: EASE, ItemKNN and trending items propose about 200 candidates per user; LightGBM LambdaRank re-orders them with ranks, trends, item age, user activity, category and co-visit features.
+    one_liner: "Cheap models propose candidates; boosted trees re-order them with many features."
     rubric:
       implementation: [4, "Candidate generators, a feature builder, leakage-safe labels and a ranker."]
       tuning: [3, "Tree shape, learning rate, candidate count, feature set; generators tuned separately."]
@@ -555,6 +599,7 @@ methods:
     code: "https://github.com/reczoo/FuxiCTR"
     fidelity: faithful
     summary: The same candidates and features as the LightGBM re-ranker, plus user, item and category embeddings, scored by a DCN-V2 cross network trained on hard negatives.
+    one_liner: "The same candidates, re-ordered by a neural network that learns feature crosses."
     rubric:
       implementation: [4, "The two-stage pipeline plus a neural scorer and its training loop."]
       tuning: [4, "Network size, dropout, learning rate, batch size, candidate count."]

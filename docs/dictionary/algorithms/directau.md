@@ -3,6 +3,12 @@
 > Matrix factorisation without negative sampling: pull each user towards their items ("alignment") and spread
 > all users and all items evenly over the sphere ("uniformity").
 
+!!! abstract "In plain words"
+    DirectAU learns user and item vectors with two plain goals. A user's vector should point the same way as the
+    vectors of the items they used (**alignment**), and all vectors together should spread evenly over a sphere
+    instead of bunching up (**uniformity**). Spreading out is part of the goal, so it needs no random "negative" items
+    at all: that is the whole trick.
+
 --8<-- "generated/methods/directau.md"
 
 !!! tip "When to use it"
@@ -85,6 +91,7 @@ $$
 | `directau_l2` | weight decay | 1e-6 | 0, 1e-8, 1e-6, 1e-4 (the authors' grid) |
 | `batch_size` | pairs per step; uniformity is measured within the batch | 256 | 256–2048 |
 | `dim`, `lr` | the usual | quick preset | `dim` 64–128, `lr` 1e-4–1e-2 |
+| `max_epochs`, `patience` | early stopping on the validation fold | 30, 3 | fixed: 100, 5 |
 
 ## 7. In recbench
 
@@ -112,6 +119,8 @@ $$
 
 - **γ too large:** everything spreads out, users drift away from their items, and accuracy drops.
 - **γ too small:** embeddings collapse towards each other.
+- **A batch that is too small.** Uniformity is measured within each batch, so a tiny batch gives a noisy picture of
+  how spread out the vectors are. The search tries batches of 256 to 2,048.
 
 ## 11. Check your understanding
 
@@ -120,6 +129,10 @@ $$
 
 ??? question "What would happen with alignment alone?"
     Every embedding would collapse to the same point: perfect alignment, zero ability to rank.
+
+??? question "Why does DirectAU need no negative sampling?"
+    Its uniformity term already pushes every vector away from every other vector in the batch. In other losses, that
+    is the job of the sampled negatives.
 
 ## 12. Further reading
 

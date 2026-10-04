@@ -60,7 +60,11 @@ queue:
     - {name: lgbm_rerank, resource: cpu, after: [ease, itemknn]}
     - {name: dcnv2_rerank, resource: gpu, after: [ease, itemknn]}
 
-# Each dataset's top methods by quick-tier test NDCG@10 are re-checked on full data.
+# Registered methods that are not in the bake-off yet, because they are heavy or never finished on the full data.
+# They join through the same gate later; tests/test_docs.py checks that every local method is queued or listed here.
+held_back: [lightgcn, xsimgcl, bert4rec, s3rec, hstu, din, dcnv2, text_hash_tower, multimodal_tower, tiger_lite]
+
+# Each dataset's top methods by quick-tier VALIDATION NDCG@10 are re-checked on full data (and get serving bundles).
 confirm:
   top: 3
   tier: full

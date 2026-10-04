@@ -3,6 +3,12 @@
 > Gets the smoothing of a graph neural network without running one: it works out what infinitely many
 > LightGCN layers converge to, and turns that into weights in a plain matrix-factorisation loss.
 
+!!! abstract "In plain words"
+    LightGCN learns by repeatedly averaging each user with their items, and each item with its users: slow on a big
+    graph. UltraGCN works out where that averaging would end up after infinitely many rounds, and turns the answer into
+    weights. Each (user, item) pair is pulled together with a strength that is larger for niche items and lighter users.
+    It then trains an ordinary embedding model with those weights: the graph's effect, without the graph rounds.
+
 --8<-- "generated/methods/ultragcn.md"
 
 !!! tip "When to use it"
@@ -89,6 +95,7 @@ $$
 | `ultragcn_gamma`, `ultragcn_lambda` | 1e-5–1e-3 and 1e-4–1e-2 (log) |
 | `ultragcn_neighbors` | 5, 10, 20 |
 | `dim`, `lr` | 64–128, 1e-4–1e-2 |
+| `max_epochs`, `patience` (early stopping) | fixed: 100, 5 |
 
 ## 7. In recbench
 
@@ -117,6 +124,9 @@ $$
 - **Copying the paper's negative settings to a small catalog:** 200 negatives from a 40-item catalog are
   mostly repeats of the same items, and training goes wrong.
 - **Calling it a GNN:** it uses no layers at all; it is MF with graph-derived weights.
+- **Copying the paper's weights without tuning.** The balance of `ultragcn_negatives`, `ultragcn_neg_weight` and
+  `ultragcn_lambda` depends on the dataset. With too little negative pressure, every user ends up close to every
+  item, which is why the search space varies them.
 
 ## 11. Check your understanding
 
@@ -127,6 +137,10 @@ $$
 ??? question "What does the item-item term add?"
     It asks the user to be close to the neighbours of the items they like, which spreads signal to items they
     never touched.
+
+??? question "Why does UltraGCN train faster than LightGCN?"
+    It never passes messages over the graph during training. The graph's effect is computed once, as the per-pair
+    weights β and the list of item neighbours, and training is plain mini-batch matrix factorisation.
 
 ## 12. Further reading
 

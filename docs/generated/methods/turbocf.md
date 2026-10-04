@@ -3,7 +3,7 @@
 | Fact | Value |
 |---|---|
 | Family | Graph filter (training-free, polynomial) |
-| Ladder rung | 3 — Graph neural networks |
+| Ladder rung | 3 — Graph methods |
 | Paper | [Turbo-CF: Matrix Decomposition-Free Graph Filtering for Fast Recommendation](https://arxiv.org/abs/2404.14243) (SIGIR 2024) |
 | Reference code | [https://github.com/jindeok/Turbo-CF](https://github.com/jindeok/Turbo-CF) |
 | What recbench runs | in-repo PyTorch, following the authors' code (github.com/jindeok/Turbo-CF, MIT) |

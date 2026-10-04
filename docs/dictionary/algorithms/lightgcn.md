@@ -5,6 +5,11 @@
 
 --8<-- "generated/methods/lightgcn.md"
 
+!!! note "Held back from the quick-tier bake-off"
+    This method is not in the [quick-tier bake-off](../../results/quick-tier.md) yet, because it is heavier or did
+    not finish on the full data. Its results below use default settings, without tuning. It joins the
+    comparison later, through the same gate as every other method.
+
 !!! tip "When to use it"
     - When higher-order connections matter ("users like you liked items liked by users like them").
     - As the standard graph baseline that newer graph methods (including [XSimGCL](xsimgcl.md)) build on.

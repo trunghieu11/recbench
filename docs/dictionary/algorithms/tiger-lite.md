@@ -6,6 +6,11 @@
 
 --8<-- "generated/methods/tiger_lite.md"
 
+!!! note "Held back from the quick-tier bake-off"
+    This method is not in the [quick-tier bake-off](../../results/quick-tier.md) yet, because it is heavier or did
+    not finish on the full data. Its results below use default settings, without tuning. It joins the
+    comparison later, through the same gate as every other method.
+
 !!! tip "When to use it"
     - To understand semantic IDs, the building block of generative retrieval (TIGER and its successors).
     - As a teaching contrast: the same codes can be used to *explain* (here) or to *generate* (real TIGER).

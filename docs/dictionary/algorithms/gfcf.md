@@ -3,6 +3,12 @@
 > A graph method with no training: it smooths a user's history over the normalised item-item graph and adds a
 > little of the graph's strongest global patterns, all with fixed matrix formulas.
 
+!!! abstract "In plain words"
+    Imagine every item as a dot, with lines between items that the same people use. GF-CF "blurs" your history along
+    those lines, so items close to yours light up. It also adds a little of the few broad patterns that explain most of
+    the data (a low-pass filter, like keeping the bass of a song and dropping the hiss). Everything is a fixed formula:
+    there is nothing to train, so it runs in seconds.
+
 --8<-- "generated/methods/gfcf.md"
 
 !!! tip "When to use it"
@@ -117,6 +123,8 @@ $$
 - **Expecting LightGCN to beat it by default.** The paper's point is that it often does not; compare them
   with the same tuning budget.
 - **Forgetting the degree normalisation.** Without it, the filter just recommends popular items.
+- **Too many singular vectors (`gfcf_k`).** The "ideal" low-pass part then keeps fine, noisy patterns too, and
+  stops being a smoothing step.
 
 ## 11. Check your understanding
 
@@ -126,6 +134,10 @@ $$
 ??? question "What does alpha = 0 reduce GF-CF to?"
     The linear filter alone: one step of normalised item-item smoothing, close in spirit to ItemKNN with a
     particular similarity.
+
+??? question "GF-CF and PureSVD both use the top singular vectors. What does GF-CF add?"
+    The degree normalisation, so popular items and very active users do not dominate, and the linear filter, so that
+    a user's direct neighbours still count. PureSVD is the low-rank projection alone, without normalisation.
 
 ## 12. Further reading
 

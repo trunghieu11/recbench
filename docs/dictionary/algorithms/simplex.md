@@ -3,6 +3,12 @@
 > Matrix factorisation done well: cosine similarity, many negatives with a margin (the "cosine contrastive
 > loss"), and a user vector that also looks at the user's history.
 
+!!! abstract "In plain words"
+    SimpleX is matrix factorisation with three sensible habits. It compares directions, not lengths, so popular items
+    cannot win just by being trained more. It shows each user many wrong items, but only learns from the ones that still
+    look too similar to the right ones. And it describes a user partly by the items they used, so light users borrow
+    strength from their history.
+
 --8<-- "generated/methods/simplex.md"
 
 !!! tip "When to use it"
@@ -85,8 +91,9 @@ $$
 | `simplex_margin` | margin for negatives | 0.8 | 0.2–0.9 |
 | `simplex_neg_weight` | weight of the negative term | 150 | 1–500 |
 | `simplex_gamma` | own embedding versus history | 0.5 | 0–1 |
-| `simplex_history` | history items averaged | 50 | 20–200 |
-| `dim`, `lr`, `dropout`, `batch_size` | the usual | quick preset | `dim` 64–128, `lr` 1e-4–1e-2 |
+| `simplex_history` | history items averaged | 50 | fixed (not searched) |
+| `dim`, `lr` | the usual | quick preset | `dim` 64, 128; `lr` 1e-4–1e-2 |
+| `max_epochs`, `patience` | early stopping on the validation fold | 30, 3 | fixed: 100, 5 |
 
 ## 7. In recbench
 
@@ -114,6 +121,8 @@ $$
 - **A margin that is too low:** almost every negative is "too close", the loss is dominated by noise, and
   training becomes slow.
 - **Too few negatives:** the main advantage of CCL disappears.
+- **Too few epochs with many negatives.** Each step is costly, and early stopping may end training before the
+  model has settled. Check `fit.epochs_run` against `max_epochs` and the learning curve in MLflow.
 
 ## 11. Check your understanding
 
@@ -124,6 +133,10 @@ $$
 ??? question "Why use cosine instead of a plain dot product?"
     A dot product can grow just by making vectors longer, which favours frequently trained (popular) items.
     Cosine compares directions only.
+
+??? question "What does the negative weight `simplex_neg_weight` balance?"
+    How much the "push wrong items down" part of the loss counts against the "pull the right item up" part. With many
+    negatives and a small weight, the positive dominates; with a large weight, the model mostly learns to say no.
 
 ## 12. Further reading
 

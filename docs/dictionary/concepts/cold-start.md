@@ -14,10 +14,13 @@ with long histories fails exactly where first impressions are made.
 
 ## A small example
 
-| Case | MostPopular | EASE / matrix factorisation | Text hash tower |
+| Case | MostPopular | EASE / matrix factorisation | Text-embedding kNN |
 |---|---|---|---|
 | Cold user, warm items | works (same list for everyone) | no history → no personal scores | needs at least one history item |
 | Warm user, cold item | the item has 0 recent interactions → never recommended | no co-occurrence or trained embedding → cannot score it | scores it from its text |
+
+The [text hash tower](../algorithms/text-hash-tower.md) also scores cold items from their words; text kNN does it with
+a pretrained sentence encoder and no training ([text-embedding kNN](../algorithms/text-knn.md)).
 
 ## Strategies
 

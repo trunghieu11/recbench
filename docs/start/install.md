@@ -44,22 +44,24 @@ uv pip install -e ".[dev]"
 | Extra | Adds |
 |---|---|
 | `serve` | the HTTP API only (what the Docker image uses) |
-| `bench` | data pipeline, evaluation, MLflow, simple baselines |
-| `cpu` / `gpu` | `bench` plus PyTorch, RecBole, FuxiCTR for the neural methods |
+| `bench` | data pipeline, evaluation, MLflow, simple baselines, scikit-learn, LightGBM (the re-ranker) and Optuna (tuning) |
+| `cpu` / `gpu` | `bench` plus PyTorch, RecBole, FuxiCTR, numba, kmeans-pytorch and sentence-transformers for the neural and text methods |
+| `sansa` | the `sansa` package for SANSA. It needs SuiteSparse first: `brew install suite-sparse` on a Mac (`setup_box.sh` installs it on a rented box). Without it, SANSA's jobs end `unsupported` |
 | `managed` | the Recombee SDK |
 | `docs` | MkDocs and Material for this site |
 | `dev` | `cpu`, `managed`, and `docs`, plus pytest (use this on the laptop) |
 
 ## Step 4: third-party model code
 
-Two models reuse code from other repositories, pinned to exact commits:
+Three models reuse code from other repositories, pinned to exact commits:
 
 ```bash
 bash scripts/fetch_third_party.sh
 ```
 
-You should see two lines like `SELFRec 5b0229423c…` and `generative-recommenders ea7b85f1…`. The code lands in
-`third_party/` (not tracked by git).
+You should see three lines like `SELFRec 5b0229423c…`, `generative-recommenders ea7b85f1…` and
+`GRU4Rec_PyTorch_Official d1fc3110…`. The code lands in `third_party/` (not tracked by git). The official GRU4Rec code
+allows research and education only; see [security](../cloud/security.md#third-party-code).
 
 ## Step 5: a Kaggle token (for H&M and RetailRocket)
 

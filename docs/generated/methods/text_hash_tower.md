@@ -3,7 +3,7 @@
 | Fact | Value |
 |---|---|
 | Family | Content-based two-tower (stand-in for LLM text encoders) |
-| Ladder rung | 6 — Content and multimodal towers |
+| Ladder rung | 6 — Content-based methods |
 | Paper | — |
 | Reference code | in-repo |
 | What recbench runs | in-repo content two-tower over hashed bag-of-words (stand-in for LLM text encoders) |

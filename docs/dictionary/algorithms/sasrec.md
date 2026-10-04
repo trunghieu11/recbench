@@ -3,6 +3,11 @@
 > Self-Attentive Sequential Recommendation: a small causal Transformer reads the user's recent items *in
 > order* and predicts the next one, like a language model predicting the next word.
 
+!!! abstract "In plain words"
+    SASRec reads a user's history in order, like a sentence, and predicts the next item, the way a phone keyboard
+    predicts the next word. Its attention mechanism lets it look back at any earlier item, so a click from long ago can
+    still matter if it is relevant to what comes next.
+
 --8<-- "generated/methods/sasrec.md"
 
 !!! tip "When to use it"

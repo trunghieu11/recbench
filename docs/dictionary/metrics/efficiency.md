@@ -6,8 +6,10 @@ hardware, so compare them only within one hardware profile (the `hardware` tag o
 ## Training time: `train_seconds`
 
 Wall-clock time of `fit()` on the active hardware. Data loading done inside `fit` is included; evaluation is
-not. recbench trains for a fixed number of steps, so this measures the cost *of the budget*. A method that
-needs ten times more steps to converge would take ten times longer.
+not. Older methods train for a fixed number of steps, so for them this measures the cost *of the budget*: a method
+that needs ten times more steps to converge would take ten times longer. Methods that stop early on a validation
+fold report the time to their best epoch plus the patience epochs. In the quick tier, a job's full cost also includes
+its tuning trials (shown as "job time" on the [overall comparison](../../results/overall-comparison.md)).
 
 ## Batch scoring speed: `score_seconds_per_1k_users`
 

@@ -5,6 +5,11 @@
 
 --8<-- "generated/methods/hstu.md"
 
+!!! note "Held back from the quick-tier bake-off"
+    This method is not in the [quick-tier bake-off](../../results/quick-tier.md) yet, because it is heavier or did
+    not finish on the full data. Its results below use default settings, without tuning. It joins the
+    comparison later, through the same gate as every other method.
+
 !!! tip "When to use it"
     - To study the architecture behind "generative recommenders" (Meta, 2024), which scales to very long
       histories and huge data.

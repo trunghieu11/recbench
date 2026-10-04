@@ -3,7 +3,7 @@
 | Fact | Value |
 |---|---|
 | Family | Graph-weighted matrix factorisation |
-| Ladder rung | 3 — Graph neural networks |
+| Ladder rung | 3 — Graph methods |
 | Paper | [UltraGCN: Ultra Simplification of Graph Convolutional Networks for Recommendation](https://arxiv.org/abs/2110.15114) (CIKM 2021) |
 | Reference code | [https://github.com/reczoo/RecZoo](https://github.com/reczoo/RecZoo) |
 | What recbench runs | in-repo PyTorch, following the authors' code (reczoo/RecZoo UltraGCN, Apache-2.0) |

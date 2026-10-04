@@ -3,6 +3,12 @@
 > A training-free graph filter built from a few dense matrix products, so it runs in seconds on a GPU: it shapes
 > which patterns of the item-item graph get through with a small polynomial.
 
+!!! abstract "In plain words"
+    Items form a graph: two items are linked when the same people use them. Turbo-CF scores items by following those
+    links from your history: one step (items used together with yours), two steps (items linked through a shared
+    neighbour), three steps. A small polynomial decides how much each kind of step counts, like the bass, middle and
+    treble knobs of an equaliser. It is all matrix multiplication, so it takes seconds on a GPU and needs no training.
+
 --8<-- "generated/methods/turbocf.md"
 
 !!! tip "When to use it"
@@ -16,12 +22,15 @@
 
 ## 1. Intuition
 
-Think of the normalised item-item matrix $\bar P$ as a set of patterns (its eigenvectors), each with a strength
-(its eigenvalue, between 0 and 1). Strong patterns are broad tastes shared by many users. Weak patterns are
-mostly noise.
+Start from the normalised item-item matrix $\bar P$: entry $(i, j)$ says how strongly items $i$ and $j$ are used
+together, after discounting popular items. A user's scores $x_u \bar P$ follow **one step** from their items.
+Multiplying by $\bar P$ again, $\bar P^2$, follows **two steps**: items linked through a shared neighbour. Turbo-CF
+scores with a small polynomial of $\bar P$, so it mixes one-, two- and three-step paths with fixed weights. A
+polynomial of a matrix is just a few matrix products: no training and no eigendecomposition.
 
-A graph filter $f$ re-weights the patterns: it keeps strength $\lambda$ as $f(\lambda)$. Turbo-CF uses small
-polynomials, because a polynomial of a matrix is just a few matrix products, with no eigendecomposition needed:
+The same polynomials can be read through the matrix's **patterns** (its eigenvectors), each with a strength (its
+eigenvalue, between 0 and 1). Strong patterns are broad tastes shared by many users; weak ones are mostly noise. A
+filter $f$ keeps strength $\lambda$ as $f(\lambda)$:
 
 | Filter (`turbocf_filter`) | $f(\lambda)$ | λ = 0.1 | λ = 0.5 | λ = 1 | Effect |
 |---|---|---|---|---|---|
@@ -34,10 +43,30 @@ and **power** raises every entry of $\bar P$ to a power (below 1, weak links get
 
 ## 2. A tiny worked example
 
-Take the strongest pattern (λ = 1) and a weak one (λ = 0.1). The linear filter keeps them in a 10 : 1 ratio.
+**Paths.** Three items in a chain: 1 and 2 are often used together, 2 and 3 too, but 1 and 3 never. After
+normalisation:
+
+$$
+\bar P = \begin{pmatrix} 0.5 & 0.5 & 0 \\ 0.5 & 0.25 & 0.25 \\ 0 & 0.25 & 0.75 \end{pmatrix},\qquad
+\text{a user who has item 1: } x = (1, 0, 0)
+$$
+
+Row 1 of $\bar P^2$ is $(0.5, 0.375, 0.125)$ and of $\bar P^3$ is $(0.4375, 0.375, 0.1875)$: item 3 is reachable in two
+or three steps. The scores of the two items the user does not have:
+
+| Filter | Formula | Item 2 | Item 3 |
+|---|---|---|---|
+| 1 | $\bar P$ | 0.500 | 0 (no direct link) |
+| 2 | $2\bar P - \bar P^2$ | 0.625 | −0.125 (two-step paths are subtracted) |
+| 3 | $\bar P + 0.01(-\bar P^3 + 10\bar P^2 - 29\bar P)$ | 0.389 | 0.011 (reached through item 2) |
+
+Only filter 3 can recommend item 3. In a large catalog, that is the difference between recommending only items
+used together with yours and also reaching items one hop further.
+
+**Patterns.** Take the strongest pattern (λ = 1) and a weak one (λ = 0.1). The linear filter keeps them in a 10 : 1 ratio.
 Filter 2 changes that to 1.00 : 0.19, about 5 : 1, so weak patterns gain influence. Filter 3 gives
 0.80 : 0.072, about 11 : 1, so the strongest pattern dominates a little more. The tuner tries all three and
-keeps whichever predicts the validation week best.
+keeps whichever predicts the validation window best.
 
 ## 3. How it works
 
@@ -109,6 +138,8 @@ $$
 
 - **Comparing it with a different item cap than EASE** without saying so.
 - **Expecting filter 3 to always win.** "Closer to ideal" is not automatically better on a time-based test.
+- **Forgetting that the filter can subtract.** Filter 2 gives two-step paths a negative weight, so items reached
+  only through a chain are pushed down. That is a choice to test, not a bug.
 
 ## 11. Check your understanding
 
@@ -119,6 +150,10 @@ $$
 ??? question "What do GF-CF and Turbo-CF share?"
     Both filter the normalised item-item graph without training. GF-CF adds an explicit SVD projection;
     Turbo-CF shapes the filter with a polynomial instead.
+
+??? question "Your history has item 1, and item 3 never appears together with item 1. Which filters can still recommend item 3?"
+    Filter 3, through two-step paths (1 → 2 → 3). Filter 1 (one step) gives it 0. Filter 2 gives it a negative score,
+    because it subtracts two-step paths.
 
 ## 12. Further reading
 

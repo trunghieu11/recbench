@@ -9,7 +9,7 @@ symbol by symbol, then where the idea lives in recbench's code.
 | Section | What you will find | Start with |
 |---|---|---|
 | **Concepts** | the vocabulary and the traps: feedback, embeddings, losses, leakage, evaluation | [Recommender systems 101](concepts/recsys-101.md) |
-| **Algorithms** | 17 methods on a ladder from Random to HSTU, plus managed services | [The method ladder](algorithms/index.md) |
+| **Algorithms** | 34 methods on a ladder from Random to HSTU, plus other managed services | [The method ladder](algorithms/index.md) |
 | **Metrics** | how recommendations are judged: accuracy, beyond accuracy, cost, explainability | [Metrics overview](metrics/index.md) |
 | **Datasets** | the five public datasets, their licences, and their quirks | [Datasets overview](datasets/index.md) |
 

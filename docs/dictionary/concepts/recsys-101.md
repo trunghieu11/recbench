@@ -37,12 +37,12 @@ the idea behind most methods on this site.
 | Family | Idea | recbench examples |
 |---|---|---|
 | Non-personalised | the same list for everyone | [MostPopular](../algorithms/most-popular.md) |
-| Neighbourhood | items or users that co-occur | [ItemKNN](../algorithms/itemknn.md) |
-| Linear / matrix factorisation | users and items as vectors or weights | [EASE](../algorithms/ease.md), [BPR-MF](../algorithms/bpr-mf.md), [iALS](../algorithms/ials.md) |
-| Graph neural networks | propagate over the user-item graph | [LightGCN](../algorithms/lightgcn.md), [XSimGCL](../algorithms/xsimgcl.md) |
-| Sequential | the order of actions | [SASRec](../algorithms/sasrec.md), [BERT4Rec](../algorithms/bert4rec.md), [HSTU](../algorithms/hstu.md) |
-| Feature-based rankers | click prediction from many features | [DIN](../algorithms/din.md), [DCN-V2](../algorithms/dcnv2.md) |
-| Content-based | items understood from text or images | [Text hash tower](../algorithms/text-hash-tower.md) |
+| Neighbourhood | items or users that co-occur | [ItemKNN](../algorithms/itemknn.md), [RP3beta](../algorithms/rp3beta.md) |
+| Linear / matrix factorisation | users and items as vectors or weights | [EASE](../algorithms/ease.md), [SLIM](../algorithms/slim.md), [PureSVD](../algorithms/puresvd.md), [BPR-MF](../algorithms/bpr-mf.md), [iALS](../algorithms/ials.md), [MultVAE](../algorithms/multvae.md) |
+| Graph methods | propagate over the user-item graph | [GF-CF](../algorithms/gfcf.md) (no training), [UltraGCN](../algorithms/ultragcn.md), [LightGCN](../algorithms/lightgcn.md), [XSimGCL](../algorithms/xsimgcl.md) |
+| Sequential | the order of actions | [GRU4Rec](../algorithms/gru4rec.md), [SASRec](../algorithms/sasrec.md), [BERT4Rec](../algorithms/bert4rec.md), [HSTU](../algorithms/hstu.md) |
+| Rankers and re-rankers | order candidates using many features | [LightGBM re-ranker](../algorithms/lgbm-rerank.md), [DCN-V2 re-ranker](../algorithms/dcnv2-rerank.md), [DIN](../algorithms/din.md) |
+| Content-based | items understood from text or images | [Text-embedding kNN](../algorithms/text-knn.md), [text hash tower](../algorithms/text-hash-tower.md) |
 | Managed services | rent a recommender | [Recombee](../algorithms/recombee.md) |
 
 ## Tasks you will meet
@@ -56,7 +56,8 @@ recbench evaluates the first two directly; [evaluation protocols](evaluation-pro
 
 ## In recbench
 
-- 17 methods on a ladder from simple to complex ([the method ladder](../algorithms/index.md)).
+- 34 methods on a ladder from simple to complex ([the method ladder](../algorithms/index.md)), 23 of them compared
+  with equal tuning in the [quick-tier bake-off](../../results/quick-tier.md).
 - 5 public datasets across movies, e-commerce, music, and games ([datasets](../datasets/index.md)).
 - One honest protocol: models learn only from the past and are judged on the future.
 

@@ -30,7 +30,8 @@ users the interval is wide: any method whose mean falls inside it is hard to tel
 ## What the intervals do *not* cover
 
 - **Training randomness.** A different seed gives a different model. The bootstrap only resamples users.
-  Small runs can move noticeably between seeds. Multi-seed runs are on the [roadmap](../../results/roadmap.md).
+  Small runs can move noticeably between seeds. The full-data confirmations of each dataset's top 3 run 3 seeds
+  for methods whose training is random, and report the spread (`ndcg_at_10_seed_sd`).
 - **Different datasets:** an interval is valid for one split only.
 
 ## When it misleads

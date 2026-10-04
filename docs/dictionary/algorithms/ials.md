@@ -4,6 +4,11 @@
 > "interacted or not", trusting observed interactions more, and solving for the vectors in closed form,
 > alternating between users and items.
 
+!!! abstract "In plain words"
+    iALS describes every user and every item with a short list of numbers (a vector), chosen so that a user's vector
+    lines up with the vectors of the items they used. Items the user never touched count as weak "no" signals, and
+    repeated use counts as a stronger "yes". It alternates between solving for users and solving for items.
+
 --8<-- "generated/methods/ials.md"
 
 !!! tip "When to use it"

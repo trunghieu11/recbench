@@ -3,6 +3,11 @@
 > Learns one item-to-item weight matrix that best "reconstructs" every user's history from the rest of it,
 > with a closed-form solution (one matrix inverse, no training loop).
 
+!!! abstract "In plain words"
+    EASE learns one big table: how much does having item A predict having item B, for every pair of items. It finds
+    the whole table in one step with a formula, without any training loop. It is often the strongest simple method, at
+    the cost of memory that grows with the number of items squared.
+
 --8<-- "generated/methods/ease.md"
 
 !!! tip "When to use it"
@@ -119,17 +124,20 @@ exactly with a Lagrange multiplier, which is where the division by $P_{jj}$ come
   seconds to about a minute.
 - **Inference:** $x_u B$ for each user, a sparse row times a dense matrix.
 - **Hardware:** CPU, or a GPU. On a CUDA GPU, recbench computes the inverse and the scores in PyTorch, which is
-  much faster, and sets the cap from the free GPU memory: about 55,000 items on a 48 GB card. Memory is the
-  limit, not the compute.
+  much faster. The cap is `ease_max_items` (30,000 on the GPU profiles), lowered further if the GPU's free memory
+  cannot hold three item × item matrices. A 48 GB card alone could hold about 55,000 items, but in the bake-off
+  three GPU jobs share one card. Memory is the limit, not the compute. [SANSA](sansa.md) computes an approximate
+  EASE with no cap.
 
 ## 6. Hyperparameters
 
-| Name in recbench config | What it does | Default | Typical range | Tip |
+| Name in recbench config | What it does | Default | Searched in the [quick tier](../../results/quick-tier.md) | Tip |
 |---|---|---|---|---|
-| `ease_lambda` | L2 penalty $\lambda$ | 500.0 | 50–5,000 | larger for denser data and bigger catalogs |
-| `ease_max_items` | catalog cap (most recently popular items) | 30,000; 20,000 on the laptop profile | 10K–60K | limited by RAM or GPU memory: about 3 × items² × 4 bytes |
-| `ease_backend` | `auto` (PyTorch on a CUDA GPU, else NumPy), `numpy`, or `torch` | auto | — | the two backends give the same weights (a test checks it) |
+| `ease_lambda` | L2 penalty $\lambda$ | 500.0 | 1–20,000 (log scale); re-checked at ×0.5, ×1, ×2 (scaled by users) on full data | larger for denser data and bigger catalogs |
+| `ease_max_items` | catalog cap (most popular items) | 30,000; 20,000 on the laptop profile | fixed by the hardware profile | limited by RAM or GPU memory: about 3 × items² × 4 bytes |
+| `ease_backend` | `auto` (PyTorch on a CUDA GPU, else NumPy), `numpy`, or `torch` | auto | fixed | the two backends give the same weights (a test checks it) |
 | `decay_half_life_days` | recent interactions weigh more, in the model and in the user's profile | none | none, 30, 90, 365 | helps when tastes drift |
+| `train_window_days` | train on the last N days only | none | none, 30, 90, 365 | the same setting exists for every method |
 
 ## 7. In recbench
 

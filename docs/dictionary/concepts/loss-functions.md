@@ -90,9 +90,19 @@ the [XSimGCL page](../algorithms/xsimgcl.md).
 
 ## In recbench
 
-- BCE: `src/recbench/methods/dcnv2.py::DCNV2` (and RecBole's DIN).
-- BPR: `implicit` for BPR-MF; SELFRec's `bpr_loss` for the graph models.
-- Softmax and sampled softmax: `src/recbench/methods/seq_trainer.py::next_item_loss`, applied at every non-padding position.
+- BCE: `src/recbench/methods/dcnv2.py::DCNV2` (and RecBole's DIN); the DCN-V2 re-ranker on candidate rows;
+  UltraGCN, with weights that mimic graph convolution ([UltraGCN](../algorithms/ultragcn.md)).
+- BPR: `implicit` for BPR-MF; SELFRec's `bpr_loss` for the graph models. GRU4Rec's official code adds **BPR-max**,
+  a BPR variant that compares each positive with a softmax-weighted set of negatives ([GRU4Rec](../algorithms/gru4rec.md)).
+- Softmax and sampled softmax: `src/recbench/methods/seq_trainer.py::next_item_loss`, applied at every non-padding
+  position (SASRec can switch between full softmax, sampled softmax and the original BCE with `sasrec_loss`).
+- **Cosine contrastive loss (CCL)**: [SimpleX](../algorithms/simplex.md) pushes negatives below a cosine margin.
+- **Alignment and uniformity**: [DirectAU](../algorithms/directau.md) needs no negatives at all; it pulls positive
+  pairs together and spreads all vectors over the sphere.
+- **Multinomial likelihood with a KL term**: the VAEs ([MultVAE](../algorithms/multvae.md),
+  [RecVAE](../algorithms/recvae.md)) reconstruct a user's whole history from a compressed code.
+- **LambdaRank**: the [LightGBM re-ranker](../algorithms/lgbm-rerank.md) weights each pair of candidates by how much
+  swapping them would change NDCG, so mistakes at the top cost most.
 
 ## Pitfalls
 

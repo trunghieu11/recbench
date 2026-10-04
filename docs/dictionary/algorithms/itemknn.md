@@ -2,6 +2,11 @@
 
 > Recommends items that are often used by the same people who used the items you already have.
 
+!!! abstract "In plain words"
+    "People who used this also used that." ItemKNN measures how often two items are used by the same people, and
+    recommends the items most similar to the ones you already have. Every recommendation comes with its reason: the
+    item of yours that it resembles.
+
 --8<-- "generated/methods/itemknn.md"
 
 !!! tip "When to use it"
@@ -125,8 +130,9 @@ is. A user's score for $j$ is how strongly $j$ is connected to everything they a
   `CosineRecommender` (`tests/test_methods.py`).
 
 !!! info "Fidelity"
-    Faithful to item-based CF (Sarwar et al., 2001) with cosine similarity and shrinkage. Variants such as
-    adjusted cosine, BM25 weighting, or RP3beta's graph-based similarity are not implemented.
+    Faithful to item-based CF (Sarwar et al., 2001) with cosine similarity and shrinkage. TF-IDF and BM25 user
+    weighting are available (`knn_weighting`); adjusted cosine is not implemented. RP3beta's graph-based
+    similarity is its own method: [RP3beta](rp3beta.md).
 
 ## 8. Results in this benchmark
 

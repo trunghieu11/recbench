@@ -75,5 +75,7 @@ For ranking metrics, add a case to `docs/assets/metric_examples.yaml` and extend
 - To show it in the report, add a column in `src/recbench/report/build.py::dataset_section`.
 - Document it on the matching page under `docs/dictionary/metrics/`.
 
-Existing runs do not get the new metric. Re-run them; the resume key does not change for a new metric, so force
-it by deleting the runs in MLflow or by bumping the package version in `src/recbench/__init__.py`.
+Existing runs do not get the new metric. Re-run them by bumping `EVAL_VERSION` in `src/recbench/protocol.py`: it is
+part of every run's identity (`config_hash`), so all runs then count as new. (The package version is deliberately
+not part of it, so bumping that changes nothing.) For a single method, bump its `impl_version` instead, or delete
+its runs in MLflow.

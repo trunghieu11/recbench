@@ -24,7 +24,11 @@ User u interacted with items {3, 7}. The catalog has items 1–10.
 | Place | What is sampled | recbench code |
 |---|---|---|
 | Pairwise training (BPR, LightGCN, XSimGCL) | 1 negative per positive, re-drawn if seen | `src/recbench/methods/_torch.py::sample_negatives` |
+| Many negatives per positive (SimpleX, UltraGCN) | 50–1,000 uniform negatives per positive, a tuned setting | `src/recbench/methods/_torch.py::edge_batches` |
+| No sampled negatives (DirectAU) | none: the uniformity term compares every pair in the batch | `src/recbench/methods/mf_losses.py::uniformity` |
+| Session-parallel training (GRU4Rec) | other sessions' items in the mini-batch, plus extra popularity-weighted samples | the official GRU4Rec code |
 | Pointwise training (DCN-V2, DIN) | 4 negatives per positive, labelled 0 | `src/recbench/methods/_torch.py::edge_batches`; RecBole's sampler for DIN |
+| Re-rankers (LightGBM, DCN-V2) | **hard negatives**: the candidates the user did not take, plausible items rather than random ones | `src/recbench/methods/rerank.py::TwoStage.training_table` |
 | Softmax training (SASRec, HSTU, TIGER-lite, towers) | the full catalog, or 1,024 shared random negatives when it is too large | `src/recbench/methods/seq_trainer.py::next_item_loss` |
 | Evaluation, secondary protocol | 100 random unseen *warm* items per user | `src/recbench/pipeline/materialize.py::materialize` (candidates.parquet) |
 

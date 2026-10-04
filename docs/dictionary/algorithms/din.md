@@ -5,8 +5,15 @@
 
 --8<-- "generated/methods/din.md"
 
+!!! note "Held back from the quick-tier bake-off"
+    This method is not in the [quick-tier bake-off](../../results/quick-tier.md) yet, because it is heavier or did
+    not finish on the full data. Its results below use default settings, without tuning. It joins the
+    comparison later, through the same gate as every other method.
+
 !!! tip "When to use it"
-    - As a **second-stage ranker**: re-scoring a few hundred candidates per user with rich features.
+    - As a **second-stage ranker**: re-scoring a few hundred candidates per user with rich features. (recbench runs
+      DIN over the full catalog; its two-stage pipeline uses the [LightGBM](lgbm-rerank.md) and
+      [DCN-V2](dcnv2-rerank.md) re-rankers.)
     - When users have diverse interests (shoes *and* cookbooks): one fixed user vector blurs them, DIN does not.
 
 !!! warning "When not to"

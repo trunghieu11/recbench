@@ -2,10 +2,13 @@
 
 This page turns benchmark results into a choice of method for a real product. It does not give you a single
 winner, because there is none: the right method depends on your data, your task, and your constraints. It gives
-you a shortlist and tells you what to check on the [leaderboards](leaderboards.md) for a dataset like yours.
+you a shortlist and tells you what to check for a dataset like yours.
 
-!!! warning "Use the full tier"
-    Base decisions on full-tier results. Smoke results are for learning the workflow.
+!!! warning "Use tuned results"
+    Base decisions on the [quick-tier bake-off](quick-tier.md), where every method gets the same tuning budget,
+    and on its full-data confirmations. The [overall comparison](overall-comparison.md) shows which methods are
+    good everywhere. The untuned [full-tier leaderboards](leaderboards.md) understate methods with many settings,
+    and smoke results are for learning the workflow.
 
 ## Step 1: find the dataset most like yours
 
@@ -21,17 +24,18 @@ you a shortlist and tells you what to check on the [leaderboards](leaderboards.m
 
 | Situation | Start with | Then try | Why |
 |---|---|---|---|
-| you need something this week | [MostPopular](../dictionary/algorithms/most-popular.md) + [EASE](../dictionary/algorithms/ease.md) or [ItemKNN](../dictionary/algorithms/itemknn.md) | [iALS](../dictionary/algorithms/ials.md) | no GPU, few settings, strong baselines, easy to explain |
-| order matters (next song, next click) | [SASRec](../dictionary/algorithms/sasrec.md) | [BERT4Rec](../dictionary/algorithms/bert4rec.md), [HSTU](../dictionary/algorithms/hstu.md) | sequence models use the order of events; compare them on the next-item board |
-| catalog over ~50,000 items, millions of users | [iALS](../dictionary/algorithms/ials.md) or [BPR-MF](../dictionary/algorithms/bpr-mf.md) | [LightGCN](../dictionary/algorithms/lightgcn.md) | EASE's memory grows with items squared; factor models scale linearly |
-| many new items (fast-moving catalog) | [text-hash tower](../dictionary/algorithms/text-hash-tower.md) | [multimodal tower](../dictionary/algorithms/multimodal-tower.md) | content features can score items with no interactions (check cold-item recall) |
-| reranking a short candidate list with rich features | [DCN-V2](../dictionary/algorithms/dcnv2.md) | [DIN](../dictionary/algorithms/din.md) | pointwise rankers are slow over a full catalog but fine for hundreds of candidates |
-| explanations are required ("because you watched X") | [ItemKNN](../dictionary/algorithms/itemknn.md) or [EASE](../dictionary/algorithms/ease.md) | embedding models with cited neighbours | item-to-item weights are directly readable |
+| you need something this week | [MostPopular](../dictionary/algorithms/most-popular.md) + [EASE](../dictionary/algorithms/ease.md), [RP3beta](../dictionary/algorithms/rp3beta.md) or [ItemKNN](../dictionary/algorithms/itemknn.md) | [iALS](../dictionary/algorithms/ials.md), [SLIM](../dictionary/algorithms/slim.md) | no GPU, few settings, strong baselines, easy to explain |
+| order matters (next song, next click) | [SASRec](../dictionary/algorithms/sasrec.md), [GRU4Rec](../dictionary/algorithms/gru4rec.md) | [V-SKNN](../dictionary/algorithms/vsknn.md) (no training); later [BERT4Rec](../dictionary/algorithms/bert4rec.md) or [HSTU](../dictionary/algorithms/hstu.md) | sequence models use the order of events; compare them on the next-item board |
+| catalog over ~50,000 items, millions of users | [SANSA](../dictionary/algorithms/sansa.md) (EASE without the item cap), [iALS](../dictionary/algorithms/ials.md) | [GF-CF](../dictionary/algorithms/gfcf.md), [MultVAE](../dictionary/algorithms/multvae.md) | EASE's memory grows with items squared; SANSA and factor models scale much better |
+| many new items (fast-moving catalog) | [text-embedding kNN](../dictionary/algorithms/text-knn.md) | the LightGBM re-ranker with its text feature | content features can score items with no interactions (check cold-item recall) |
+| reranking a short candidate list with rich features | [LightGBM re-ranker](../dictionary/algorithms/lgbm-rerank.md) | [DCN-V2 re-ranker](../dictionary/algorithms/dcnv2-rerank.md) | two stages: cheap models propose ~200 candidates, a ranker orders them with many signals; check candidate recall first |
+| explanations are required ("because you watched X") | [ItemKNN](../dictionary/algorithms/itemknn.md), [EASE](../dictionary/algorithms/ease.md), [RP3beta](../dictionary/algorithms/rp3beta.md) or [SLIM](../dictionary/algorithms/slim.md) | embedding models with cited neighbours | item-to-item weights are directly readable |
 | no ML team, need a hosted service | [Recombee](../dictionary/algorithms/recombee.md) | other [managed services](../dictionary/algorithms/managed-services.md) | you trade control and cost for time to market |
 
-## Step 3: check the leaderboards for your dataset
+## Step 3: check the results for your dataset
 
-For each shortlisted method, look up on the dataset from step 1:
+For each shortlisted method, look up on the dataset from step 1, on the [quick-tier page](quick-tier.md) and the
+[overall comparison](overall-comparison.md):
 
 1. **Accuracy:** is it tied with the best (≈) on the board for your task (top-N or next-item)?
 2. **Beyond accuracy:** coverage and popularity percentile, if discovery matters; calibration, if users have
@@ -70,7 +74,7 @@ An offline winner is a hypothesis. Before switching a product over, run an A/B t
 1. Closest datasets: RetailRocket (short visits) and MovieLens (book-like long-term tastes). Check both.
 2. Shortlist: MostPopular as the fallback for new visitors, EASE (20,000 items fits on a laptop), ItemKNN for
    "customers who bought this also bought", and iALS as a scalable alternative.
-3. On both datasets' full-tier boards, see which of these are tied with the best, and compare coverage and
-   training time.
+3. On both datasets' quick-tier boards, see which of these are tied with the best, and compare coverage and
+   training time on the overall comparison's accuracy-vs-cost chart.
 4. Build in-house: the methods are simple, run on a CPU, and explain themselves.
 5. A/B test EASE against the current "bestsellers" list.

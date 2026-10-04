@@ -3,7 +3,7 @@
 | Fact | Value |
 |---|---|
 | Family | Two-stage re-ranker (gradient-boosted trees, LambdaRank) |
-| Ladder rung | 5 — CTR-style rankers |
+| Ladder rung | 5 — CTR-style rankers and re-rankers |
 | Paper | [LightGBM: A Highly Efficient Gradient Boosting Decision Tree](https://proceedings.neurips.cc/paper/2017/hash/6449f44a102fde848669bdd9eb6b76fa-Abstract.html) (NeurIPS 2017) |
 | Reference code | [https://github.com/microsoft/LightGBM](https://github.com/microsoft/LightGBM) |
 | What recbench runs | LightGBM LambdaRank over in-repo candidates and features |

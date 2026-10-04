@@ -16,7 +16,7 @@ versioned (currently **v2**) so results are comparable and reproducible.
 | Already-seen items | allowed, or removed | removed by default (`exclude_seen`); Last.fm also reports `allow_repeats` |
 | Relevant items | all test-window items, or the next one only | both: top-N metrics use all relevant test items; next-item metrics use the first |
 | List length K | 10, 20, 50 | all three; headline metric NDCG@10 |
-| Uncertainty | none, bootstrap, multiple seeds | bootstrap 95% confidence intervals over users (multiple seeds: roadmap) |
+| Uncertainty | none, bootstrap, multiple seeds | bootstrap 95% confidence intervals over users; 3 seeds for the full-data confirmations of random methods |
 
 ## Full ranking vs sampled metrics
 
@@ -49,7 +49,7 @@ Last.fm reports both; the `allow_repeats/*` columns hold the second version.
 ```mermaid
 flowchart TD
     A[clean events] --> B[cutoffs in UTC microseconds on the full data]
-    B --> C[tier sampling: smoke, standard, slice, or full]
+    B --> C[tier sampling: smoke, standard, quick, slice, or full; -val folds cut one window earlier]
     C --> D[pre-test events: TrainView, what models may see]
     C --> E[test events: relevance sets, next items]
     D --> F[fit the method]

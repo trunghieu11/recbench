@@ -3,6 +3,11 @@
 > Looks at what you did in your latest session, finds past sessions that looked like it, and recommends what
 > those sessions also contained, giving your most recent clicks the most weight.
 
+!!! abstract "In plain words"
+    Think of a shop assistant with a good memory. When you browse, they recall earlier customers whose visits looked
+    like yours, and suggest what those customers also looked at, with your latest clicks counting most. There is no
+    training at all: V-SKNN only remembers past sessions and compares them with yours.
+
 --8<-- "generated/methods/vsknn.md"
 
 !!! tip "When to use it"
@@ -131,6 +136,8 @@ $$
   recbench excludes it.
 - **Session gaps that do not fit the domain.** 30 minutes suits browsing; a music app may need a different
   gap.
+- **Letting popular items dominate the match.** Items that appear in almost every session say little about intent.
+  The IDF option (`vsknn_idf`) gives them less weight when sessions are compared.
 
 ## 11. Check your understanding
 
@@ -140,6 +147,11 @@ $$
 
 ??? question "When would `vsknn_last_n = 50` beat using the last session?"
     When sessions are very short (one or two clicks), so the last session alone says too little about intent.
+
+??? question "V-SKNN has no training step. Where does its cost go instead?"
+    To scoring: for each user it compares their recent session with a sample of past sessions. That is why
+    `vsknn_sample` limits how many sessions it looks at, and why its scoring time per 1,000 users is higher than for
+    models that only multiply vectors.
 
 ## 12. Further reading
 

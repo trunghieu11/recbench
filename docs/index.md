@@ -1,15 +1,17 @@
 # recbench
 
-**A recommender-systems benchmark that doubles as a dictionary.** It runs 18 recommendation methods, from a
-random baseline to Meta's HSTU and a managed service, on 5 public datasets under one honest protocol. It serves
-the results behind an API, and it explains every algorithm, metric, and design choice from scratch.
+**A recommender-systems benchmark that doubles as a dictionary.** It runs 34 recommendation methods, from a
+random baseline to Meta's HSTU and a managed service, on 5 public datasets under one honest protocol, and tunes the
+23 low-budget ones with the same budget in a bake-off. It serves the results behind a monitored API, and it explains
+every algorithm, metric, and design choice from scratch.
 
 ## Who it is for
 
-- **You are learning recommender systems.** Follow the [learning path](start/learning-path.md): six weeks from
+- **You are learning recommender systems.** Follow the [learning path](start/learning-path.md): seven weeks from
   "what is a recommendation" to deploying one, with a checkpoint each week.
 - **You need to choose a method for a product.** Read the [decision guide](results/decision-guide.md), then the
-  [leaderboards](results/leaderboards.md) for the dataset most like yours.
+  [overall comparison](results/overall-comparison.md) and the [quick-tier results](results/quick-tier.md) for the
+  dataset most like yours.
 - **You want to look something up.** The [dictionary](dictionary/index.md) has a page for every concept,
   algorithm, metric, and dataset.
 - **You want to extend it.** Add a [method](how-to/add-a-method.md), a [metric](how-to/add-a-metric.md), or a
@@ -21,7 +23,8 @@ the results behind an API, and it explains every algorithm, metric, and design c
 flowchart LR
     A[Raw data<br/>download] --> B[Clean<br/>one schema]
     B --> C[Temporal split<br/>UTC cutoff]
-    C --> D[Train<br/>pre-test data only]
+    C --> T[Tune<br/>on a validation fold]
+    T --> D[Train<br/>pre-test data only]
     D --> E[Evaluate<br/>full-catalog ranking]
     E --> F[(MLflow)]
     F --> G[Reports and<br/>these docs]
@@ -35,11 +38,12 @@ Every step is one command; the [first smoke run](start/first-smoke-run.md) runs 
 
 | | |
 |---|---|
-| **Methods** | a ladder from simplest to most complex: Random, MostPopular · ItemKNN, EASE · BPR-MF, iALS · LightGCN, XSimGCL · SASRec, BERT4Rec, S3-Rec, HSTU, TIGER-lite · DIN, DCN-V2 · text and multimodal towers · Recombee. See the [algorithms](dictionary/algorithms/index.md). |
+| **Methods** | a ladder from simplest to most complex, from Random and MostPopular through neighbourhood, linear, matrix-factorisation, graph and sequential models to re-rankers, content-based methods and a managed service. See the [algorithms](dictionary/algorithms/index.md). |
 | **Datasets** | MovieLens-25M (movies), RetailRocket and H&M (e-commerce), Last.fm-1K (music), Steam (games). See the [datasets](dictionary/datasets/index.md). |
 | **Metrics** | 33: ranking accuracy, next-item accuracy, coverage and popularity, novelty and diversity, calibration and fairness, cold start, efficiency, explanations, plus a qualitative rubric and time to market. See the [metrics](dictionary/metrics/index.md). |
 | **Protocol** | one global time cutoff; models see only events before it; every item in the catalog is ranked; 95% confidence intervals. See [evaluation protocols](dictionary/concepts/evaluation-protocols.md). |
-| **Serving** | precomputed recommendation lists behind a small API, deployable to Cloud Run with cost guardrails. See [Cloud & MLOps](cloud/gcp-basics.md). |
+| **Tuning** | the quick-tier bake-off: the same tuning budget for every low-budget method, a 3-hour cap per job, each dataset's top 3 confirmed on full data. See the [quick tier](results/quick-tier.md). |
+| **Serving** | precomputed recommendation lists behind a small API, deployable to Cloud Run with cost guardrails and monitoring. See [Cloud & MLOps](cloud/gcp-basics.md) and [monitoring](cloud/monitoring.md). |
 
 ## How these docs are organised
 

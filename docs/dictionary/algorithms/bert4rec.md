@@ -5,6 +5,11 @@
 
 --8<-- "generated/methods/bert4rec.md"
 
+!!! note "Held back from the quick-tier bake-off"
+    This method is not in the [quick-tier bake-off](../../results/quick-tier.md) yet, because it is heavier or did
+    not finish on the full data. Its results below use default settings, without tuning. It joins the
+    comparison later, through the same gate as every other method.
+
 !!! tip "When to use it"
     - To compare bidirectional ("fill in the blank") with causal ("predict the next") training on your data.
     - When sequences have strong context on both sides, for example items bought together in a basket.

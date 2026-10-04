@@ -17,10 +17,10 @@ separate pull request. Good first projects are marked ★.
 
 | Item | Why | Sketch |
 |---|---|---|
-| ★ Multi-seed runs and paired significance tests | one seed hides training randomness ([confidence intervals](../dictionary/metrics/confidence-intervals.md)) | add a `seeds: [42, 43, 44]` key; log one run per seed; a paired test over users and seeds in `results.py` |
-| ★ Pareto and scenario-profile leaderboards | a single metric hides trade-offs (your Q11) | mark methods that no other method beats on accuracy, coverage, and cost at once; profiles weight metrics per scenario ("discovery", "low cost") |
+| ★ Paired significance tests, and seeds beyond the confirmations | one seed hides training randomness ([confidence intervals](../dictionary/metrics/confidence-intervals.md)); only the full-data confirmations run 3 seeds today | a paired test over users and seeds in `results.py`, using the saved `per_user_metrics.npz`; seeds for the quick-tier test runs |
+| ★ Scenario-profile leaderboards | the [overall comparison](overall-comparison.md) now has an accuracy-vs-cost Pareto front, but one metric still hides other trade-offs | add coverage to the Pareto front; profiles weight metrics per scenario ("discovery", "low cost") |
 | Online-style evaluation | offline accuracy is not user response ([offline vs online](../dictionary/concepts/offline-vs-online.md)) | off-policy estimators on logged data, or a simple simulator; A/B routing in the API |
-| Rolling temporal windows | one test week per dataset | repeat the split at several cutoffs and average |
+| Rolling temporal windows | one test window per dataset (the last 10% of events; H&M: 7 days) | repeat the split at several cutoffs and average |
 
 ## Methods
 
@@ -60,13 +60,13 @@ deliberately.
 | Q8 | Licences | tag each dataset's licence; allow all for research |
 | Q9 | Splits | a global temporal cutoff, plus leave-last-out for next-item |
 | Q10 | Candidates | full-catalog ranking |
-| Q11 | Leaderboards | scenario profiles and Pareto fronts (planned above) |
-| Q12 | Statistics | seeds, confidence intervals, significance tests (intervals done; seeds planned) |
+| Q11 | Leaderboards | scenario profiles and Pareto fronts (accuracy-vs-cost Pareto front done; profiles planned) |
+| Q12 | Statistics | seeds, confidence intervals, significance tests (intervals done; 3 seeds in the full-data confirmations; tests planned) |
 | Q13 | Qualitative criteria | a 1–5 rubric with reasons, plus automated proxies |
 | Q14 | Cost | runtime × a price table (proxies done; price table planned) |
 | Q15 | Beyond accuracy | coverage and popularity, diversity and novelty, cold start, fairness and calibration |
 | Q16 | Online evaluation | offline now, designed so online evaluation can plug in |
-| Q17 | Hardware | GPUs on demand (superseded: your own GPU machine, see round 2) |
+| Q17 | Hardware | GPUs on demand (superseded twice: your own GPU machine in round 2, then short rented boxes for the bake-off) |
 | Q18 | Cloud | Google Cloud |
 | Q19 | Budget | under $50 a month |
 | Q20 | Serving | every model behind one API, load-tested |
@@ -84,6 +84,6 @@ deliberately.
 | 7 | Docs style | tutorials plus reference |
 | 8 | Docs scope | runbook, recsys dictionary with a detailed page per algorithm, codebase walkthrough, cloud and MLOps |
 | 9 | Explanations | intuition first, then the key math symbol by symbol, with tiny worked examples |
-| 10 | Full tier | runs on your own GPU machine; no cloud GPU automation |
+| 10 | Full tier | runs on your own GPU machine; no cloud GPU automation (later: the quick-tier bake-off runs on short vast.ai rentals, see [step 5](../start/quick-tier-box.md)) |
 
 The [2026-10-02 review](../review/2026-10-02-review.md) records the bugs that round 2 fixed.

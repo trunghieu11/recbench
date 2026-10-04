@@ -3,7 +3,7 @@
 | Fact | Value |
 |---|---|
 | Family | Graph contrastive learning |
-| Ladder rung | 3 — Graph neural networks |
+| Ladder rung | 3 — Graph methods |
 | Paper | [XSimGCL: Towards Extremely Simple Graph Contrastive Learning for Recommendation](https://arxiv.org/abs/2209.02544) (IEEE TKDE 2023) |
 | Reference code | [https://github.com/Coder-Yu/SELFRec](https://github.com/Coder-Yu/SELFRec) |
 | What recbench runs | SELFRec XSimGCL_Encoder @ 5b022942 |

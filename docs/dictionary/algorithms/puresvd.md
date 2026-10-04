@@ -3,6 +3,12 @@
 > Compresses the user × item matrix into a few "taste directions" with a truncated SVD, then recommends the items
 > that sit along the same directions as a user's history.
 
+!!! abstract "In plain words"
+    Every user's history is a long row of 0s and 1s. PureSVD finds a handful of "taste directions" that explain most
+    of those rows; for films, something like "action vs drama" or "old vs new". It describes each user by where their
+    history points in those directions, and recommends the items that point the same way. There is no training loop
+    and no learning rate: just one matrix decomposition.
+
 --8<-- "generated/methods/puresvd.md"
 
 !!! tip "When to use it"
@@ -111,6 +117,8 @@ This is called **folding in**.
 
 - **Too few factors:** the top directions are mostly popularity, so lists collapse to bestsellers.
 - **Too many factors:** the projection keeps noise and starts to just reproduce the user's own history.
+- **Reading scores as probabilities.** SVD treats every missing cell as a 0, as if the user disliked the item.
+  That is fine for ordering items, but the scores are only useful as a ranking.
 
 ## 11. Check your understanding
 
@@ -121,6 +129,10 @@ This is called **folding in**.
 ??? question "How is PureSVD different from iALS?"
     Both learn latent factors. iALS weights observed interactions more than missing ones (confidence) and
     regularises; PureSVD treats every cell equally and simply truncates.
+
+??? question "The dataset gets ten times more users but keeps the same items. Which part of PureSVD's cost grows?"
+    The truncated SVD, whose cost grows with the number of interactions, so roughly ten times for a fixed number of
+    factors. Scoring one user stays the same: a product of their history with the item directions.
 
 ## 12. Further reading
 

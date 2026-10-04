@@ -4,6 +4,14 @@
 > a regularisation strength that grows with how much a user has done, and alternating encoder and decoder
 > updates.
 
+!!! abstract "In plain words"
+    RecVAE is [MultVAE](multvae.md) with better training habits:
+
+    - a deeper network to read the history;
+    - a rule that keeps each user's code close to what it was in the previous epoch, so learning is steadier;
+    - regularisation scaled to how active a user is;
+    - training the reading half and the rebuilding half of the network in turns.
+
 --8<-- "generated/methods/recvae.md"
 
 !!! tip "When to use it"
@@ -14,6 +22,12 @@
     - When order matters, for cold items, or with very short histories.
 
 ## 1. Intuition
+
+!!! info "Words used on this page"
+    - **Code:** the short vector the encoder makes from a user's history.
+    - **Prior:** the model's default guess of what codes look like, before seeing the user.
+    - **KL term:** a penalty that grows the further a user's code moves from the prior.
+    - **Swish:** a smooth activation function, $x \cdot \sigma(x)$, used instead of ReLU.
 
 RecVAE keeps MultVAE's idea (encode the history, decode a softmax over items) and changes four things:
 
@@ -43,6 +57,17 @@ With γ = 0.005:
 A user with 10 interactions is regularised lightly: their few items carry most of the information. A
 heavy user's reconstruction term is about 40 times larger, so their KL weight is scaled up to match, instead
 of using one β for everybody as MultVAE does.
+
+**The composite prior in one dimension.** A user's code is now 2.0; last epoch it was 1.8. With unit-variance
+normals, the KL penalty against a component centred at $m$ is $(2.0 - m)^2 / 2$:
+
+| Prior component (weight) | Centre | Penalty |
+|---|---|---|
+| standard normal (3/20) | 0 | (2.0 − 0)² / 2 = **2.0** |
+| previous epoch (3/4) | 1.8 | (2.0 − 1.8)² / 2 = **0.02** |
+
+The mixture is dominated by its heaviest, closest part, so this code is cheap: it may sit far from zero as long
+as it moved little since the last epoch. A code that jumped to 2.0 from −1.0 would pay heavily under both parts.
 
 ## 3. How it works
 
@@ -87,7 +112,8 @@ $$
 | `vae_hidden`, `vae_latent` | layer sizes | 600, 200 | 200–1000, 64–256 |
 | `vae_dropout` | input dropout in encoder passes | 0.5 | 0.3–0.7 |
 | `recvae_enc_epochs`, `recvae_dec_epochs` | passes per epoch | 3, 1 | fixed |
-| `lr` | Adam learning rate (both optimisers) | 5e-4 | 1e-4–5e-3 |
+| `lr` | Adam learning rate (both optimisers) | 1e-3 from the preset (the paper uses 5e-4) | 1e-4–5e-3 |
+| `max_epochs`, `patience` | early stopping on the validation fold; each epoch is 3 encoder passes and 1 decoder pass | 30, 3 | fixed: 50, 5 (the paper's 50 epochs) |
 
 ## 7. In recbench
 
@@ -112,6 +138,8 @@ $$
 
 - **Comparing RecVAE and MultVAE with different tuning budgets.** The quick tier gives both the same budget.
 - **Dropout in decoder passes:** the authors switch it off there, and so does recbench.
+- **Comparing it with MultVAE at the same number of epochs.** Each RecVAE epoch is four passes over the users
+  (three for the encoder, one for the decoder), so the same epoch count costs RecVAE about four times more.
 
 ## 11. Check your understanding
 
@@ -122,6 +150,10 @@ $$
 ??? question "Why scale the KL weight by the number of interactions?"
     The reconstruction term sums over a user's items, so it is larger for heavy users. Scaling the KL term the
     same way keeps the trade-off similar for everyone.
+
+??? question "What does the 'previous epoch' part of the prior do?"
+    It pulls each user's code towards what the encoder said about that user one epoch earlier, so codes can drift
+    away from zero, but only gradually. That steadies training without forcing every code towards the same point.
 
 ## 12. Further reading
 

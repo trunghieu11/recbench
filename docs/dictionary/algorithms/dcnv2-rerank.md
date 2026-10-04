@@ -4,6 +4,12 @@
 > features as the LightGBM re-ranker, plus user, item and category embeddings, and learns feature crosses
 > instead of trees.
 
+!!! abstract "In plain words"
+    The same two-stage idea as the LightGBM re-ranker, with a neural network as the second stage. Besides the numeric
+    signals, it learns a vector for every user, item and category, and it multiplies features with each other
+    ("crosses"), so it can find combinations such as "fresh item and a strong ItemKNN rank" by itself. Trees find such
+    combinations with splits; this network finds them with products.
+
 --8<-- "generated/methods/dcnv2_rerank.md"
 
 !!! tip "When to use it"
@@ -66,11 +72,21 @@ flowchart LR
 | $W_l, b_l$ | the learned matrix and bias of layer $l$ |
 | $\odot$ | element-wise product (this creates the feature crosses) |
 
+After $l$ cross layers, $x_l$ contains products of up to $l + 1$ input features, while the residual "$+ x_l$" keeps
+the lower-order terms. The final logit is a linear layer over the concatenated cross output and MLP output, and the
+loss is binary cross-entropy against the label (1 = the user took this candidate).
+
 ## 5. Training and inference
 
-- **Training:** a small network over tens of thousands of candidate rows; minutes on a GPU.
-- **Inference:** one forward pass per candidate.
-- **Hardware:** GPU recommended.
+- **Training rows:** up to `rerank_train_users` (20,000) recent users × about 200 candidates each: up to 4 million
+  rows, of which only the users with at least one taken candidate are kept.
+- **Training:** mini-batches of rows (`batch_size`), Adam with bf16 on a GPU. One epoch is one pass over the rows.
+  On a validation fold, early stopping scores the fold through the whole two-stage pipeline after each epoch, and
+  keeps the best epoch. Minutes on a GPU.
+- **Inference:** stage 1 proposes the candidates, the features are computed, and one forward pass scores all of a
+  batch of users' candidates at once.
+- **Hardware:** GPU recommended; the two stage-1 generators (EASE and ItemKNN) are fitted twice, for the label
+  window and for the test cutoff.
 
 ## 6. Hyperparameters
 
@@ -80,6 +96,7 @@ flowchart LR
 | `dim` | embedding size | 16–64 |
 | `dropout`, `lr`, `batch_size` | training | 0–0.3, 1e-4–1e-2, 512–4096 |
 | `rerank_candidates`, `rerank_text` | as for the LightGBM re-ranker | 100/200, true/false |
+| `max_epochs`, `patience` | early stopping on the validation fold; an epoch is one pass over the training rows | 30, 3 (not searched) |
 
 ## 7. In recbench
 
@@ -106,6 +123,8 @@ flowchart LR
 - **Training on random negatives** and then re-ranking plausible candidates: the model learns the wrong task.
   Train on the candidates themselves.
 - **Forgetting to standardise features:** large counts (popularity) would dominate the input.
+- **Reading its probability as a click rate.** It is trained on candidate rows with the labels of one window, so
+  its scores are only useful for ordering candidates.
 
 ## 11. Check your understanding
 
@@ -116,6 +135,10 @@ flowchart LR
 ??? question "What does a cross layer add over an MLP?"
     Explicit multiplicative interactions between input features in every layer, which an MLP can only
     approximate with many units.
+
+??? question "Why does the DCN-V2 re-ranker standardise its numeric features?"
+    Counts such as popularity can be thousands of times larger than ranks or shares. Without standardisation they
+    would dominate the input and the products the cross layers form.
 
 ## 12. Further reading
 

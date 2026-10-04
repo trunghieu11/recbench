@@ -62,8 +62,10 @@ Details: [review log](../../review/2026-10-02-review.md).
 
 - **Global statistics computed on all data** (popularity, normalisation, vocabularies) leak too: compute them
   from training data only.
-- **Validation data:** if you tune on the test window, your test results are optimistic. recbench reserves a
-  validation window (`valid_start` to `test_start`) for future tuning.
+- **Validation data:** if you tune on the test window, your test results are optimistic. recbench tunes on a
+  separate **validation fold** (`quick-val`, `full-val`): a copy of the split cut one window earlier, with every real
+  test event physically deleted, so tuning cannot see the test window even by mistake. Early stopping refuses to
+  look at a real test split (`ValidationMonitor`).
 - **Features from the future**, such as "total number of reviews" taken from a later snapshot.
 
 ## Check your understanding

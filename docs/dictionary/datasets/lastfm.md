@@ -31,7 +31,9 @@ User `user_000001` played a track by artist "Deep Dish" at 2009-05-04 23:08:57 U
 ## Pitfalls
 
 - **Few users, very long histories:** a user may have tens of thousands of plays. The smoke tier keeps each
-  sampled user's 300 most recent pre-test plays; the full tier keeps everything.
+  sampled user's 300 most recent pre-test plays, the quick tier 1,000 (and up to 200 test plays per user), and the
+  full tier keeps everything. With fewer than 1,000 users, the quick tier keeps most of them, so its sample is
+  about users' recent histories rather than a subset of users.
 - **Repeats dominate:** a large share of test plays are artists the user already knows (shown as "repeat share"
   above). Discovery and repeat prediction are different tasks; read both columns.
 - **Old data:** 2005–2013 listening habits.

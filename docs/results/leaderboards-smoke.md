@@ -3,7 +3,7 @@
 The tables below are **generated** from MLflow by
 
 ```bash
-python -m recbench.report.build --tier smoke --out reports/smoke-latest --docs
+python -m recbench.report.build --tier smoke --tuning defaults --out reports/smoke-latest --docs
 ```
 
 Never edit them by hand: re-run the command after new runs. To read them correctly, start with
@@ -13,7 +13,8 @@ Never edit them by hand: re-run the command after new runs. To read them correct
     These are laptop runs on user-sampled slices (about 50,000 events per dataset, a few hundred to a few
     thousand evaluation users), with small untuned models. They show that every method runs end to end, and
     they teach you how to read a leaderboard. Many methods are statistically tied (≈). Choose methods with the
-    **full tier** (run on your GPU machine; see [full tier](../start/full-tier-gpu.md)).
+    tuned [quick-tier bake-off](quick-tier.md) and its full-data confirmations, and see which are good everywhere
+    on the [overall comparison](overall-comparison.md).
 
 The full-tier results are on the [leaderboards](leaderboards.md) page.
 

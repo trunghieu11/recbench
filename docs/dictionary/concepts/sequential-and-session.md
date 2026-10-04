@@ -23,8 +23,8 @@ Every user walks through items in order: 5 → 6 → 7 → 8. What comes next?
 - A set-based model sees {5, 6, 7, 8} and recommends items that co-occur with *any* of them, perhaps 4 or 6,
   but it has no idea which comes *next*.
 
-recbench uses exactly this synthetic task as a test (`tests/test_methods.py`). SASRec, HSTU, and
-TIGER-lite must predict the next item with at least 90% accuracy, BERT4Rec with at least 60%. ItemKNN
+recbench uses exactly this synthetic task as a test (`tests/test_methods.py`). SASRec, HSTU, TIGER-lite and
+GRU4Rec must predict the next item with at least 90% accuracy, BERT4Rec with at least 60%. ItemKNN
 scores close to 0 on it.
 
 ## How histories are fed to models: padding and alignment
@@ -56,6 +56,11 @@ history, so no test item can leak into training.
   session ids).
 - Next-item metrics (`next_hitrate_at_10`, `next_ndcg_at_10`) are computed for **every** method, so static and
   sequential models can be compared on the same "what comes next" task.
+- The order-aware methods (the "Order-aware" column of the [capability matrix](../algorithms/index.md)):
+  [GRU4Rec](../algorithms/gru4rec.md) (a recurrent network, the authors' code), [SASRec](../algorithms/sasrec.md),
+  [BERT4Rec](../algorithms/bert4rec.md), [S3-Rec](../algorithms/s3rec.md), [HSTU](../algorithms/hstu.md),
+  [TIGER-lite](../algorithms/tiger-lite.md), and [V-SKNN](../algorithms/vsknn.md), which needs no training at all: it
+  finds past sessions similar to the user's latest one, weighting recent items more.
 
 ## Pitfalls
 

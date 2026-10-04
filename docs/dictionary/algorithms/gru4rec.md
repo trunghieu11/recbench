@@ -3,6 +3,12 @@
 > A recurrent neural network that reads a user's clicks one by one, keeps a running "memory" of what they are
 > after, and scores every item as the possible next click.
 
+!!! abstract "In plain words"
+    GRU4Rec reads a user's clicks in order, like you read a sentence, and keeps a running summary of "what this person
+    is after right now". Each new click updates that summary: a small switch (a gate) decides whether the click is a
+    detour or a change of mind. After the latest click, the items closest to the summary are the predicted next
+    clicks. recbench uses the authors' own code, because unofficial versions were shown to score much lower.
+
 --8<-- "generated/methods/gru4rec.md"
 
 !!! tip "When to use it"
@@ -119,6 +125,9 @@ tuned RetailRocket settings.
 - **Using an unofficial re-implementation.** Hidasi & Czapp (2023) showed popular third-party versions miss
   features and score much lower.
 - **Comparing it untuned with a tuned Transformer.** The quick tier gives every method the same budget.
+- **Comparing BPR-max and cross-entropy at the same learning rate.** The two losses behave differently, so the
+  search samples the loss together with the learning rate and batch size, and each loss can find its own good
+  setting.
 
 ## 11. Check your understanding
 
@@ -129,6 +138,10 @@ tuned RetailRocket settings.
 ??? question "Why are other sequences' targets good negatives?"
     They come for free (they are already in the batch), and they are popular items, which are exactly the hard
     cases a ranker must learn to place below the true next item.
+
+??? question "GRU4Rec and SASRec both read the history in order. What is the main difference?"
+    GRU4Rec carries one running state forward, click by click. SASRec's attention can look at any earlier click
+    directly when predicting the next one. GRU4Rec is cheaper per step; SASRec handles long-range links more easily.
 
 ## 12. Further reading
 

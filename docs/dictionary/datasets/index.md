@@ -37,8 +37,8 @@ If you choose a method for a commercial product, re-run the benchmark on your ow
 
 ## Splits on your machine
 
-Each dataset page shows the splits that exist on your machine (smoke, standard, slice, full), read from their
-`meta.json` files. Create them with:
+Each dataset page shows the splits that exist on your machine (smoke, standard, quick, slice, full), read from their
+`meta.json` files. Validation folds (`quick-val`, `full-val`, …) are left out of those tables. Create the splits with:
 
 ```bash
 python -m recbench.pipeline.prepare --config configs/benchmarks/smoke-cpu.yaml --datasets movielens-25m

@@ -3,7 +3,7 @@
 | Fact | Value |
 |---|---|
 | Family | Content-based nearest neighbours (pretrained text encoder) |
-| Ladder rung | 6 — Content and multimodal towers |
+| Ladder rung | 6 — Content-based methods |
 | Paper | [Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks](https://arxiv.org/abs/1908.10084) (EMNLP 2019) |
 | Reference code | [https://github.com/UKPLab/sentence-transformers](https://github.com/UKPLab/sentence-transformers) |
 | What recbench runs | sentence-transformers (pretrained encoder) + in-repo cosine kNN |

@@ -12,7 +12,7 @@ flat dictionary from `src/recbench/config.py::method_config`.
 | `tier` | smoke | which split to use: smoke, standard, quick, slice, full (tuning adds the `-val` fold) |
 | `hardware` | configs/hardware/local-cpu.yaml | the hardware profile |
 | `preset` | (hardware's) | the model-size preset, e.g. `quick` |
-| `overrides` | {} | settings that replace the preset's and the hardware's, e.g. `{max_epochs: 3}` |
+| `overrides` | {} | settings that replace the preset's and the hardware's, e.g. `{max_epochs: 30}`. In tuning jobs, a search space's own values win over these; use `tuning.force` to override them |
 | `seed` | 42 | training seed (also used for eval-user subsampling) |
 | `resume` | true | skip pairs whose `config_hash` already finished |
 | `continue_on_error` | true | keep going when a method fails |
@@ -98,7 +98,7 @@ depends on data size: on full data it is tried at these multiples, after scaling
 | puresvd | `svd_factors` 128 |
 | slim | `slim_alpha` 1e-3, `slim_l1_ratio` 0.1, `slim_neighbors` 100, `slim_max_iter` 100 |
 | sansa | `sansa_lambda` 500.0, `sansa_weights_per_item` (not set) or `sansa_density` 1e-3, `sansa_factorizer` cholmod (icf) |
-| vsknn | `vsknn_k` 100, `vsknn_sample` 1,000, `vsknn_weighting` div, `vsknn_idf` false |
+| vsknn | `vsknn_k` 100, `vsknn_sample` 1,000, `vsknn_weighting` div, `vsknn_idf` false, `vsknn_last_n` (none: the latest session) |
 | gfcf | `gfcf_alpha` 0.3, `gfcf_k` 256 |
 | turbocf | `turbocf_alpha` 0.5, `turbocf_power` 1.0, `turbocf_filter` 1, `turbocf_max_items` 30,000 |
 | simplex | `simplex_margin` 0.8, `simplex_negatives` 100, `simplex_neg_weight` 150, `simplex_gamma` 0.5, `simplex_history` 50 |
@@ -118,9 +118,10 @@ depends on data size: on full data it is tried at these multiples, after scaling
 | text_hash_tower, multimodal_tower | `hash_features` 2048 |
 | recombee | `recombee_max_requests` 90,000, `recombee_max_polls` 20, `recombee_poll_seconds` 30, `recombee_reset_wait_seconds` 30, `recombee_scenario` (none) |
 
-All neural methods also read `dim`, `layers`, `heads`, `seq_len`, `batch_size`, `lr`, `max_steps`, `seed`, and
-`device` from the preset. Methods trained in epochs also read `epochs` (a fixed count), `max_epochs` (30) and
-`patience` (3) for early stopping on a validation fold, and `amp` (true: bf16 on CUDA). Evaluation reads `seq_len`, `max_eval_users`, and optionally `eval_batch_users` and
+All neural methods also read `dim`, `layers`, `heads`, `seq_len`, `batch_size`, `lr`, `seed` and `device` from the
+preset. The bake-off's neural methods train in epochs: they read `epochs` (a fixed count), `max_epochs` (30 unless
+the search space fixes another limit) and `patience` (3) for early stopping on a validation fold, and `amp` (true:
+bf16 on CUDA). Only the older, held-back neural methods read `max_steps`. Evaluation reads `seq_len`, `max_eval_users`, and optionally `eval_batch_users` and
 `eval_score_budget` (maximum scores in memory, default 250 million). Bundles read `bundle_k` (100) and
 `bundle_users` (20,000).
 
@@ -134,6 +135,7 @@ Changing any of these changes the run's `config_hash`, so the run is redone rath
 | `RECBENCH_ROOT` | runner, results | repository root for relative paths |
 | `MLFLOW_TRACKING_URI` | runner, reports | MLflow store (default `file://<root>/runs/mlflow`) |
 | `RECBENCH_BUNDLES`, `RECBENCH_TIER`, `RECBENCH_SERVE_METHODS` | API | where bundles are, which tier to serve, optional allow-list |
+| `RECBENCH_REQUEST_LOG` | API | `0` turns off the JSON log line per request |
 | `RECBENCH_ID_TOKEN` | load tester | identity token for a private Cloud Run service |
 | `RECBENCH_RECOMBEE_DB`, `_TOKEN`, `_REGION`, `_ALLOW_RESET`, `_KEEP` | Recombee | credentials and reset behaviour |
 | `RECBENCH_LIVE` | tests | `1` enables live external tests |
@@ -145,8 +147,11 @@ Changing any of these changes the run's `config_hash`, so the run is redone rath
 
 | File | Purpose |
 |---|---|
-| `configs/benchmarks/smoke-cpu.yaml` | laptop: smoke tier, all datasets, every method except DIN, ≤ 2,000 eval users |
-| `configs/benchmarks/quick.yaml` | rented GPU box: the quick-tier bake-off, 23 methods, dataset by dataset ([how](../start/quick-tier-box.md)) |
+| `configs/benchmarks/smoke-cpu.yaml` | laptop: smoke tier, all datasets, the 16 original methods except DIN (add newer ones with `--methods`), ≤ 2,000 eval users |
+| `configs/benchmarks/quick.yaml` | rented GPU box: the quick-tier bake-off, dataset by dataset; `queue.methods` lists the bake-off's methods and `held_back` the others ([how](../start/quick-tier-box.md)) |
 | `configs/benchmarks/quick-smoke.yaml` | laptop: a free dry run of `quick.yaml` on the smoke splits |
-| `configs/benchmarks/gpu-full.yaml` | GPU machine: full tier, all methods, 8-hour timeout per method |
+| `configs/benchmarks/gpu-full.yaml` | GPU machine: full tier, the 17 original methods with default settings, 8-hour timeout per method |
+| `configs/benchmarks/archive/gpu-12h.yaml` | the config that produced the untuned v0.2 full results (kept for provenance; see `scripts/archive/`) |
+| `configs/hardware/box.yaml` | a rented GPU box: device auto, preset `48gb`, EASE item cap 30,000 |
+| `configs/tuning/quick.yaml` | the bake-off's search spaces, one per method |
 | `configs/benchmarks/recombee-slice.yaml` | Recombee vs six local methods on the free-plan-sized slice |

@@ -40,7 +40,7 @@
 | `lgbm_rerank` crashes with exit code 139 on a Mac | PyTorch and LightGBM bundle different OpenMP runtimes; multi-threaded LightGBM crashes when both are loaded | handled: on macOS LightGBM runs on one thread when PyTorch is loaded (slower, only on the laptop) |
 | `pkill -f recbench.runner` kills your own SSH command | the pattern also matches the remote shell running it | use `pkill -f "[r]ecbench\.runner"` |
 | `failed` | an exception | open the run in MLflow and read `error.txt` |
-| `skipped_existing` | an identical run already finished | change a setting, bump the version in `src/recbench/__init__.py`, or delete the run in MLflow to force a re-run |
+| `skipped_existing` | an identical run already finished | change a setting; after a code change, bump the method's `impl_version` (or `EVAL_VERSION` in `src/recbench/protocol.py` for evaluator changes); or delete the run in MLflow. The package version is not part of a run's identity |
 | results near Random for a new sequence model | reading padding instead of the newest item | use the last column of right-aligned histories (see [sequential models](../dictionary/concepts/sequential-and-session.md)) |
 | very slow DIN or DCN-V2 on a laptop | full-catalog ranking scores every pair | use the GPU tier, or lower `eval.max_eval_users` |
 

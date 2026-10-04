@@ -64,7 +64,10 @@ Possible statuses:
 ./scripts/run_smoke_cpu.sh
 ```
 
-This prepares all five datasets (H&M and RetailRocket need the Kaggle token) and runs all default methods.
+This prepares all five datasets (H&M and RetailRocket need the Kaggle token) and runs the methods listed in
+`configs/benchmarks/smoke-cpu.yaml`: the 16 original ones, with default settings. The newer bake-off methods are
+added with `--methods` (for example `--methods rp3beta,slim`), and the free
+[bake-off dry run](box-1-before-you-rent.md) runs all of them.
 Expect one to two hours on an M4 Pro, and about 15 GB of disk for raw and clean data. DIN is excluded from the
 laptop default because its full-catalog evaluation is very slow on a CPU; add it with `--methods din` if you want.
 

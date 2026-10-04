@@ -1,0 +1,7 @@
+# The improvement lab's machine profile: CPUs only, and EASE kept to 20,000 items. The lab uses it on the laptop and
+# on a rented box alike, so lab results are comparable wherever they ran; only the times differ.
+name: lab-cpu
+device: cpu
+default_preset: cpu
+overrides:
+  ease_max_items: 20000

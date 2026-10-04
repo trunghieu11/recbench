@@ -5,6 +5,7 @@
 #
 #   ./scripts/upload_splits.sh vast-gpu                       # the repository is at ~/recbench on the box
 #   ./scripts/upload_splits.sh vast-gpu /workspace/recbench
+#   QUICK_ONLY=1 ./scripts/upload_splits.sh vast-gpu          # only the quick tiers: enough for the improvement lab
 #
 # "vast-gpu" is an SSH host name from ~/.ssh/config (or user@address). Re-running only sends what changed.
 set -euo pipefail
@@ -15,13 +16,16 @@ cd "$ROOT"
 source "$ROOT/scripts/_common.sh"
 read -r -a DATASETS <<< "$(quick_datasets)"
 
+TIERS="quick quick-val full full-val"
+PHASES=("quick quick-val" "full full-val")
+if [[ -n "${QUICK_ONLY:-}" ]]; then TIERS="quick quick-val"; PHASES=("quick quick-val"); fi
 for d in "${DATASETS[@]}"; do
-  for t in quick quick-val full full-val; do
+  for t in $TIERS; do
     [[ -f "data/splits/$d/$t/meta.json" ]] || { echo "data/splits/$d/$t is missing: prepare it first (docs/start/quick-tier-box.md)." >&2; exit 1; }
   done
 done
 ssh "$HOST" "mkdir -p $(printf "'$REMOTE/data/splits/%s' " "${DATASETS[@]}")"
-for phase in "quick quick-val" "full full-val"; do
+for phase in "${PHASES[@]}"; do
   for d in "${DATASETS[@]}"; do
     for t in $phase; do
       rsync -a --exclude cache "data/splits/$d/$t" "$HOST:$REMOTE/data/splits/$d/"

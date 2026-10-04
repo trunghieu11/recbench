@@ -47,6 +47,24 @@ def tuned_params(data: TrainView, method: str) -> dict[str, Any]:
     return {}
 
 
+def text_vectors(data: TrainView, model_name: str, device: str) -> np.ndarray:
+    """The items' text vectors from the split's cache. A missing cache is filled by a separate process: the sentence
+    encoder needs PyTorch, and on macOS PyTorch's OpenMP runtime crashes LightGBM's when both are in one process."""
+    from recbench.methods.text_knn import vectors_path
+
+    path = vectors_path(data, model_name)
+    if not path.exists():
+        import os
+        import subprocess
+
+        script = ("import sys\nfrom recbench.data import TrainView\nfrom recbench.methods._torch import resolve_device\n"
+                  "from recbench.methods.text_knn import cached_item_vectors\n"
+                  "cached_item_vectors(TrainView(sys.argv[1]), sys.argv[2], resolve_device({'device': sys.argv[3]}).type)\n")
+        subprocess.run([sys.executable, "-c", script, str(data.root), model_name, device], check=True,
+                       env={**os.environ, "RECBENCH_METHOD_MODULES": "text_knn"})
+    return np.load(path)
+
+
 class Generators:
     """EASE + ItemKNN + recent popularity, fitted on one view; proposes candidates with their scores and ranks."""
 
@@ -181,10 +199,9 @@ class TwoStage(Recommender):
         self.knn_cfg = {**tuned_params(data, "itemknn"), **(cfg.get("rerank_itemknn") or {})}
         text = None
         if cfg.get("rerank_text") and (any(data.item_text[1:]) or any(data.item_category[1:])):
-            from recbench.methods._torch import resolve_device
-            from recbench.methods.text_knn import DEFAULT_ENCODER, cached_item_vectors
+            from recbench.methods.text_knn import DEFAULT_ENCODER
 
-            text = cached_item_vectors(data, str(cfg.get("text_encoder") or DEFAULT_ENCODER), resolve_device(cfg).type)
+            text = text_vectors(data, str(cfg.get("text_encoder") or DEFAULT_ENCODER), str(cfg.get("device", "auto")))
         self.text = text
 
     def training_table(self) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:

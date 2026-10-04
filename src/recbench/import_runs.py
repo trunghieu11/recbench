@@ -18,6 +18,7 @@ import argparse
 from pathlib import Path
 from typing import Any, Iterator
 
+from recbench.paths import use_workspace
 from recbench.runner import EXPERIMENT, _mlflow, tracking_uri
 
 PARAMS_PER_BATCH = 100  # MLflow's limit per log_batch call
@@ -77,7 +78,9 @@ def import_runs(source: str | Path) -> dict[str, int]:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Import runs from another machine's copied runs/mlflow folder.")
     parser.add_argument("source", type=Path, help="the copied folder, e.g. runs/mlflow-gpu")
+    parser.add_argument("--workspace", default="", help="import into this workspace's store, e.g. lab (runs/lab/mlflow)")
     args = parser.parse_args()
+    use_workspace(args.workspace or None)
     counts = import_runs(args.source)
     print(f"{counts} -> {tracking_uri()}")
 

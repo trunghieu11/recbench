@@ -51,13 +51,17 @@ def encode_texts(texts: list[str], model_name: str, device: str, batch_size: int
     return vectors
 
 
+def vectors_path(data: TrainView, model_name: str) -> "os.PathLike":
+    """Where the split's item vectors for `model_name` are cached (the key covers every item's text)."""
+    key = hashlib.sha256(("\n".join(item_texts(data)) + "|" + model_name).encode()).hexdigest()[:16]
+    return data.cache_dir / f"text_vectors_{key}.npy"
+
+
 def cached_item_vectors(data: TrainView, model_name: str, device: str) -> np.ndarray:
-    texts = item_texts(data)
-    key = hashlib.sha256(("\n".join(texts) + "|" + model_name).encode()).hexdigest()[:16]
-    path = data.cache_dir / f"text_vectors_{key}.npy"
+    path = vectors_path(data, model_name)
     if path.exists():
         return np.load(path)
-    vectors = encode_texts(texts, model_name, device)
+    vectors = encode_texts(item_texts(data), model_name, device)
     tmp = path.with_name(f"{path.stem}.{os.getpid()}.tmp.npy")  # parallel jobs may encode the same split
     np.save(tmp, vectors)
     os.replace(tmp, path)

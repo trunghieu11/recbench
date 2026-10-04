@@ -29,7 +29,10 @@
 | [TIGER-lite](tiger-lite.md) | 4 | Generative retrieval (semantic IDs), simplified | topn, sequential | yes | no | no | simplified | no |
 | [V-SKNN](vsknn.md) | 4 | Session-based nearest neighbours | topn, sequential, session | yes | no | no | simplified | yes |
 | [DCN-V2](dcnv2.md) | 5 | CTR ranker with feature crosses | topn, ctr | no | no | no | faithful | yes |
+| [DCN-V2 re-ranker](dcnv2-rerank.md) | 5 | Two-stage re-ranker (neural feature crosses) | topn, sequential | yes | no | no | faithful | yes |
 | [DIN](din.md) | 5 | CTR ranker with target attention | topn, sequential, ctr | yes | no | no | faithful | yes |
+| [LightGBM re-ranker](lgbm-rerank.md) | 5 | Two-stage re-ranker (gradient-boosted trees, LambdaRank) | topn, sequential | yes | no | no | faithful | yes |
 | [Multimodal tower](multimodal-tower.md) | 6 | Content-based two-tower with images | topn, sequential, similar_items | yes | yes | yes | simplified | yes |
 | [Text hash tower](text-hash-tower.md) | 6 | Content-based two-tower (stand-in for LLM text encoders) | topn, sequential, similar_items | yes | yes | yes | simplified | yes |
+| [Text-embedding kNN](text-knn.md) | 6 | Content-based nearest neighbours (pretrained text encoder) | topn, sequential, similar_items | yes | yes | yes | faithful | yes |
 | [Recombee](recombee.md) | 7 | Managed recommendation service (SaaS) | topn | no | yes | no | faithful | yes |

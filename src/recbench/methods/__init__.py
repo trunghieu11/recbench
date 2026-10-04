@@ -14,11 +14,14 @@ from recbench.methods import (
     neighbourhood,
     recbole_models,
     recombee,
+    rerank,
     sasrec,
+    text_knn,
     tiger,
     ultragcn,
     vae,
 )
 
 __all__ = ["baselines", "content", "dcnv2", "graph", "graph_filters", "gru4rec", "hstu", "implicit_mf", "linear", "mf_losses", "neighbourhood",
-           "recbole_models", "recombee", "sasrec", "tiger", "ultragcn", "vae"]
+           "recbole_models", "recombee", "rerank", "sasrec", "text_knn", "tiger", "ultragcn",
+           "vae"]

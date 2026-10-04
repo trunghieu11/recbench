@@ -18,6 +18,27 @@ FAST_CFG = {
 }
 
 
+def fake_encode_texts(texts, model_name, device, batch_size=256):
+    """A tiny deterministic stand-in for a sentence-transformer: hashed bag of words, unit length."""
+    import zlib
+
+    import numpy as np
+
+    out = np.zeros((len(texts), 32), dtype=np.float32)
+    for row, text in enumerate(texts):
+        for word in str(text).lower().replace(",", " ").split():
+            out[row, zlib.crc32(word.encode()) % 32] += 1.0
+    norms = np.linalg.norm(out, axis=1, keepdims=True)
+    return out / np.where(norms > 0, norms, 1.0)
+
+
+@pytest.fixture(autouse=True)
+def _no_model_downloads(monkeypatch, request):
+    """Tests never download a text encoder, except the one test marked to use the real model."""
+    if "real_text_encoder" not in request.keywords:
+        monkeypatch.setattr("recbench.methods.text_knn.encode_texts", fake_encode_texts)
+
+
 def build_toy(root: Path, **kwargs) -> Path:
     write_toy_clean(root / "clean", **kwargs)
     return materialize(root / "clean", root / "split", dataset="toy", tier="full", tier_overrides={"min_eval_users": 1})

@@ -13,6 +13,12 @@
     - With only IDs and one categorical feature (as in recbench's datasets): its strength, rich features, is barely used.
     - For full-catalog retrieval at scale: it scores one pair at a time.
 
+!!! note "Two DCN-V2s in recbench"
+    This page is the **full-catalog** version: it scores every (user, item) pair. The
+    [DCN-V2 re-ranker](dcnv2-rerank.md) uses the same cross network for the job it was designed for, re-ordering
+    about 200 candidates from cheap models. The quick-tier bake-off runs only the re-ranker; this version waits
+    for the heavy-methods phase.
+
 ## 1. Intuition
 
 Many signals are **combinations**: "likes running" and "item is a shoe" each mean a little; together they
@@ -137,4 +143,4 @@ $$
 - Wang et al. (2021), [DCN V2: Improved Deep & Cross Network and Practical Lessons for Web-scale Learning to
   Rank Systems](https://arxiv.org/abs/2008.13535) (WWW 2021).
 - FuxiCTR: <https://github.com/reczoo/FuxiCTR>.
-- [Retrieval and ranking](../concepts/retrieval-and-ranking.md).
+- [DCN-V2 re-ranker](dcnv2-rerank.md), [retrieval and ranking](../concepts/retrieval-and-ranking.md).

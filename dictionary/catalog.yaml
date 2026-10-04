@@ -306,7 +306,6 @@ methods:
       controllability: [4, "Filters and boosters in its query language (ReQL)."]
       explainability: [1, "Black box: no reasons returned."]
 
-# Services documented in the dictionary but not benchmarked live (budget, access, or retirement).
   rp3beta:
     title: RP3beta
     family: Graph random walk (item-item)
@@ -515,6 +514,55 @@ methods:
       controllability: [2, "A hidden state; little to steer directly."]
       explainability: [2, "Post-hoc only."]
 
+  text_knn:
+    title: Text-embedding kNN
+    family: Content-based nearest neighbours (pretrained text encoder)
+    rung: 6
+    year: 2019
+    paper: {title: "Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks", venue: "EMNLP 2019", url: "https://arxiv.org/abs/1908.10084"}
+    code: "https://github.com/UKPLab/sentence-transformers"
+    fidelity: faithful
+    summary: Encodes every item's text with a pretrained sentence-transformer, then recommends items whose text is closest to the user's recent items. Scores brand-new items too.
+    rubric:
+      implementation: [1, "One library call to encode, then a weighted mean and a dot product."]
+      tuning: [1, "Profile window and recency decay."]
+      data_hunger: [1, "Needs item texts, not interactions."]
+      controllability: [3, "Item texts and categories can be edited, filtered and weighted."]
+      explainability: [4, "Cites the history items with the most similar text."]
+
+  lgbm_rerank:
+    title: LightGBM re-ranker
+    family: Two-stage re-ranker (gradient-boosted trees, LambdaRank)
+    rung: 5
+    year: 2017
+    paper: {title: "LightGBM: A Highly Efficient Gradient Boosting Decision Tree", venue: "NeurIPS 2017", url: "https://proceedings.neurips.cc/paper/2017/hash/6449f44a102fde848669bdd9eb6b76fa-Abstract.html"}
+    code: "https://github.com/microsoft/LightGBM"
+    fidelity: faithful
+    summary: EASE, ItemKNN and trending items propose about 200 candidates per user; LightGBM LambdaRank re-orders them with ranks, trends, item age, user activity, category and co-visit features.
+    rubric:
+      implementation: [4, "Candidate generators, a feature builder, leakage-safe labels and a ranker."]
+      tuning: [3, "Tree shape, learning rate, candidate count, feature set; generators tuned separately."]
+      data_hunger: [3, "Needs enough users active in the label window."]
+      controllability: [5, "Business signals are just more features; candidates can be filtered."]
+      explainability: [3, "Feature importances globally; per item, a co-visit with the user's last item when there is one."]
+
+  dcnv2_rerank:
+    title: DCN-V2 re-ranker
+    family: Two-stage re-ranker (neural feature crosses)
+    rung: 5
+    year: 2021
+    paper: {title: "DCN V2: Improved Deep & Cross Network and Practical Lessons for Web-scale Learning to Rank Systems", venue: "WWW 2021", url: "https://arxiv.org/abs/2008.13535"}
+    code: "https://github.com/reczoo/FuxiCTR"
+    fidelity: faithful
+    summary: The same candidates and features as the LightGBM re-ranker, plus user, item and category embeddings, scored by a DCN-V2 cross network trained on hard negatives.
+    rubric:
+      implementation: [4, "The two-stage pipeline plus a neural scorer and its training loop."]
+      tuning: [4, "Network size, dropout, learning rate, batch size, candidate count."]
+      data_hunger: [4, "ID embeddings need many labelled candidate rows."]
+      controllability: [4, "Business signals can be added as input features."]
+      explainability: [2, "Per item, a co-visit with the user's last item when there is one; the network itself is opaque."]
+
+# Services documented in the dictionary but not benchmarked live (budget, access, or retirement).
 services:
   amazon_personalize:
     title: Amazon Personalize

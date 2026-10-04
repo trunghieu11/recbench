@@ -52,6 +52,10 @@ queue:
     - {name: recvae, resource: gpu}
     - {name: gru4rec, resource: gpu}
     - {name: sasrec, resource: gpu}
+    - {name: text_knn, resource: gpu}   # the GPU encodes item texts once per split
+    # 4. re-rankers last: their candidates come from the tuned EASE and ItemKNN of the same dataset
+    - {name: lgbm_rerank, resource: cpu, after: [ease, itemknn]}
+    - {name: dcnv2_rerank, resource: gpu, after: [ease, itemknn]}
 
 # Each dataset's top methods by quick-tier test NDCG@10 are re-checked on full data.
 confirm:

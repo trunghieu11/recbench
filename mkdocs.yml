@@ -142,8 +142,11 @@ nav:
           - S3-Rec: dictionary/algorithms/s3rec.md
           - HSTU: dictionary/algorithms/hstu.md
           - TIGER-lite: dictionary/algorithms/tiger-lite.md
+          - LightGBM re-ranker: dictionary/algorithms/lgbm-rerank.md
+          - DCN-V2 re-ranker: dictionary/algorithms/dcnv2-rerank.md
           - DIN: dictionary/algorithms/din.md
           - DCN-V2: dictionary/algorithms/dcnv2.md
+          - Text-embedding kNN: dictionary/algorithms/text-knn.md
           - Text hash tower: dictionary/algorithms/text-hash-tower.md
           - Multimodal tower: dictionary/algorithms/multimodal-tower.md
           - Recombee: dictionary/algorithms/recombee.md

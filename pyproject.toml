@@ -62,4 +62,5 @@ addopts = "-q"
 markers = [
   "live: calls a real external service; needs credentials (deselected unless RECBENCH_LIVE=1)",
   "slow: takes more than a few seconds",
+  "real_text_encoder: downloads and runs the real sentence-transformer (slow, needs the internet once)",
 ]

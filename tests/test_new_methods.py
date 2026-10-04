@@ -195,3 +195,64 @@ def test_ultragcn_neighbours_match_the_dense_definition(toy):
     for item in range(1, a.shape[0]):
         best = np.sort(omega[item])[::-1][:5]
         assert np.allclose(np.sort(weights[item])[::-1], best, atol=1e-5)
+
+
+def test_text_knn_follows_content_and_scores_new_items(toy):
+    from recbench.methods.text_knn import TextKNN
+
+    data, _ = toy
+    method = TextKNN()
+    method.fit(data, {"text_profile_window": 20, "text_position_decay": 1.0})
+    user = int(data.warm_users()[0])
+    history = data.user_items(user)
+    favourite = max(set(data.item_category[history]), key=list(data.item_category[history]).count)
+    scores = method.score_users(np.array([user]), data.history_batch(np.array([user]), 20))[0]
+    same = [i for i in range(1, data.n_items + 1) if data.item_category[i] == favourite]
+    other = [i for i in range(1, data.n_items + 1) if data.item_category[i] != favourite]
+    assert scores[same].mean() > scores[other].mean()
+    assert method.spec.scores_cold_items and np.isfinite(scores[1:]).all()  # content scores every item
+
+
+@pytest.mark.parametrize("name,extra", [("lgbm_rerank", {"lgbm_trees": 100}), ("dcnv2_rerank", {"max_epochs": 10, "batch_size": 256})])
+def test_rerankers_beat_random_and_report_candidate_recall(toy, name, extra):
+    from recbench.evaluation import Evaluator
+    from recbench.registry import ensure_loaded
+
+    data, split = toy
+    cfg = {**FAST_CFG, "rerank_candidates": 30, **extra}
+    results = {}
+    for method_name in ("random", name):
+        method = ensure_loaded().create_method(method_name)
+        method.fit(data, cfg)
+        results[method_name] = Evaluator(split, data, cfg).run(method).metrics
+    assert results[name]["ndcg_at_10"] > results["random"]["ndcg_at_10"] + 0.1
+    assert 0.0 < results[name]["candidate_recall"] <= 1.0
+
+
+def test_reranker_labels_come_only_from_the_window_before_the_test_cutoff(toy):
+    from recbench.methods.rerank import LGBMRerank
+
+    data, _ = toy
+    method = LGBMRerank()
+    method._setup(data, {**FAST_CFG, "rerank_candidates": 30})
+    _, labels, users, items = method.training_table()
+    events = data.events()
+    lo, hi = int(data.meta["valid_start_us"]), int(data.meta["test_start_us"])
+    window = set(zip(events.loc[(events["ts_us"] >= lo) & (events["ts_us"] < hi), "user_idx"], events.loc[(events["ts_us"] >= lo) & (events["ts_us"] < hi), "item_idx"]))
+    positives = set(zip(users[labels == 1].tolist(), items[labels == 1].tolist()))
+    assert positives and positives <= window
+
+
+@pytest.mark.slow
+@pytest.mark.real_text_encoder
+def test_text_knn_with_the_real_sentence_transformer(tmp_path):
+    pytest.importorskip("sentence_transformers")
+    from conftest import build_toy
+    from recbench.methods.text_knn import TextKNN
+
+    data = TrainView(build_toy(tmp_path))  # a fresh split: other tests cache fake vectors in the shared one
+    method = TextKNN()
+    method.fit(data, {"device": "cpu"})
+    assert method.vectors.shape[1] == 384  # all-MiniLM-L6-v2
+    users = data.warm_users()[:5]
+    assert np.isfinite(method.score_users(users, data.history_batch(users, 10))[:, 1:]).all()

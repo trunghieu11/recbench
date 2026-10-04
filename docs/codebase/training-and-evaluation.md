@@ -73,7 +73,13 @@ flowchart TD
   left as the hard timeout. Finished trials live in an Optuna journal, so an interrupted job resumes. With
   `retry=True`, a failed job starts a fresh attempt.
 - **The final run** uses the best trial's settings and its best epoch count (`epochs`), so the test split is used
-  exactly once per job.
+  exactly once per job. With `tuning.final_seeds` (the lab), a method whose training is random runs that one
+  setting once per seed, and the summary averages them; `final_runs` records each run's identity, which is how
+  `python -m recbench.compare` finds the per-user results.
+- **Labels and re-runs.** A lab experiment is a job with a `label` (summary `<method>@<label>.json`, its own study)
+  and a `fingerprint` of its definition and code. `src/recbench/tuning/job.py::prepare_rerun` archives a finished
+  summary and leaves a stub with the next attempt number, so the job runs again with a fresh study:
+  `python -m recbench.queue run ... --rerun` and `python -m recbench.lab run ... --rerun` use it.
 - **A confirmation** (`src/recbench/tuning/job.py::run_confirm`) re-checks the setting that depends on data size on
   `full-val`, then runs the final test on `full` once per seed. Its first final run exports the serving bundle.
 - **The queue** (`src/recbench/queue.py::Queue`) orders jobs dataset by dataset, gives CPU jobs to CPU workers with

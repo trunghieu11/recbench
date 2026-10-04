@@ -9,7 +9,7 @@
 | What recbench runs | implicit 0.7.3 BayesianPersonalizedRanking |
 | Fidelity | faithful |
 | Tasks | topn, sequential, similar_items |
-| Uses the order of the history | no |
+| Uses the user's history | no |
 | Can recommend brand-new items | no |
 | Needs item text/categories | no |
 | Needs images | no |

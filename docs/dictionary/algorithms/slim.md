@@ -11,6 +11,10 @@
 
 --8<-- "generated/methods/slim.md"
 
+!!! example "Improve it yourself"
+    [Lab 4](../../labs/04-slim.md) takes you through SLIM in four levels: reproduce its baseline, understand
+    every setting, leave out rare items, and allow negative weights (Steck 2019). The [lab scoreboard](../../labs/scoreboard.md) tracks your results.
+
 !!! tip "When to use it"
     - When you want EASE-like accuracy with a **sparse** item × item matrix (fast to serve, easy to inspect).
     - As a strong classical baseline next to EASE, RP3beta, and ItemKNN.
@@ -99,6 +103,7 @@ This is scikit-learn's ElasticNet with `positive=True` and no intercept.
 | `slim_alpha` | penalty strength | 0.001 | 1e-5–0.1 (log) |
 | `slim_l1_ratio` | share of L1 (sparsity) in the penalty | 0.1 | 0.01–1 |
 | `slim_neighbors` | candidate features per item | 100 | 50, 100, 200 |
+| `slim_max_iter` | coordinate-descent iterations per regression | 100 | not searched |
 | `decay_half_life_days`, `train_window_days` | time-aware settings | none | as for every method |
 
 ## 7. In recbench
@@ -127,6 +132,9 @@ This is scikit-learn's ElasticNet with `positive=True` and no intercept.
   nothing new.
 - **A too-strong penalty.** All weights become 0 and every score is 0. A job's tuning summary
   (`runs/tuning/quick/<dataset>/slim.json`) shows it: settings with a very large `slim_alpha` score near zero.
+- **Silent non-convergence.** ElasticNet's convergence warnings are silenced. With 100 iterations (`slim_max_iter`)
+  and a small penalty, the weights may stop short of the optimum without a message ([lab 4](../../labs/04-slim.md),
+  Level 2).
 - **Running the regressions one after another on a big catalog.** Each item is its own regression, so time grows
   with the number of items. recbench runs them in parallel (joblib) and limits each one to the item's most
   similar items (`slim_neighbors`).

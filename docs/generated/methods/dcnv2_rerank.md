@@ -9,7 +9,7 @@
 | What recbench runs | FuxiCTR 2.3 CrossNetV2 over in-repo candidates and features |
 | Fidelity | faithful |
 | Tasks | topn, sequential |
-| Uses the order of the history | yes |
+| Uses the user's history | yes |
 | Can recommend brand-new items | no |
 | Needs item text/categories | no |
 | Needs images | no |

@@ -44,12 +44,15 @@ Every step is one command; the [first smoke run](start/first-smoke-run.md) runs 
 | **Protocol** | one global time cutoff; models see only events before it; every item in the catalog is ranked; 95% confidence intervals. See [evaluation protocols](dictionary/concepts/evaluation-protocols.md). |
 | **Tuning** | the quick-tier bake-off: the same tuning budget for every low-budget method, a 3-hour cap per job, each dataset's top 3 confirmed on full data. See the [quick tier](results/quick-tier.md). |
 | **Serving** | precomputed recommendation lists behind a small API, deployable to Cloud Run with cost guardrails and monitoring. See [Cloud & MLOps](cloud/gcp-basics.md) and [monitoring](cloud/monitoring.md). |
+| **Labs** | improve the 11 light methods yourself, one per week: reproduce, understand every setting, try data tricks, implement an idea from a paper, and judge it with a paired test. See the [labs](labs/index.md) and the [developer handbook](handbook/index.md). |
 
 ## How these docs are organised
 
 | Section | Kind | Use it to |
 |---|---|---|
 | [Start here](start/learning-path.md) | tutorials | learn by doing, in order |
+| [Developer handbook](handbook/index.md) | how we work | set up, run, experiment, compare, test, debug, Git, docs |
+| [Labs](labs/index.md) | guided projects | improve one method per week, with hints and folded solutions |
 | [How-to](how-to/add-a-method.md) | recipes | complete a specific task |
 | [Dictionary](dictionary/index.md) | explanations and reference | understand a concept, algorithm, metric, or dataset |
 | [Codebase](codebase/architecture.md) | reference | find where and how something is implemented |

@@ -39,7 +39,9 @@ The ≈ mark is a quick, conservative screen: two separate intervals can overlap
 other for most users. A **paired** comparison is sharper because every method is evaluated on the same seeded
 users, in the same order (when the split, `seed`, and `max_eval_users` are the same).
 
-Download `per_user_metrics.npz` for both runs from MLflow, then:
+For lab results, `python -m recbench.compare` does all of this, with users matched by id and seeds averaged
+([compare results](../handbook/compare-results.md)). By hand: download `per_user_metrics.npz` for both runs from
+MLflow, then:
 
 ```python
 import numpy as np

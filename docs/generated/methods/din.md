@@ -9,7 +9,7 @@
 | What recbench runs | RecBole 1.2 DIN (attention over the history, BCE with sampled negatives) |
 | Fidelity | faithful |
 | Tasks | topn, sequential, ctr |
-| Uses the order of the history | yes |
+| Uses the user's history | yes |
 | Can recommend brand-new items | no |
 | Needs item text/categories | no |
 | Needs images | no |

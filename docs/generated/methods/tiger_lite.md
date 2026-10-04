@@ -9,7 +9,7 @@
 | What recbench runs | in-repo GRU + residual codebook inspired by TIGER (no official code); experimental |
 | Fidelity | simplified |
 | Tasks | topn, sequential |
-| Uses the order of the history | yes |
+| Uses the user's history | yes |
 | Can recommend brand-new items | no |
 | Needs item text/categories | no |
 | Needs images | no |

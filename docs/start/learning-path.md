@@ -81,6 +81,8 @@ Each week ends with a checkpoint: if you can do it, move on. The weeks follow th
 
 ## After that
 
+- **Improve the methods yourself:** the [labs](../labs/index.md) take the 11 light methods one week at a time, with the
+  [developer handbook](../handbook/index.md) for the day-to-day workflow.
 - Run the [full tier on a GPU machine](full-tier-gpu.md) for the heavy methods held back from the bake-off.
 - Benchmark a managed service: [Recombee](../how-to/run-recombee.md).
 - Pick an item from the [roadmap](../results/roadmap.md) and implement it.

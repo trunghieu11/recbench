@@ -106,6 +106,9 @@ Epoch
 :   One full pass over the training data. The newer recbench methods train in epochs and stop early when the
     validation score stops improving; the older ones train for a fixed number of *steps*.
 
+Experiment (lab)
+:   A named change to how a method is tuned (settings added, removed or fixed, or a code variant switched on), run with the baseline's budget on every dataset and compared with it. See [run experiments](../../handbook/run-experiments.md).
+
 Explainability
 :   The ability to say why an item was recommended. See [explainability](explainability.md).
 
@@ -114,6 +117,9 @@ Explicit feedback
 
 Fallback
 :   What the API returns for a user it does not know: the popularity list, marked `"fallback": true`. A high fallback share means the served lists miss many callers.
+
+Focused experiment
+:   A lab experiment with `from_baseline: true`: every setting the baseline searched stays at that dataset's best value, so the trials go only to the new settings. Best for testing one idea.
 
 Fold (validation fold)
 :   A copy of a split cut one window earlier, with every real test event deleted (`quick-val`, `full-val`). Settings are tuned on it, so the test split is used only once.
@@ -130,6 +136,9 @@ Gate (quick-tier)
 
 Gini coefficient
 :   A measure of inequality; 0 = everything shown equally often, 1 = one item gets all the exposure.
+
+Golden test
+:   A test that stores a method's output for fixed input (here, the toy data at default settings) and fails when it changes. `tests/test_lab_defaults.py` keeps the lab methods' defaults from changing by accident. See [test](../../handbook/test.md).
 
 Graph filter
 :   A training-free way to score items by smoothing the user-item graph with a fixed formula, as in GF-CF and Turbo-CF.
@@ -163,6 +172,9 @@ Item cap
 KL divergence
 :   A measure of how different two probability distributions are. VAEs add it to their loss to keep each user's code close to a simple prior.
 
+Label (experiment)
+:   The name of a lab experiment, such as `no-time-knobs`. Its job summary is `<method>@<label>.json`, and `python -m recbench.compare ease ease:edlae` compares it with the baseline.
+
 LambdaRank
 :   A learning-to-rank objective that weights each pair of items by how much swapping them would change NDCG, so mistakes at the top of the list cost most. The LightGBM re-ranker uses it.
 
@@ -185,6 +197,9 @@ MLflow
 MRR (mean reciprocal rank)
 :   The average of 1/rank of the first relevant item. See [ranking accuracy](../metrics/ranking-accuracy.md#mrr).
 
+Multiple comparisons
+:   Running many tests at once: with a 95% interval, about one test in 20 shows a difference by chance. Agreement across datasets guards against it. See [comparing methods fairly](../../labs/primer-comparing.md).
+
 Negative sampling
 :   Picking non-interacted items as stand-in negatives. See [negative sampling](negative-sampling.md).
 
@@ -202,6 +217,9 @@ Over budget
 Padding
 :   Filler (item 0) used to make histories of different lengths fit into one rectangular batch.
 
+Paired test
+:   A comparison of two methods on the same users, through each user's difference. It removes the users' own spread and detects much smaller differences than comparing two separate averages. See [compare results](../../handbook/compare-results.md).
+
 Pareto front
 :   The methods that no other method beats on two goals at once, here accuracy and training time. Choose from the front at the budget you can afford.
 
@@ -216,6 +234,9 @@ Precision@K
 
 Pre-test
 :   recbench's name for all events before the test cutoff (train + validation): everything a model may see.
+
+Promotion
+:   Making a lab improvement part of the method: a search-space option (better on some datasets, worse on none) or the new default (better on all five), followed by a re-run of its bake-off job. See [promote a winner](../../handbook/promote.md).
 
 Protocol (evaluation)
 :   The full set of evaluation choices. recbench's current one is version 2. See [evaluation protocols](evaluation-protocols.md).
@@ -249,6 +270,9 @@ Sampled metrics
 Search space
 :   The settings a tuning job may try, with their ranges (`configs/tuning/quick.yaml`).
 
+Segment (error analysis)
+:   A group of users (by activity, recency, or the popularity of their items) in which a difference is measured separately, to see where a change helps or hurts.
+
 Serendipity
 :   Recommendations that are both relevant and unexpected.
 
@@ -270,6 +294,9 @@ Split
 Step budget
 :   The fixed number of optimisation steps an older (held-back) model trains for in recbench (preset-dependent).
     The bake-off's methods train in epochs with early stopping instead.
+
+Sweep
+:   Trying one setting at several values while everything else stays fixed, to see how sensitive a method is to it (`python -m recbench.lab sweep`).
 
 Temporal split
 :   A split by time: earlier events for training, later ones for testing.
@@ -296,5 +323,15 @@ Two-stage recommender
 VAE (variational autoencoder)
 :   A network that compresses a user's history into a small random code and rebuilds the history from it (MultVAE, RecVAE).
 
+Variant
+:   A new setting of an existing method that switches on changed code, with a default that keeps today's behaviour, for example `ease_variant: edlae`.
+
 Warm user / item
 :   A user or item that has pre-test history.
+
+
+Winner's curse
+:   Picking the best of many noisy scores always picks a lucky one: its score overstates its quality. The lab chooses on validation and tests once to avoid it.
+
+Workspace
+:   A separate place for results: with `workspace: lab`, runs, summaries and reports go to `runs/lab/` and `reports/lab/`, apart from the bake-off's.

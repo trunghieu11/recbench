@@ -59,12 +59,15 @@ flowchart LR
 | `src/recbench/evaluation.py` | `EvalSplit`, `Evaluator`, `MetricContext`, bootstrap CIs |
 | `src/recbench/metrics/catalog.py` | every metric |
 | `src/recbench/config.py` | presets, config resolution, `config_hash` |
+| `src/recbench/paths.py` | where results go: the active workspace (the bake-off's `runs/`, `reports/`, or the lab's `runs/lab/`, `reports/lab/`) and its MLflow store |
 | `src/recbench/runner.py` | CLI: runs pairs in child processes, logs to MLflow, resumes |
 | `src/recbench/tuning/` | quick-tier tuning: `spaces.py` (search spaces), `job.py` (one job: trials on the fold, one test run, confirmations), `__main__.py` (one job from the command line) |
 | `src/recbench/queue.py` | the bake-off's job queue: dataset by dataset, CPU and GPU workers, backfill, resume |
 | `src/recbench/queue_status.py` | what the queue is doing: text status and the self-refreshing status page |
 | `src/recbench/export.py` | exports a serving bundle with the bake-off's chosen settings |
 | `src/recbench/results.py` | reads protocol-v2 runs back from MLflow |
+| `src/recbench/lab/` | the improvement lab: `__main__.py` (`baseline`, `status`, `once`, `sweep`, `run`, `scoreboard`), `experiments.py` (experiment files), `runs.py`, `api.py` (notebook helpers), `scoreboard.py`, `checks.py` (variant tests) |
+| `src/recbench/compare.py` | paired comparison of two lab results, verdicts, the promotion rule, error analysis (`--segments`) |
 | `src/recbench/import_runs.py` | imports another machine's MLflow runs (GPU → laptop) |
 | `src/recbench/report/build.py` | Markdown/HTML leaderboards (and docs leaderboards) |
 | `src/recbench/report/overall.py` | the overall comparison across datasets |
@@ -104,6 +107,9 @@ flowchart LR
 | `runs/tuning/journal.log` | the Optuna journal, which lets an interrupted job resume its trials | no |
 | `runs/queue/<tier>.json` | the queue's state (rewritten every minute while it runs) | no |
 | `runs/mlflow-box/`, `runs/queue-box/`, `runs/logs-box/` | copies fetched from a rented box | no |
+| `runs/lab/` (`mlflow/`, `tuning/`, `queue/`, `logs/`) and `reports/lab/` | the lab workspace: the same layout, apart from the bake-off; `runs/lab-box/` holds a box's lab runs before import | no |
+| `labs/<nn>-<method>/` | each lab's notebook and `experiments.yaml`; `labs/templates/` holds the variant test template | yes |
+| `tests/golden/lab_defaults.json` | the lab methods' pinned default behaviour on the toy data | yes |
 | `runs/logs/` | run logs | no |
 | `reports/` | generated reports, including `quick-tuned/`, `full-tuned/`, `overall/` and `queue/<tier>.html` | no |
 | `configs/tuning/` | the bake-off's search spaces | yes |

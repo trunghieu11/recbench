@@ -17,7 +17,7 @@ separate pull request. Good first projects are marked ★.
 
 | Item | Why | Sketch |
 |---|---|---|
-| ★ Paired significance tests, and seeds beyond the confirmations | one seed hides training randomness ([confidence intervals](../dictionary/metrics/confidence-intervals.md)); only the full-data confirmations run 3 seeds today | a paired test over users and seeds in `results.py`, using the saved `per_user_metrics.npz`; seeds for the quick-tier test runs |
+| ★ Paired tests and seeds in the bake-off's reports | the lab now has a paired test (`python -m recbench.compare`) and tests random methods with 3 seeds; the bake-off's leaderboards still use interval overlap and one seed | reuse `src/recbench/compare.py::paired_difference` in the leaderboards; `tuning.final_seeds` in `configs/benchmarks/quick.yaml` |
 | ★ Scenario-profile leaderboards | the [overall comparison](overall-comparison.md) now has an accuracy-vs-cost Pareto front, but one metric still hides other trade-offs | add coverage to the Pareto front; profiles weight metrics per scenario ("discovery", "low cost") |
 | Online-style evaluation | offline accuracy is not user response ([offline vs online](../dictionary/concepts/offline-vs-online.md)) | off-policy estimators on logged data, or a simple simulator; A/B routing in the API |
 | Rolling temporal windows | one test window per dataset (the last 10% of events; H&M: 7 days) | repeat the split at several cutoffs and average |

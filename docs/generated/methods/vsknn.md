@@ -9,7 +9,7 @@
 | What recbench runs | in-repo numpy/scipy, after Ludewig & Jannach's session-rec VSKNN |
 | Fidelity | simplified |
 | Tasks | topn, sequential, session |
-| Uses the order of the history | yes |
+| Uses the user's history | yes |
 | Can recommend brand-new items | no |
 | Needs item text/categories | no |
 | Needs images | no |

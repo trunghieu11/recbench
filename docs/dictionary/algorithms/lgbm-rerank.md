@@ -12,6 +12,10 @@
 
 --8<-- "generated/methods/lgbm_rerank.md"
 
+!!! example "Improve it yourself"
+    [Lab 11](../../labs/11-lgbm-rerank.md) takes you through LightGBM re-ranker in four levels: reproduce its baseline, understand
+    every setting, sample fewer negatives, and add a third candidate generator. The [lab scoreboard](../../labs/scoreboard.md) tracks your results.
+
 !!! tip "When to use it"
     - When you already have decent retrieval and want the "last mile" of ranking quality. This is the recipe
       behind many winning competition solutions, including H&M's Kaggle challenge.
@@ -104,6 +108,8 @@ The trees are fitted to these "lambda" gradients, so mistakes near the top of th
 | `lgbm_trees` | maximum trees (early stopping picks fewer) | 500 | fixed |
 | `rerank_text` | add text similarity as a feature | false | true, false |
 | `rerank_train_users` | recent users in the training table | 20,000 | fixed |
+| `rerank_pop_days` | the window of the "popular this week" generator | 7 | fixed |
+| `rerank_ease`, `rerank_itemknn` | override the generators' settings | their tuned settings | fixed |
 
 ## 7. In recbench
 
@@ -134,6 +140,9 @@ The trees are fitted to these "lambda" gradients, so mistakes near the top of th
 - **Computing features with future data.** Here, features for training come strictly from before the validation
   cutoff, and features for scoring from before the test cutoff.
 - **Judging the ranker without candidate recall.** A low NDCG may simply mean the right items never reached it.
+- **PyTorch next to LightGBM on macOS.** Their OpenMP runtimes crash together. With `rerank_text`, recbench
+  therefore encodes missing item text vectors in a separate process
+  (`src/recbench/methods/rerank.py::text_vectors`).
 - **Too few recent users to learn from.** The training labels come from one validation window. On small data,
   few users take a candidate item there, and the method stops with "too few recent users with a reachable next
   item" (`unsupported`) rather than learning from noise.

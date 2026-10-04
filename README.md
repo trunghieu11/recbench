@@ -60,11 +60,20 @@ quick-tier bake-off chooses, with the same tuning budget for every method. Compa
 methods whose confidence intervals overlap as tied, and use the overall comparison (`docs/results/overall-comparison.md`)
 to see which methods are good everywhere.
 
+## Improve the methods yourself
+
+The labs (`docs/labs/index.md`) take the 11 light methods one week at a time: reproduce the baseline, understand every
+setting, try data tricks, and implement one idea from a paper, with hints and folded solutions. Your experiments live
+in their own workspace (`runs/lab/`), and `python -m recbench.compare` judges each one with a paired test. The
+developer handbook (`docs/handbook/index.md`) covers the daily workflow: set up, run, experiment, compare, test,
+debug, Git and docs.
+
 ## Layout
 
 ```
 src/recbench/       package: data pipeline, methods, evaluation, metrics, runner, reports, serving
 configs/            benchmark and hardware profiles; tuning/ holds the bake-off's search spaces
+labs/               the improvement labs: one notebook and experiments.yaml per method, the test template
 dictionary/         catalog.yaml: facts and rubric scores shown in the docs
 docs/               documentation sources (docs/generated/ is built from code and results)
 scripts/, deploy/   run scripts, Docker/Cloud Run deployment, budget alert, teardown

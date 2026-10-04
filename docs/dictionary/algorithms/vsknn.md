@@ -10,6 +10,10 @@
 
 --8<-- "generated/methods/vsknn.md"
 
+!!! example "Improve it yourself"
+    [Lab 10](../../labs/10-vsknn.md) takes you through V-SKNN in four levels: reproduce its baseline, understand
+    every setting, tune the session gap, and make old sessions count less (STAN). The [lab scoreboard](../../labs/scoreboard.md) tracks your results.
+
 !!! tip "When to use it"
     - For short-term intent: shopping sessions, browsing, playlists. Published comparisons found session kNN
       methods competitive with neural session models such as GRU4Rec.
@@ -106,6 +110,8 @@ $$
 | `vsknn_weighting` | position weights in the profile | div | div, linear, same |
 | `vsknn_last_n` | profile = last N items instead of the last session | null | null, 10, 50 |
 | `vsknn_idf` | multiply scores by item IDF | false | true, false |
+| `train_window_days` | past sessions from the last N days only | none | none, 30, 90, 365 |
+| (session gap) | a longer pause starts a new session | 30 minutes | fixed in the code (`SESSION_GAP_US`) |
 
 ## 7. In recbench
 
@@ -157,5 +163,7 @@ $$
 
 - Ludewig, Jannach (2018). *Evaluation of Session-based Recommendation Algorithms.* User Modeling and
   User-Adapted Interaction. [arXiv](https://arxiv.org/abs/1803.09587)
+- Garg et al. (2019). *Sequence and time aware neighborhood for session-based recommendations: STAN.* SIGIR
+  ([lab 10](../../labs/10-vsknn.md), Level 4).
 - [Sequential and session recommendation](../concepts/sequential-and-session.md), [GRU4Rec](gru4rec.md),
   [SASRec](sasrec.md).

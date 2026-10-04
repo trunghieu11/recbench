@@ -9,7 +9,7 @@
 | What recbench runs | RecBole 1.2 S3Rec: pretrain (AAP/MIP/MAP/SP) then finetune (CE) |
 | Fidelity | faithful |
 | Tasks | topn, sequential, session, similar_items |
-| Uses the order of the history | yes |
+| Uses the user's history | yes |
 | Can recommend brand-new items | no |
 | Needs item text/categories | yes |
 | Needs images | no |

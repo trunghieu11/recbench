@@ -10,6 +10,10 @@
 
 --8<-- "generated/methods/ease.md"
 
+!!! example "Improve it yourself"
+    [Lab 3](../../labs/03-ease.md) takes you through EASE in four levels: reproduce its baseline, understand
+    every setting, choose which items its cap keeps, and implement EDLAE (Steck 2020). The [lab scoreboard](../../labs/scoreboard.md) tracks your results.
+
 !!! tip "When to use it"
     - As the strongest simple baseline. It often matches or beats deep models on top-N benchmarks.
     - When you need exact, item-level explanations.
@@ -169,6 +173,9 @@ exactly with a Lagrange multiplier, which is where the division by $P_{jj}$ come
 - **Too small a $\lambda$** on big data overfits; too large makes everything look like popularity.
 - **Inverting in float64 on a laptop** can exhaust memory; float32 is accurate enough here.
 - **Forgetting the zero diagonal** makes the model predict that you will interact with what you already have.
+- **A cap that cuts a big catalog.** On the full data with 30,000 items, EASE kept only about 60% of RetailRocket's
+  and H&M's interactions: items outside the cap can never be recommended. Check `fit.item_cap_coverage`;
+  [SANSA](sansa.md) has no cap.
 
 ## 11. Check your understanding
 
@@ -189,3 +196,5 @@ exactly with a Lagrange multiplier, which is where the division by $P_{jj}$ come
   (WWW 2019), code: <https://github.com/hasteck/EASE_WWW19>.
 - [ItemKNN](itemknn.md) for the counting version of the same idea.
 - [Fair baselines](../concepts/fair-baselines-and-tuning.md): why such simple models are hard to beat.
+- Steck (2020), *Autoencoders that don't overfit towards the identity*, NeurIPS: dropout as a per-item penalty
+  (EDLAE, [lab 3](../../labs/03-ease.md), Level 4).

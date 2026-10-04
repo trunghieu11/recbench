@@ -9,6 +9,10 @@
 
 --8<-- "generated/methods/itemknn.md"
 
+!!! example "Improve it yourself"
+    [Lab 1](../../labs/01-itemknn.md) takes you through ItemKNN in four levels: reproduce its baseline, understand
+    every setting, find out how much recency matters, and implement the asymmetric cosine (Aiolli 2013). The [lab scoreboard](../../labs/scoreboard.md) tracks your results.
+
 !!! tip "When to use it"
     - As a strong, cheap, and **explainable** baseline ("because you watched X").
     - For "similar items" carousels on product pages.
@@ -117,13 +121,15 @@ is. A user's score for $j$ is how strongly $j$ is connected to everything they a
 | `knn_weighting` | down-weights very active users before measuring similarity | none | none, tfidf, bm25 | BM25 often helps on data with a few heavy users (Ferrari Dacrema et al. 2019) |
 | `decay_half_life_days` | an interaction $a$ days old counts $2^{-a/h}$, in the similarities and in the user's profile | none | none, 30, 90, 365 | recent taste matters more on shops than on movies |
 | `train_window_days` | train on the last $N$ days only (each user keeps their last 10 events) | none | none, 30, 90, 365 | the same setting exists for every method |
+| `train_window_keep_last` | with a training window, each user's last N events are kept too, for learning and for the profile used in scoring | 10 | not searched | keeping more helped on MovieLens ([lab 1](../../labs/01-itemknn.md#32-keep-more-of-each-users-history)) |
 
 ## 7. In recbench
 
 - Code: `src/recbench/methods/baselines.py::ItemKNN`; the similarity computation is
   `src/recbench/methods/baselines.py::item_cosine_topk`.
-- The history used for scoring is the full pre-test history (`TrainView.seen`), not just the last
-  `seq_len` items.
+- The history used for scoring is every pre-test interaction the model was fitted on, not just the last `seq_len`
+  items. With `train_window_days`, that is the window plus each user's last `train_window_keep_last` events (10):
+  the window also trims the profile used for scoring ([lab 1](../../labs/01-itemknn.md), Level 3.2).
 - Explanations come from `src/recbench/methods/_explain.py::contribution_explanations`: they cite the
   history items with the largest similarity to the recommendation, which are exactly the terms of the sum.
 - A test checks that, with shrinkage 0, recbench ranks items like the `implicit` library's
@@ -153,6 +159,8 @@ is. A user's score for $j$ is how strongly $j$ is connected to everything they a
 - **Not removing seen items.** The most similar items are often ones the user already has.
 - **Very heavy users.** One user with 10,000 items creates 50 million co-occurring pairs. Real systems cap or
   down-weight such users.
+- **Strong time decay with `knn_shrink = 0`.** Very old interactions underflow to 0, and the cosine then divides by 0
+  (a `divide by zero` warning). Keep a positive shrink, or a longer half-life.
 
 ## 11. Check your understanding
 
@@ -173,3 +181,5 @@ is. A user's score for $j$ is how strongly $j$ is connected to everything they a
   [Item-based Collaborative Filtering Recommendation Algorithms](https://dl.acm.org/doi/10.1145/371920.372071).
 - [Collaborative vs content-based filtering](../concepts/collaborative-content-hybrid.md).
 - [EASE](ease.md): a learned version of the same item-to-item idea.
+- Aiolli (2013), *Efficient top-N recommendation for very large scale binary rated datasets*, RecSys: the asymmetric
+  cosine and the locality exponent ([lab 1](../../labs/01-itemknn.md), Level 4).

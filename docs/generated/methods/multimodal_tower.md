@@ -9,7 +9,7 @@
 | What recbench runs | in-repo two-tower over hashed text + colour image features + id residual |
 | Fidelity | simplified |
 | Tasks | topn, sequential, similar_items |
-| Uses the order of the history | yes |
+| Uses the user's history | yes |
 | Can recommend brand-new items | yes |
 | Needs item text/categories | yes |
 | Needs images | yes |

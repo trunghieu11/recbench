@@ -9,7 +9,7 @@
 | What recbench runs | in-repo PyTorch, following Liang et al. 2018 (Mult-VAE^PR) |
 | Fidelity | faithful |
 | Tasks | topn, sequential, similar_items |
-| Uses the order of the history | yes |
+| Uses the user's history | yes |
 | Can recommend brand-new items | no |
 | Needs item text/categories | no |
 | Needs images | no |

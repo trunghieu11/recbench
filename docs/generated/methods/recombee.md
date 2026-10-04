@@ -9,7 +9,7 @@
 | What recbench runs | Recombee API via recombee-api-client 6.3.1 |
 | Fidelity | faithful |
 | Tasks | topn |
-| Uses the order of the history | no |
+| Uses the user's history | no |
 | Can recommend brand-new items | yes |
 | Needs item text/categories | no |
 | Needs images | no |

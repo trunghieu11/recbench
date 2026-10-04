@@ -9,7 +9,7 @@
 | What recbench runs | in-repo PyTorch, following Kang & McAuley 2018 with full cross-entropy (Klenitskiy & Vasilev 2023) |
 | Fidelity | faithful |
 | Tasks | topn, sequential, session, similar_items |
-| Uses the order of the history | yes |
+| Uses the user's history | yes |
 | Can recommend brand-new items | no |
 | Needs item text/categories | no |
 | Needs images | no |

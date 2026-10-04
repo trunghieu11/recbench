@@ -9,7 +9,7 @@
 | What recbench runs | RecBole 1.2 BERT4Rec (CE loss, mask_ratio 0.2) |
 | Fidelity | faithful |
 | Tasks | topn, sequential, session, similar_items |
-| Uses the order of the history | yes |
+| Uses the user's history | yes |
 | Can recommend brand-new items | no |
 | Needs item text/categories | no |
 | Needs images | no |

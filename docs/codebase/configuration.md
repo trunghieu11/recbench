@@ -25,6 +25,8 @@ flat dictionary from `src/recbench/config.py::method_config`.
 | `max_steps` | (preset) | overrides the preset's training steps |
 | `eval` | {} | evaluation settings, e.g. `{max_eval_users: 2000}` |
 | `tier_overrides` | {} | per-tier split settings for `prepare`, e.g. `{smoke: {min_eval_users: 10}}` |
+| `workspace` | — | keep this file's results apart: `lab` sends runs, summaries and reports to `runs/lab/` and `reports/lab/` (`src/recbench/paths.py`) |
+| `track_code` | false | put each method's source into its runs' identity, so runs compute again after a code edit (the lab) |
 
 Quick-tier files (`quick.yaml`, `quick-smoke.yaml`) add four sections, read by `recbench.tuning` and
 `recbench.queue`:
@@ -36,6 +38,7 @@ Quick-tier files (`quick.yaml`, `quick-smoke.yaml`) add four sections, read by `
 | `tuning.search_users` | 3,000 | validation users that score each trial (the same seeded sample every time) |
 | `tuning.cap_minutes` | 180 | wall-clock limit per job, tuning and final run included |
 | `tuning.force` | {} | settings that win over the search spaces, e.g. `{max_epochs: 3}` in the laptop dry run (`quick-smoke.yaml`) |
+| `tuning.final_seeds` | — | test methods whose training is random once per seed and average them (the lab: 42, 43, 44) |
 | `queue.methods` | [] | job order inside a dataset: `{name, resource: cpu or gpu, after: [methods of the same dataset]}` |
 | `queue.jobs_per_gpu` | 3 | GPU jobs that share one GPU |
 | `queue.cpu_workers` | cores ÷ 16 (1 to 8) | parallel CPU jobs; `--cpu-workers` overrides it |
@@ -44,8 +47,9 @@ Quick-tier files (`quick.yaml`, `quick-smoke.yaml`) add four sections, read by `
 | `write_docs` | true | write docs fragments when a dataset finishes (`quick.yaml` turns it off: the box's checkout stays clean) |
 
 Queue command-line options (`python -m recbench.queue run`): `--datasets`, `--methods`, `--hardware`,
-`--deadline-hours`, `--stop-after-dataset`, `--retry-failed`, `--cpu-workers`, and `--price-per-hour` (shown as the
-session's cost by `status` and on the status page `reports/queue/<tier>.html`). `python -m recbench.queue status`
+`--deadline-hours`, `--stop-after-dataset`, `--retry-failed`, `--cpu-workers`, `--price-per-hour` (shown as the
+session's cost by `status` and on the status page `reports/queue/<tier>.html`), and `--rerun` (with `--methods`: run
+those methods' finished jobs again with fresh studies, after a [promotion](../handbook/promote.md)). `python -m recbench.queue status`
 takes `--state` (another machine's copied state file) and `--html` (write the page there too).
 
 ### Search spaces (`configs/tuning/quick.yaml`)
@@ -142,6 +146,8 @@ Changing any of these changes the run's `config_hash`, so the run is redone rath
 | `CUDA_VISIBLE_DEVICES` | PyTorch | the smoke script sets it empty to force the CPU |
 | `PYTHONWARNINGS` | Python | the scripts set `ignore` to hide RecBole's pandas warnings |
 | `RECBENCH_METHOD_MODULES` | `recbench.methods` | set by the runner for each run's child process: import only these method modules (keeps PyTorch out of CPU-only runs) |
+| `RECBENCH_WORKSPACE` | runner, tuning, queue, reports | the active workspace (set from a benchmark file's `workspace`; child processes inherit it). In a workspace, `MLFLOW_TRACKING_URI` is ignored: the store is always `runs/<workspace>/mlflow` |
+| `RECBENCH_UPDATE_GOLDEN` | tests | `1` rewrites `tests/golden/lab_defaults.json` (after an intended default change) |
 
 ## The bundled configs
 
@@ -150,6 +156,8 @@ Changing any of these changes the run's `config_hash`, so the run is redone rath
 | `configs/benchmarks/smoke-cpu.yaml` | laptop: smoke tier, all datasets, the 16 original methods except DIN (add newer ones with `--methods`), ≤ 2,000 eval users |
 | `configs/benchmarks/quick.yaml` | rented GPU box: the quick-tier bake-off, dataset by dataset; `queue.methods` lists the bake-off's methods and `held_back` the others ([how](../start/quick-tier-box.md)) |
 | `configs/benchmarks/quick-smoke.yaml` | laptop: a free dry run of `quick.yaml` on the smoke splits |
+| `configs/benchmarks/lab.yaml` | the improvement lab: the 11 lab methods plus MostPopular on the quick tier, in the lab workspace, 3 test seeds for random methods, top-10 lists saved ([labs](../labs/index.md)) |
+| `configs/hardware/lab-cpu.yaml` | the lab's machine profile on any machine: CPUs only, EASE item cap 20,000 |
 | `configs/benchmarks/gpu-full.yaml` | GPU machine: full tier, the 17 original methods with default settings, 8-hour timeout per method |
 | `configs/benchmarks/archive/gpu-12h.yaml` | the config that produced the untuned v0.2 full results (kept for provenance; see `scripts/archive/`) |
 | `configs/hardware/box.yaml` | a rented GPU box: device auto, preset `48gb`, EASE item cap 30,000 |

@@ -9,7 +9,7 @@
 | What recbench runs | in-repo scipy implementation of Shen et al. 2021 (GF-CF) |
 | Fidelity | faithful |
 | Tasks | topn, sequential, similar_items |
-| Uses the order of the history | yes |
+| Uses the user's history | yes |
 | Can recommend brand-new items | no |
 | Needs item text/categories | no |
 | Needs images | no |

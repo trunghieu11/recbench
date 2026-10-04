@@ -9,7 +9,7 @@
 | What recbench runs | official GRU4Rec_PyTorch_Official (pinned commit; research/education licence) |
 | Fidelity | faithful |
 | Tasks | topn, sequential, session |
-| Uses the order of the history | yes |
+| Uses the user's history | yes |
 | Can recommend brand-new items | no |
 | Needs item text/categories | no |
 | Needs images | no |

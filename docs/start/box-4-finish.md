@@ -68,6 +68,11 @@ exported), make one **on the box, before destroying it**, then fetch again:
 python -m recbench.export --dataset movielens-25m --method ease --from-confirm
 ```
 
+!!! tip "Before you destroy it: the improvement lab"
+    If you follow the [labs](../labs/index.md), use the box once more for their baseline: `./scripts/run_lab_box.sh`
+    inside tmux, then `./scripts/fetch_lab_results.sh vast-gpu` on the laptop. The lab trains on CPUs only, so it
+    can run while the bake-off's GPU jobs finish ([set up, step 5](../handbook/setup.md#step-5-the-baseline)).
+
 ## Step 3: destroy the box
 
 Only after step 2. In the vast.ai console, open **Instances**, use the destroy (trash) button on your instance, and

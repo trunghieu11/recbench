@@ -122,6 +122,18 @@ model (all-MiniLM-L6-v2, about 90 MB), so `pytest -q -m "not slow"` stays offlin
 | `test_refuses_runs_that_would_exceed_the_budget` | surprise bills |
 | `test_live_recombee` (live) | the real API path |
 
+### The improvement lab (`tests/test_lab.py`, `tests/test_compare.py`, `tests/test_lab_defaults.py`, `tests/test_labs.py`)
+
+| Test | Guards against |
+|---|---|
+| `test_lab.py` | lab runs leaking into the bake-off's store or summaries; wrong experiment spaces, labels, fingerprints or seeds; `once` touching a test split; the notebook API giving other numbers than the commands |
+| `test_compare.py` | a wrong paired interval, users paired by position instead of id, seeds not averaged, a broken promotion rule, a scoreboard that picks experiments by test score |
+| `test_lab_defaults.py` | a change that silently alters a lab method's default behaviour (pinned in `tests/golden/lab_defaults.json`; regenerate with `RECBENCH_UPDATE_GOLDEN=1` only together with an `impl_version` bump) |
+| `test_labs.py` | a malformed notebook, outputs saved in it, a missing level, a call to a `lab` function that does not exist; the slow test runs every notebook on the toy data |
+
+Variant tests from `labs/templates/test_variant_template.py` go next to these as `tests/test_<method>_variant.py`
+([test](../handbook/test.md)).
+
 ### Documentation (`tests/test_docs.py`)
 
 | Test | Guards against |

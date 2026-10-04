@@ -9,7 +9,7 @@
 | What recbench runs | sentence-transformers (pretrained encoder) + in-repo cosine kNN |
 | Fidelity | faithful |
 | Tasks | topn, sequential, similar_items |
-| Uses the order of the history | yes |
+| Uses the user's history | yes |
 | Can recommend brand-new items | yes |
 | Needs item text/categories | yes |
 | Needs images | no |

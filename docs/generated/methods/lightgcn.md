@@ -9,7 +9,7 @@
 | What recbench runs | SELFRec LGCN_Encoder @ 5b022942 |
 | Fidelity | faithful |
 | Tasks | topn, sequential, similar_items |
-| Uses the order of the history | no |
+| Uses the user's history | no |
 | Can recommend brand-new items | no |
 | Needs item text/categories | no |
 | Needs images | no |

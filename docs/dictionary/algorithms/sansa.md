@@ -11,6 +11,10 @@
 
 --8<-- "generated/methods/sansa.md"
 
+!!! example "Improve it yourself"
+    [Lab 5](../../labs/05-sansa.md) takes you through SANSA in four levels: reproduce its baseline, understand
+    every setting, trade accuracy against time, and add EDLAE's penalty as made-up users. The [lab scoreboard](../../labs/scoreboard.md) tracks your results.
+
 !!! tip "When to use it"
     - When EASE works well but your catalog is too large for its dense item × item matrix. In recbench, EASE
       keeps at most 20,000–60,000 items; SANSA keeps them all.
@@ -124,7 +128,9 @@ $$
 
 ## 10. Common pitfalls
 
-- **A density that is too low:** too few weights survive, and accuracy drops sharply.
+- **A density that is too low:** too few weights survive, and accuracy drops sharply. On MovieLens' validation
+  fold the package's default density (about 28 weights per item) scored 0.096 NDCG@10, against 0.171 with about
+  277. That is why recbench searches `sansa_weights_per_item` (20 to 500).
 - **Comparing SANSA to a capped EASE without saying so.** The difference may come from the extra items, not
   the method.
 - **Running it in a process that has loaded PyTorch, on macOS.** SuiteSparse and PyTorch then bring two OpenMP

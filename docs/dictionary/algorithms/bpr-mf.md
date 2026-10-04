@@ -10,6 +10,10 @@
 
 --8<-- "generated/methods/bpr_mf.md"
 
+!!! example "Improve it yourself"
+    [Lab 9](../../labs/09-bpr-mf.md) takes you through BPR-MF in four levels: reproduce its baseline, understand
+    every setting, leave out rare items, and write your own training loop with popularity-based negatives. The [lab scoreboard](../../labs/scoreboard.md) tracks your results.
+
 !!! tip "When to use it"
     - As the classic learned baseline for implicit feedback (clicks, plays, purchases).
     - When you want compact vectors (embeddings) for users and items, for example to find similar items.
@@ -129,6 +133,10 @@ vectors small. Rendle et al. (2009) show this is a smooth stand-in for the AUC.
 - **Comparing untuned BPR to tuned baselines.** Rendle et al. (2020) showed that the tuning budget often
   decides the winner.
 - **Expecting explanations from factors.** Factor dimensions rarely map to human concepts.
+- **Expecting the same result twice.** `implicit` trains on several threads that update the vectors without locks
+  (Hogwild), so two runs with the same seed differ a little. The lab tests BPR-MF with 3 seeds and averages them.
+- **Expecting time decay to work.** BPR-MF trains on 0/1 interactions (`data.seen`), so `decay_half_life_days`
+  does not apply; only the training window does.
 
 ## 11. Check your understanding
 
@@ -148,4 +156,6 @@ vectors small. Rendle et al. (2009) show this is a smooth stand-in for the AUC.
 - Rendle, Freudenthaler, Gantner and Schmidt-Thieme (2009),
   [BPR: Bayesian Personalized Ranking from Implicit Feedback](https://arxiv.org/abs/1205.2618) (UAI 2009).
 - [Loss functions](../concepts/loss-functions.md#bpr) and [negative sampling](../concepts/negative-sampling.md).
+- Rendle and Freudenthaler (2014), *Improving pairwise learning for item recommendation from implicit feedback*,
+  WSDM: harder negatives ([lab 9](../../labs/09-bpr-mf.md), Level 4).
 - The `implicit` library: <https://github.com/benfred/implicit>.

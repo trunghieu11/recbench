@@ -11,6 +11,10 @@
 
 --8<-- "generated/methods/ials.md"
 
+!!! example "Improve it yourself"
+    [Lab 8](../../labs/08-ials.md) takes you through iALS in four levels: reproduce its baseline, understand
+    every setting, try log-scaled confidence, and weight interactions by inverse popularity. The [lab scoreboard](../../labs/scoreboard.md) tracks your results.
+
 !!! tip "When to use it"
     - As a fast, robust learned baseline for implicit feedback. Well-tuned iALS is still competitive
       with much newer methods.
@@ -135,7 +139,8 @@ $$
 ## 10. Common pitfalls
 
 - **Treating every 0 as "dislike".** The confidence weights exist precisely because a 0 often means "never saw it".
-- **A huge $\alpha$ with heavy users.** One user with thousands of plays dominates; consider log-scaling counts.
+- **A huge $\alpha$ with heavy users.** One user with thousands of plays dominates; consider log-scaling counts
+  ([lab 8](../../labs/08-ials.md), Level 3.2).
 - **Under-tuned baselines.** Rendle et al. (2022) showed iALS is much stronger with proper tuning than
   many papers reported.
 

@@ -9,7 +9,7 @@
 | What recbench runs | in-repo PyTorch, following the authors' code (reczoo/RecZoo SimpleX, Apache-2.0) |
 | Fidelity | faithful |
 | Tasks | topn, sequential, similar_items |
-| Uses the order of the history | yes |
+| Uses the user's history | yes |
 | Can recommend brand-new items | no |
 | Needs item text/categories | no |
 | Needs images | no |

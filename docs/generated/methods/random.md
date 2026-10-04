@@ -9,7 +9,7 @@
 | What recbench runs | numpy |
 | Fidelity | faithful |
 | Tasks | topn, sequential |
-| Uses the order of the history | no |
+| Uses the user's history | no |
 | Can recommend brand-new items | yes |
 | Needs item text/categories | no |
 | Needs images | no |

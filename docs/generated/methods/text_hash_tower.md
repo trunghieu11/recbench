@@ -9,7 +9,7 @@
 | What recbench runs | in-repo content two-tower over hashed bag-of-words (stand-in for LLM text encoders) |
 | Fidelity | simplified |
 | Tasks | topn, sequential, similar_items |
-| Uses the order of the history | yes |
+| Uses the user's history | yes |
 | Can recommend brand-new items | yes |
 | Needs item text/categories | yes |
 | Needs images | no |

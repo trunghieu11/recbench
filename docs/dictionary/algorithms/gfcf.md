@@ -11,6 +11,10 @@
 
 --8<-- "generated/methods/gfcf.md"
 
+!!! example "Improve it yourself"
+    [Lab 7](../../labs/07-gfcf.md) takes you through GF-CF in four levels: reproduce its baseline, understand
+    every setting, prune its filter for speed, and make its low-pass filter smooth. The [lab scoreboard](../../labs/scoreboard.md) tracks your results.
+
 !!! tip "When to use it"
     - As a cheap stand-in for LightGCN. The paper showed that LightGCN's benefit comes mostly from this kind of
       smoothing, which GF-CF computes directly, in seconds instead of hours.
@@ -96,6 +100,7 @@ $$
 |---|---|---|---|
 | `gfcf_alpha` | weight of the ideal low-pass part | 0.3 | 0–1 |
 | `gfcf_k` | singular vectors in the low-pass part | 256 | 64–1024 |
+| (normalisation exponent) | how strongly user and item degrees are divided out | 0.5 | fixed in the code |
 | `decay_half_life_days`, `train_window_days` | time-aware settings | none | as for every method |
 
 ## 7. In recbench
@@ -123,6 +128,8 @@ $$
 - **Expecting LightGCN to beat it by default.** The paper's point is that it often does not; compare them
   with the same tuning budget.
 - **Forgetting the degree normalisation.** Without it, the filter just recommends popular items.
+- **Slow scoring.** The linear filter is never pruned: on MovieLens it holds about 70 million weights, and scoring
+  takes about 4 seconds per 1,000 users, some 30 times ItemKNN's ([lab 7](../../labs/07-gfcf.md), Level 3.2).
 - **Too many singular vectors (`gfcf_k`).** The "ideal" low-pass part then keeps fine, noisy patterns too, and
   stops being a smoothing step.
 

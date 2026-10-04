@@ -50,6 +50,7 @@ uv pip install -e ".[dev]"
 | `managed` | the Recombee SDK |
 | `docs` | MkDocs and Material for this site |
 | `dev` | `cpu`, `managed`, and `docs`, plus pytest (use this on the laptop) |
+| `lab` | the lab notebooks: a Jupyter kernel for VS Code, matplotlib, and the notebook runner used by the tests ([labs](../labs/index.md)) |
 
 ## Step 4: third-party model code
 

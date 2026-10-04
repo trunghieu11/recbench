@@ -9,7 +9,7 @@
 | What recbench runs | FuxiCTR 2.3 CrossNetV2 inside an in-repo DCN-V2 (ids + category tokens) |
 | Fidelity | faithful |
 | Tasks | topn, ctr |
-| Uses the order of the history | no |
+| Uses the user's history | no |
 | Can recommend brand-new items | no |
 | Needs item text/categories | no |
 | Needs images | no |

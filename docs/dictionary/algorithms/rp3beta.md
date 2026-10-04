@@ -11,6 +11,10 @@
 
 --8<-- "generated/methods/rp3beta.md"
 
+!!! example "Improve it yourself"
+    [Lab 2](../../labs/02-rp3beta.md) takes you through RP3beta in four levels: reproduce its baseline, understand
+    every setting, find and fix a numerical trap in its time decay, and re-normalise its weights. The [lab scoreboard](../../labs/scoreboard.md) tracks your results.
+
 !!! tip "When to use it"
     - As a strong, cheap item-to-item baseline next to ItemKNN and EASE. Published re-evaluations found it
       among the best simple methods.
@@ -138,6 +142,10 @@ $$
 - **Comparing with an untuned ItemKNN.** Both deserve the same tuning budget.
 - **Keeping every neighbour.** Without a top-k per item (`rp3_neighbors`), the item × item matrix is dense: slow,
   memory-hungry, and full of tiny weights that add noise.
+- **A 30-day half-life on years of data.** A user whose events are all very old gets weights around $10^{-42}$. The
+  float32 row normalisation divides by them and overflows to infinity, which spreads into the item weights. A
+  `RuntimeWarning: overflow encountered in divide` is the sign; [lab 2](../../labs/02-rp3beta.md) finds and fixes it
+  (Level 3.2).
 
 ## 11. Check your understanding
 

@@ -9,7 +9,7 @@
 | What recbench runs | in-repo PyTorch, following the authors' code (github.com/jindeok/Turbo-CF, MIT) |
 | Fidelity | faithful |
 | Tasks | topn, sequential, similar_items |
-| Uses the order of the history | yes |
+| Uses the user's history | yes |
 | Can recommend brand-new items | no |
 | Needs item text/categories | no |
 | Needs images | no |

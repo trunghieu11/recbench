@@ -9,7 +9,7 @@
 | What recbench runs | in-repo dense HSTU; attention verified against Meta generative-recommenders pytorch_hstu_mha @ ea7b85f |
 | Fidelity | simplified |
 | Tasks | topn, sequential, session, similar_items |
-| Uses the order of the history | yes |
+| Uses the user's history | yes |
 | Can recommend brand-new items | no |
 | Needs item text/categories | no |
 | Needs images | no |

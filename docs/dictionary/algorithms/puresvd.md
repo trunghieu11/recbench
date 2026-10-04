@@ -11,6 +11,10 @@
 
 --8<-- "generated/methods/puresvd.md"
 
+!!! example "Improve it yourself"
+    [Lab 6](../../labs/06-puresvd.md) takes you through PureSVD in four levels: reproduce its baseline, understand
+    every setting, normalise users by activity, and implement EigenRec's popularity scaling. The [lab scoreboard](../../labs/scoreboard.md) tracks your results.
+
 !!! tip "When to use it"
     - As the simplest learned-factor baseline: one SVD call, one setting.
     - To build intuition for matrix factorisation before iALS and BPR.
@@ -91,6 +95,7 @@ This is called **folding in**.
 | Name in recbench config | What it does | Default | Searched over |
 |---|---|---|---|
 | `svd_factors` | number of directions kept | 128 | 16–1024 |
+| (power iterations) | how exact the randomized SVD's directions are | 5 | fixed in the code (`n_iter`) |
 | `decay_half_life_days` | recent interactions weigh more | none | none, 30, 90, 365 |
 | `train_window_days` | train on the last N days only | none | none, 30, 90, 365 |
 
@@ -137,4 +142,6 @@ This is called **folding in**.
 ## 12. Further reading
 
 - Cremonesi, Koren, Turrin (2010). *Performance of Recommender Algorithms on Top-N Recommendation Tasks.* RecSys.
+- Nikolakopoulos et al. (2019). *EigenRec: generalizing PureSVD for effective and efficient top-N recommendations.*
+  Knowledge and Information Systems ([lab 6](../../labs/06-puresvd.md), Level 4).
 - [Embeddings](../concepts/embeddings.md), [iALS](ials.md), and [the interaction matrix](../concepts/interaction-matrix.md).

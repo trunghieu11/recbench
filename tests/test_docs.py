@@ -51,6 +51,10 @@ def test_snippets_point_at_generated_fragments():
     allowed |= {f"generated/datasets/{n}.md" for n in reg.datasets}
     tiers = ("smoke", "full", "quick-tuned", "full-tuned")
     allowed |= {f"generated/leaderboards/{tier}/{n}.md" for tier in tiers for n in reg.datasets}
+    from recbench.report.overall import SOURCES
+
+    allowed |= {"generated/overall/headline.md", "generated/overall/scorecard.md"}
+    allowed |= {f"generated/overall/{part}-{key}.md" for part in ("matrix", "cost", "beyond", "status") for key, *_ in SOURCES}
     bad = [f"{p.relative_to(DOCS)}: {s}" for p in _pages() for s in SNIPPET.findall(p.read_text()) if s not in allowed]
     assert not bad, "\n".join(bad)
 

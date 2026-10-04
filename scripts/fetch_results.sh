@@ -33,5 +33,6 @@ python -m recbench.import_runs runs/mlflow-box
 python -m recbench.report.build --tier quick --tuning tuned --out reports/quick-tuned --docs
 python -m recbench.report.build --tier full --tuning tuned --out reports/full-tuned --docs
 python -m recbench.dictionary.build
+python -m recbench.report.overall --docs --out reports/overall
 python -m recbench.queue status --config configs/benchmarks/quick.yaml --state runs/queue-box/quick.json --html reports/queue/quick.html
 echo "Reports: reports/quick-tuned/report.html and reports/full-tuned/report.html; docs fragments in docs/generated/."

@@ -237,7 +237,10 @@ class Queue:
             out = repo_root() / "reports" / f"{tier}-tuned"
             docs = repo_root() / "docs" if self.benchmark.get("write_docs", True) else None  # off for dry runs
             build(tier, out, docs_dir=docs, tuning="tuned")
-            print(f"[queue] {dataset}: {'confirmation' if confirm else 'quick tier'} done; report in {out}", flush=True)
+            from recbench.report.overall import build as build_overall
+
+            build_overall(docs_dir=docs, out_dir=repo_root() / "reports" / "overall", root=repo_root())
+            print(f"[queue] {dataset}: {'confirmation' if confirm else 'quick tier'} done; reports in {out} and reports/overall", flush=True)
         except Exception as exc:  # noqa: BLE001 - a report failure must not stop the queue
             print(f"[queue] report for {dataset} failed: {type(exc).__name__}: {exc}", flush=True)
 

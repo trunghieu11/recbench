@@ -197,6 +197,7 @@ nav:
       - Cost control: cloud/cost-control.md
       - Security: cloud/security.md
   - Results:
+      - Overall comparison: results/overall-comparison.md
       - Quick-tier bake-off: results/quick-tier.md
       - Leaderboards: results/leaderboards.md
       - Smoke-tier leaderboards: results/leaderboards-smoke.md

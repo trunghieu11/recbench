@@ -132,7 +132,7 @@ model (all-MiniLM-L6-v2, about 90 MB), so `pytest -q -m "not slow"` stays offlin
 | `test_catalog_has_every_method` | missing or malformed rubric scores |
 | `test_documented_command_flags_exist` | a `python -m recbench.… --flag` in the docs or README that the module no longer accepts (checked against each module's `--help`) |
 | `test_documented_scripts_exist` | instructions that name a `scripts/` or `deploy/` file that does not exist |
-| `test_method_and_dataset_counts_match_the_code` | stale counts such as "18 methods": a stated count of methods or datasets must be one the code and configs produce |
+| `test_method_and_dataset_counts_match_the_code` | stale counts, like a page still giving the old number of methods: a stated count of methods or datasets must be one the code and configs produce |
 | `test_method_pages_follow_the_template` | method pages missing a template section, or bake-off methods without an "In plain words" box |
 | `test_readme_method_table_is_current` | a README method table that `python -m recbench.dictionary.build` would change |
 | `test_code_and_catalog_agree_on_fidelity` | a method called "faithful" in one place and "simplified" in another |

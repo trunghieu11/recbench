@@ -181,6 +181,9 @@ def run_experiment(method: str, label: str, datasets: list[str] | None = None, *
             missing = [g for g in ("ease", "itemknn") if (summary(g, dataset) or {}).get("status") != "finished"]
             if missing:
                 log(f"{dataset}: note: no lab baseline for {', '.join(missing)} yet, so the re-ranker uses their default settings")
+        if experiment.from_baseline and (summary(method, dataset) or {}).get("status") != "finished":
+            log(f"{dataset}: skipped: from_baseline needs the baseline on this dataset first")
+            continue
         todo.append(dataset)
     if not todo:
         return []
@@ -190,7 +193,8 @@ def run_experiment(method: str, label: str, datasets: list[str] | None = None, *
         f"settings on {tier()}-val, then the best once on {tier()})")
 
     def one(dataset: str) -> dict[str, Any]:
-        result = run_job(dataset, method, settings, job, experiment.space, child_env={"CUDA_VISIBLE_DEVICES": ""}, retry=True,
+        space = experiment.space_for((summary(method, dataset) or {}).get("best_params"))
+        result = run_job(dataset, method, settings, job, space, child_env={"CUDA_VISIBLE_DEVICES": ""}, retry=True,
                          isolate=ISOLATE, label=tag, fingerprint=fingerprint)
         test = (result.get("test") or {}).get("ndcg_at_10")
         log(f"{dataset}: {result.get('status')}" + (f", test NDCG@10 {test:.4f} (validation {result.get('best_val'):.4f})" if test is not None

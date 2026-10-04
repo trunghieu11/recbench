@@ -182,3 +182,23 @@ def test_the_notebook_api_gives_the_same_numbers_as_once(lab):
     frame = runs.sweep("itemknn", "toy", "knn_neighbors", [2, 5], log=lambda _: None)
     assert list(frame["knn_neighbors"]) == [2, 5] and frame["ndcg_at_10"].notna().all()
     assert (lab / "reports" / "lab" / "sweeps" / "itemknn" / "toy-knn_neighbors.csv").exists()
+
+
+def test_from_baseline_searches_only_the_new_settings(lab):
+    from recbench.tuning.job import run_job
+
+    experiments = lab / "labs" / "01-itemknn" / "experiments.yaml"
+    experiments.write_text(experiments.read_text() + "\n  focused:\n    from_baseline: true\n    params:\n"
+                           "      train_window_keep_last: {type: choice, values: [10, 50]}\n")
+    focused = ex.get("itemknn", "focused", lab)
+    with pytest.raises(ex.ExperimentError, match="no finished baseline"):
+        focused.space_for(None)
+    space = focused.space_for({"knn_neighbors": 7, "knn_shrink": 0, "train_window_keep_last": 99})
+    assert list(space.params) == ["train_window_keep_last"] and space.fixed == {"knn_neighbors": 7, "knn_shrink": 0}
+
+    _, resolved, spaces, settings = runs.lab_config()
+    baseline = run_job("toy", "itemknn", resolved, settings, spaces["itemknn"], isolate=False)
+    result = runs.run_experiment("itemknn", "focused", ["toy"], log=lambda _: None)[0]
+    assert list(result["space"]["params"]) == ["train_window_keep_last"]
+    held = {k: v for k, v in baseline["best_params"].items() if k != "train_window_keep_last"}
+    assert {k: result["best_params"][k] for k in held} == held  # every other setting at the baseline's best

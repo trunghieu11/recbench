@@ -6,6 +6,8 @@ An experiment starts from the method's entry in configs/tuning/quick.yaml (what 
     remove:   settings no longer searched (the method's default applies)
     fixed:    settings held at one value (they leave the search)
     trials:   settings to try (default: the baseline's budget, 10; keep it for a fair comparison)
+    from_baseline: true holds every setting the baseline searched at that dataset's best value and searches only
+              `params`: the experiment's 10 trials then all go to the new idea (an ablation)
     note:     what you tried and why (shown on the scoreboard)
     promoted: true once the change is promoted (docs/handbook/promote.md)
 
@@ -29,7 +31,7 @@ LAB_CONFIG = Path("configs") / "benchmarks" / "lab.yaml"
 LABS_DIR = Path("labs")
 BASELINE = "baseline"
 REFERENCE = "most_popular"  # the floor every method should beat; in the lab's baseline, but not one of the labs
-KEYS = {"params", "remove", "fixed", "trials", "note", "promoted"}
+KEYS = {"params", "remove", "fixed", "trials", "from_baseline", "note", "promoted"}
 PARAM_TYPES = {"choice", "log", "float", "int", "logint"}
 LABEL = re.compile(r"^[a-z0-9][a-z0-9-]{0,39}$")
 # Settings read by the runner rather than by a method's own code (see runner.run_single).
@@ -53,6 +55,23 @@ class Experiment:
     @property
     def is_baseline(self) -> bool:
         return self.label == BASELINE
+
+    @property
+    def from_baseline(self) -> bool:
+        return bool(self.entry.get("from_baseline"))
+
+    def space_for(self, baseline_best: dict[str, Any] | None) -> MethodSpace:
+        """The space actually searched on one dataset. With from_baseline, every setting the baseline chose is held at
+        its value there (except those this experiment searches or removes), so only `params` are searched."""
+        if not self.from_baseline:
+            return self.space
+        if not baseline_best:
+            raise ExperimentError(f"{self.method}:{self.label} uses from_baseline, but this dataset has no finished baseline")
+        own = set(self.entry.get("params") or {})
+        removed = set(self.entry.get("remove") or [])
+        held = {k: v for k, v in baseline_best.items() if k not in own and k not in removed}
+        return MethodSpace(method=self.method, params={k: v for k, v in self.space.params.items() if k in own},
+                           fixed={**held, **self.space.fixed}, trials=self.space.trials, confirm=dict(self.space.confirm))
 
 
 def lab_benchmark(root: Path | None = None) -> dict[str, Any]:
@@ -103,6 +122,8 @@ def load_experiments(method: str, root: Path | None = None) -> dict[str, dict[st
             raise ExperimentError(f"{path}: {label}: unknown keys {sorted(set(entry) - KEYS)}; allowed: {sorted(KEYS)}")
         if label == BASELINE and set(entry) - {"note"}:
             raise ExperimentError(f"{path}: `baseline` must stay unchanged (it is the reference); copy it under a new label")
+        if entry.get("from_baseline") and not entry.get("params"):
+            raise ExperimentError(f"{path}: {label}: from_baseline searches only `params`, and there are none")
         out[label] = entry
     out.setdefault(BASELINE, {})
     return out
@@ -152,7 +173,8 @@ def get(method: str, label: str = BASELINE, root: Path | None = None) -> Experim
 def fingerprint(experiment: Experiment, code_version: str) -> str:
     """Identifies an experiment's definition and the code it runs (`code_version`: runner.method_version)."""
     space = experiment.space
-    payload = {"params": space.params, "fixed": space.fixed, "trials": space.trials, "code": code_version}
+    payload = {"params": space.params, "fixed": space.fixed, "trials": space.trials, "code": code_version,
+               "from_baseline": experiment.from_baseline}
     return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode()).hexdigest()[:10]
 
 

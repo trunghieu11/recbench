@@ -12,9 +12,10 @@ from typing import Any
 
 import numpy as np
 
-# Small, fast settings for the toy data; everything else stays at the method's default.
+# Small, fast settings for the toy data (120 users, 40 items); everything else stays at the method's default. The
+# low-rank methods keep 8 directions: their defaults (128, 256) would cover the whole toy catalog and learn nothing.
 TOY_SETTINGS: dict[str, Any] = {"seed": 42, "ease_backend": "numpy", "threads": 1, "dim": 16, "ials_iterations": 5, "bpr_iterations": 20,
-                                "rerank_candidates": 50, "lgbm_trees": 50}
+                                "rerank_candidates": 50, "lgbm_trees": 50, "svd_factors": 8, "gfcf_k": 8}
 N_USERS = 30
 
 

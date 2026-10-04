@@ -47,9 +47,11 @@ def test_the_variant_is_deterministic(toy):
 
 
 def test_the_variant_still_learns(toy):
-    """On the toy data, a working variant ranks far better than random; a broken one usually does not."""
+    """On the toy data, a working variant ranks better than random and keeps most of the method's default quality; a
+    broken change usually does not."""
     view, split = toy
-    assert checks.toy_ndcg(METHOD, view, split, **VARIANT) > 2 * checks.toy_ndcg("random", view, split)
+    variant = checks.toy_ndcg(METHOD, view, split, **VARIANT)
+    assert variant > checks.toy_ndcg("random", view, split) and variant > 0.8 * checks.toy_ndcg(METHOD, view, split)
 
 
 def test_the_new_math_on_a_case_small_enough_to_check_by_hand():

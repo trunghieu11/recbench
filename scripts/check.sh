@@ -23,7 +23,8 @@ if [[ "${1:-}" == "--quick" ]]; then
   shopt -s nullglob
   variants=(tests/test_*_variant.py)
   step "the lab's tests and your variant tests"
-  pytest -q -p no:warnings tests/test_lab.py tests/test_compare.py tests/test_lab_defaults.py tests/test_labs.py "${variants[@]}"
+  # ${a[@]+"${a[@]}"} expands an empty array safely under `set -u` in macOS's bash 3.2
+  pytest -q -p no:warnings tests/test_lab.py tests/test_compare.py tests/test_lab_defaults.py tests/test_labs.py ${variants[@]+"${variants[@]}"}
 else
   step "fast tests, including the strict docs build (a few minutes)"
   pytest -q -p no:warnings -m "not slow"

@@ -39,7 +39,7 @@ users the interval is wide: any method whose mean falls inside it is hard to tel
 - **Overlap is a heuristic, not a formal test.** Two intervals can overlap while a paired test (same users,
   both methods) still finds a significant difference. Paired tests over the saved per-user values are the
   stronger tool.
-- **Many comparisons:** with 15 methods, some "significant" differences appear by chance.
+- **Many comparisons:** when many methods are compared, some "significant" differences appear by chance.
 
 ## Check your understanding
 

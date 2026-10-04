@@ -60,6 +60,21 @@ the 11 light methods, so PyTorch is never imported. That matters on macOS: SANSA
 OpenMP runtime is loaded in the same process. Run it first in every notebook; after a crash, restart the kernel
 (**Restart** in the notebook toolbar) and run it again.
 
+### Run the notebooks on the rented box
+
+Cells that fit models are training, which belongs on the box. VS Code can open the box's copy of the repository as if
+it were local:
+
+1. Install the **Remote - SSH** extension.
+2. Command Palette (Cmd+Shift+P) → **Remote-SSH: Connect to Host…** → `vast-gpu` (the name from `~/.ssh/config`,
+   see [renting a box](../start/box-1-before-you-rent.md)).
+3. **File → Open Folder…** → the repository on the box (`~/recbench`), then install the Python and Jupyter
+   extensions there when VS Code offers it.
+4. Open a lab notebook and select the box's `.venv` kernel. Every cell now runs on the box.
+
+Cells that only read stored results (the baseline, `lab.compare`, `lab.segments`) work on the laptop too, after
+`./scripts/fetch_lab_results.sh`.
+
 ## Step 4: a first check
 
 ```bash

@@ -5,6 +5,8 @@
 #   fixed:    settings held at one value
 #   trials:   settings to try (default 10, the baseline's budget: keep it, so the comparison stays fair)
 #   note:     what you tried and why (shown on the scoreboard)
+#   from_baseline: true holds every other setting at that dataset's baseline best, so the 10 trials all go to
+#             your new settings (best for testing one idea)
 #   promoted: true once you promote it (docs/handbook/promote.md)
 # Run one:    python -m recbench.lab run --method sansa --experiment icf
 # Compare:    python -m recbench.compare sansa sansa:icf
@@ -19,11 +21,14 @@ experiments:
   # Level 3, after a small code change: leave out very rare items before factorising.
   # min-count:
   #   note: Items with fewer than n interactions are left out of the Gram matrix
+  #   from_baseline: true
   #   params:
   #     sansa_min_count: {type: choice, values: [1, 3, 5, 10]}
 
   # Level 4, after you write the variant: EDLAE's per-item penalty through extra pseudo-user rows (Steck 2020).
   # edlae:
   #   note: Per-item penalty lambda + p / (1 - p) * G_ii, added as pseudo-user rows
+  #   from_baseline: true
   #   params:
   #     sansa_dropout: {type: float, low: 0.05, high: 0.75}
+  #     sansa_lambda: {type: log, low: 1.0, high: 20000.0}   # the dropout adds penalty: re-tune lambda

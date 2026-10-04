@@ -5,6 +5,8 @@
 #   fixed:    settings held at one value
 #   trials:   settings to try (default 10, the baseline's budget: keep it, so the comparison stays fair)
 #   note:     what you tried and why (shown on the scoreboard)
+#   from_baseline: true holds every other setting at that dataset's baseline best, so the 10 trials all go to
+#             your new settings (best for testing one idea)
 #   promoted: true once you promote it (docs/handbook/promote.md)
 # Run one:    python -m recbench.lab run --method rp3beta --experiment no-popularity-penalty
 # Compare:    python -m recbench.compare rp3beta rp3beta:no-popularity-penalty
@@ -19,11 +21,15 @@ experiments:
   # Level 3, after a small code change: walk along interaction counts instead of 0/1.
   # counts:
   #   note: P(j | u) from interaction counts instead of 0/1
+  #   from_baseline: true
   #   params:
   #     rp3_counts: {type: choice, values: [true]}
+  #     rp3_alpha: {type: float, low: 0.3, high: 2.0}   # counts change the walk's probabilities: re-tune alpha
 
   # Level 4, after you write the variant: re-normalise each item's weights after keeping the top-k.
   # normalised:
   #   note: Row-normalised similarity after top-k (Ferrari Dacrema et al.'s reference code)
+  #   from_baseline: true
   #   params:
   #     rp3_normalize: {type: choice, values: [true]}
+  #     rp3_neighbors: {type: logint, low: 20, high: 1000}   # how many weights are normalised

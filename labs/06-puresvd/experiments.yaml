@@ -5,6 +5,8 @@
 #   fixed:    settings held at one value
 #   trials:   settings to try (default 10, the baseline's budget: keep it, so the comparison stays fair)
 #   note:     what you tried and why (shown on the scoreboard)
+#   from_baseline: true holds every other setting at that dataset's baseline best, so the 10 trials all go to
+#             your new settings (best for testing one idea)
 #   promoted: true once you promote it (docs/handbook/promote.md)
 # Run one:    python -m recbench.lab run --method puresvd --experiment no-time-knobs
 # Compare:    python -m recbench.compare puresvd puresvd:no-time-knobs
@@ -19,11 +21,15 @@ experiments:
   # Level 3, after a small code change: normalise each user's row by their activity.
   # user-norm:
   #   note: Divide each user's row by (number of items)^gamma before the SVD
+  #   from_baseline: true
   #   params:
   #     svd_user_norm: {type: float, low: 0.0, high: 1.0}
+  #     svd_factors: {type: choice, values: [16, 32, 64, 128, 256, 512, 1024]}
 
   # Level 4, after you write the variant: EigenRec's popularity scaling (Nikolakopoulos et al. 2019).
   # eigenrec:
   #   note: Scale item columns by popularity^d before the SVD
+  #   from_baseline: true
   #   params:
   #     svd_pop_exponent: {type: float, low: -0.5, high: 0.5}
+  #     svd_factors: {type: choice, values: [16, 32, 64, 128, 256, 512, 1024]}

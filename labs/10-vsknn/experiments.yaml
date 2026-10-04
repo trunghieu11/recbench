@@ -5,6 +5,8 @@
 #   fixed:    settings held at one value
 #   trials:   settings to try (default 10, the baseline's budget: keep it, so the comparison stays fair)
 #   note:     what you tried and why (shown on the scoreboard)
+#   from_baseline: true holds every other setting at that dataset's baseline best, so the 10 trials all go to
+#             your new settings (best for testing one idea)
 #   promoted: true once you promote it (docs/handbook/promote.md)
 # Run one:    python -m recbench.lab run --method vsknn --experiment no-window
 # Compare:    python -m recbench.compare vsknn vsknn:no-window
@@ -19,11 +21,13 @@ experiments:
   # Level 3, after a small code change: the session gap (fixed at 30 minutes today).
   # session-gap:
   #   note: Sessions split at gaps of 10 minutes to 1 day
+  #   from_baseline: true
   #   params:
   #     vsknn_gap_minutes: {type: choice, values: [10, 30, 120, 1440]}
 
   # Level 4, after you write the variant: STAN's recency decay of neighbour sessions (Garg et al. 2019).
   # stan-recency:
   #   note: Neighbour sessions weighted by exp(-age / lambda)
+  #   from_baseline: true
   #   params:
   #     vsknn_recency_days: {type: log, low: 1.0, high: 365.0}

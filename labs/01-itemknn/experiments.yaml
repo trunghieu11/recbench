@@ -5,6 +5,8 @@
 #   fixed:    settings held at one value
 #   trials:   settings to try (default 10, the baseline's budget: keep it, so the comparison stays fair)
 #   note:     what you tried and why (shown on the scoreboard)
+#   from_baseline: true holds every other setting at that dataset's baseline best, so the 10 trials all go to
+#             your new settings (best for testing one idea)
 #   promoted: true once you promote it (docs/handbook/promote.md)
 # Run one:    python -m recbench.lab run --method itemknn --experiment no-time-knobs
 # Compare:    python -m recbench.compare itemknn itemknn:no-time-knobs
@@ -20,12 +22,14 @@ experiments:
   # outside the window). Keep more of every user's recent history.
   # keep-more-history:
   #   note: The window trims the profile used for scoring; keep each user's last 50 or 200 events
+  #   from_baseline: true
   #   params:
   #     train_window_keep_last: {type: choice, values: [10, 50, 200]}
 
   # Level 4, after you write the variant (Lab 1, Level 4): asymmetric cosine and a locality exponent (Aiolli 2013).
   # asymmetric:
   #   note: Asymmetric cosine with alpha and locality q (Aiolli 2013)
+  #   from_baseline: true
   #   params:
   #     knn_similarity: {type: choice, values: [asymmetric]}
   #     knn_alpha: {type: float, low: 0.1, high: 0.9}

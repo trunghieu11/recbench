@@ -5,6 +5,8 @@
 #   fixed:    settings held at one value
 #   trials:   settings to try (default 10, the baseline's budget: keep it, so the comparison stays fair)
 #   note:     what you tried and why (shown on the scoreboard)
+#   from_baseline: true holds every other setting at that dataset's baseline best, so the 10 trials all go to
+#             your new settings (best for testing one idea)
 #   promoted: true once you promote it (docs/handbook/promote.md)
 # Run one:    python -m recbench.lab run --method gfcf --experiment linear-only
 # Compare:    python -m recbench.compare gfcf gfcf:linear-only
@@ -19,11 +21,14 @@ experiments:
   # Level 3, after a small code change: prune the item-item filter (faster scoring; maybe less noise).
   # pruned:
   #   note: Keep each item's k largest weights in the linear filter
+  #   from_baseline: true
   #   params:
   #     gfcf_prune: {type: choice, values: [50, 200, 1000]}
 
   # Level 4, after you write the variant: a smooth low-pass filter from the singular values.
   # smooth:
   #   note: Weight singular direction k by (sigma_k / sigma_1)^gamma instead of 1
+  #   from_baseline: true
   #   params:
   #     gfcf_sv_power: {type: float, low: 0.0, high: 2.0}
+  #     gfcf_alpha: {type: float, low: 0.0, high: 1.0}   # the low-pass part's weight changes with its shape

@@ -5,6 +5,8 @@
 #   fixed:    settings held at one value
 #   trials:   settings to try (default 10, the baseline's budget: keep it, so the comparison stays fair)
 #   note:     what you tried and why (shown on the scoreboard)
+#   from_baseline: true holds every other setting at that dataset's baseline best, so the 10 trials all go to
+#             your new settings (best for testing one idea)
 #   promoted: true once you promote it (docs/handbook/promote.md)
 # Run one:    python -m recbench.lab run --method slim --experiment more-neighbours
 # Compare:    python -m recbench.compare slim slim:more-neighbours
@@ -14,17 +16,22 @@ experiments:
   # Level 3, no code needed: does pre-selecting only 50-200 candidate neighbours per item hold SLIM back?
   more-neighbours:
     note: Search 200-800 candidate neighbours instead of 50-200
+    from_baseline: true
     params:
       slim_neighbors: {type: choice, values: [200, 400, 800]}
 
   # Level 3, after a small code change: leave out very rare items.
   # min-count:
   #   note: Items with fewer than n interactions get no weights
+  #   from_baseline: true
   #   params:
   #     slim_min_count: {type: choice, values: [1, 3, 5, 10]}
 
   # Level 4, after you write the variant: allow negative weights (Steck 2019).
   # negative-weights:
   #   note: SLIM without the non-negativity constraint
+  #   from_baseline: true
   #   params:
   #     slim_positive: {type: choice, values: [false]}
+  #     slim_alpha: {type: log, low: 0.00001, high: 0.1}   # negative weights need their own penalty
+  #     slim_l1_ratio: {type: log, low: 0.01, high: 1.0}

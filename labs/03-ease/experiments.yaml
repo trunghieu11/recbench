@@ -5,6 +5,8 @@
 #   fixed:    settings held at one value
 #   trials:   settings to try (default 10, the baseline's budget: keep it, so the comparison stays fair)
 #   note:     what you tried and why (shown on the scoreboard)
+#   from_baseline: true holds every other setting at that dataset's baseline best, so the 10 trials all go to
+#             your new settings (best for testing one idea)
 #   promoted: true once you promote it (docs/handbook/promote.md)
 # Run one:    python -m recbench.lab run --method ease --experiment no-time-knobs
 # Compare:    python -m recbench.compare ease ease:no-time-knobs
@@ -16,15 +18,18 @@ experiments:
     note: Lambda only, without recency weighting or a training window
     remove: [decay_half_life_days, train_window_days]
 
-  # Level 3, after a small code change: which items the item cap keeps (this laptop keeps 20,000).
+  # Level 3, after a small code change: which items the item cap keeps (the lab keeps 20,000).
   # keep-alltime-popular:
   #   note: Keep the all-time most popular items under the cap instead of the recently popular
+  #   from_baseline: true
   #   params:
   #     ease_keep: {type: choice, values: [recent, alltime]}
 
   # Level 4, after you write the variant: EDLAE, a per-item penalty (Steck 2020).
   # edlae:
   #   note: EDLAE penalty lambda + p / (1 - p) * G_ii (Steck 2020)
+  #   from_baseline: true
   #   params:
   #     ease_variant: {type: choice, values: [edlae]}
   #     ease_dropout: {type: float, low: 0.05, high: 0.75}
+  #     ease_lambda: {type: log, low: 1.0, high: 20000.0}   # the dropout adds penalty: re-tune lambda

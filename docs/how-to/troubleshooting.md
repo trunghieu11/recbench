@@ -32,6 +32,8 @@
 | `unsupported: RecBole's sequence dataset would need ~X GB` | not enough RAM for RecBole at this size | lower `seq_len`, use SASRec, or a bigger machine |
 | `timeout` | exceeded `timeout_minutes` (wall clock) | raise `timeout_minutes` in the config, or run the method on the GPU tier |
 | iALS fails with exit code -11 (segfault) on a many-core machine | OpenBLAS was built for at most 128 threads; the machine has more | the runner caps `OPENBLAS_NUM_THREADS`, `OMP_NUM_THREADS` and `MKL_NUM_THREADS` at 32 per child process; set them lower if needed |
+| `sansa` fails on a Mac with `OMP: Error #15` (exit code -6) | PyTorch and Homebrew's SuiteSparse each load an OpenMP runtime; the second one aborts the process once CHOLMOD runs in parallel | handled for runs: each run's process imports only its method's module, so SANSA's never loads PyTorch. In a notebook, fit SANSA before importing PyTorch (`KMP_DUPLICATE_LIB_OK` does not help: it then crashes) |
+| A quick-tier job keeps failing after a fix | its failed trials count against its 10-trial budget | rerun with `--retry-failed`: the job starts a new attempt (a fresh study) |
 | `lgbm_rerank` crashes with exit code 139 on a Mac | PyTorch and LightGBM bundle different OpenMP runtimes; multi-threaded LightGBM crashes when both are loaded | handled: on macOS LightGBM runs on one thread when PyTorch is loaded (slower, only on the laptop) |
 | `pkill -f recbench.runner` kills your own SSH command | the pattern also matches the remote shell running it | use `pkill -f "[r]ecbench\.runner"` |
 | `failed` | an exception | open the run in MLflow and read `error.txt` |

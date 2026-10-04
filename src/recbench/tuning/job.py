@@ -48,17 +48,19 @@ def tuning_dir() -> Path:
     return path
 
 
-def summary_path(tier: str, dataset: str, method: str) -> Path:
-    return tuning_dir() / tier / dataset / f"{method}.json"
+def summary_path(tier: str, dataset: str, method: str, stage: str = "tune") -> Path:
+    """runs/tuning/<tier>/<dataset>/<method>.json for a tuning job, <method>.confirm.json for a confirmation."""
+    suffix = ".confirm" if stage == "confirm" else ""
+    return tuning_dir() / tier / dataset / f"{method}{suffix}.json"
 
 
-def read_summary(tier: str, dataset: str, method: str) -> dict[str, Any] | None:
-    path = summary_path(tier, dataset, method)
+def read_summary(tier: str, dataset: str, method: str, stage: str = "tune") -> dict[str, Any] | None:
+    path = summary_path(tier, dataset, method, stage)
     return json.loads(path.read_text()) if path.exists() else None
 
 
 def _write_summary(summary: dict[str, Any]) -> Path:
-    path = summary_path(summary["tier"], summary["dataset"], summary["method"])
+    path = summary_path(summary["tier"], summary["dataset"], summary["method"], summary.get("stage", "tune"))
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(summary, indent=2, default=str))
@@ -73,8 +75,8 @@ def _storage():
     return JournalStorage(JournalFileBackend(str(tuning_dir() / "journal.log")))
 
 
-def _finished_metric(dataset: str, method: str, cfg: dict[str, Any], split_dir: Path) -> float | None:
-    """The metric of an identical run that already finished (a resumed job, or a repeated configuration)."""
+def _finished_metrics(dataset: str, method: str, cfg: dict[str, Any], split_dir: Path) -> dict[str, float] | None:
+    """The metrics of an identical run that already finished (a resumed job, or a repeated configuration)."""
     from recbench.data import TrainView
 
     spec = ensure_loaded().methods[method].spec
@@ -86,16 +88,22 @@ def _finished_metric(dataset: str, method: str, cfg: dict[str, Any], split_dir: 
         filter_string=f"tags.config_hash = '{run_hash}' and tags.status = 'finished'",
         max_results=1,
     )
-    column = f"metrics.{METRIC}"
-    return None if frame.empty or column not in frame else float(frame[column].iloc[0])
+    if frame.empty:
+        return None
+    row = frame.iloc[0]
+    return {c[len("metrics."):]: float(row[c]) for c in frame.columns if c.startswith("metrics.") and row[c] == row[c]}  # skip NaN
+
+
+def _outcome_metrics(outcome: dict[str, Any], dataset: str, method: str, cfg: dict[str, Any], split_dir: Path) -> dict[str, float] | None:
+    if outcome.get("status") == "finished":
+        return outcome.get("metrics") or {}
+    if outcome.get("status") == "skipped_existing":
+        return _finished_metrics(dataset, method, cfg, split_dir)
+    return None
 
 
 def _outcome_value(outcome: dict[str, Any], dataset: str, method: str, cfg: dict[str, Any], split_dir: Path) -> float | None:
-    if outcome.get("status") == "finished":
-        return (outcome.get("metrics") or {}).get(METRIC)
-    if outcome.get("status") == "skipped_existing":
-        return _finished_metric(dataset, method, cfg, split_dir)
-    return None
+    return (_outcome_metrics(outcome, dataset, method, cfg, split_dir) or {}).get(METRIC)
 
 
 def _base_cfg(resolved: dict[str, Any], method: str, tuned_keys: set[str]) -> dict[str, Any]:
@@ -115,8 +123,12 @@ def run_job(
     *,
     child_env: dict[str, str] | None = None,
     isolate: bool = True,
+    retry: bool = False,
 ) -> dict[str, Any]:
-    """Tune `method` on `dataset` and evaluate the best configuration once. Returns the job summary."""
+    """Tune `method` on `dataset` and evaluate the best configuration once. Returns the job summary.
+
+    With retry=True, a job that failed starts a new attempt: a fresh study, so trials that failed (for example
+    before a bug fix) do not use up its budget. An interrupted attempt resumes where it stopped."""
     import optuna
     from optuna.trial import TrialState
 
@@ -136,6 +148,10 @@ def run_job(
         _write_summary(summary)
         return summary
 
+    previous = read_summary(settings.tier, dataset, method) or {}
+    attempt = int(previous.get("attempt", 0)) + (1 if retry and previous.get("status") == "failed" else 0)
+    summary.update(attempt=attempt, status="running")
+    _write_summary(summary)  # an interrupted job resumes this attempt
     space = space or MethodSpace(method)
     n_trials = space.trials if space.trials is not None else (settings.trials if space.params else 1)
     summary["trials_budget"] = n_trials
@@ -144,7 +160,7 @@ def run_job(
     if child_env:
         base["child_env"] = dict(child_env)
     study = optuna.create_study(
-        study_name=f"{settings.tier}/{dataset}/{method}/v{settings.space_version}/s{settings.seed}",
+        study_name=f"{settings.tier}/{dataset}/{method}/v{settings.space_version}/s{settings.seed}" + (f"/a{attempt}" if attempt else ""),
         storage=_storage(),
         sampler=optuna.samplers.TPESampler(seed=settings.seed, n_startup_trials=min(5, n_trials)),
         direction="maximize",
@@ -165,8 +181,11 @@ def run_job(
         trial = study.ask()
         params = space.sample(trial)
         trial_budget = remaining - reserve
+        # Training stops (keeping its best epoch) once this trial has used its fair share of the time left, so one
+        # slow setting cannot eat the budget of the others. The hard timeout stays at everything that is left.
+        fair_share = remaining / (n_trials - len(done) + settings.final_factor)
         cfg = {**base, **params, "stage": "search", "trial": trial.number, "max_eval_users": settings.search_users,
-               "timeout_minutes": trial_budget / 60, "fit_deadline": time.time() + 0.8 * trial_budget}
+               "timeout_minutes": trial_budget / 60, "fit_deadline": time.time() + 0.8 * min(fair_share, trial_budget)}
         t0 = time.time()
         outcome = run_pair(val_dir, method, cfg, isolate=isolate)
         seconds = time.time() - t0
@@ -207,8 +226,9 @@ def run_job(
     final = run_pair(test_dir, method, final_cfg, isolate=isolate)
     summary["final_seconds"] = time.time() - t0
     summary["final_status"] = final.get("status")
-    test_value = _outcome_value(final, dataset, method, final_cfg, test_dir)
-    summary["test"] = {**(final.get("metrics") or {}), METRIC: test_value} if test_value is not None else final.get("metrics")
+    test_metrics = _outcome_metrics(final, dataset, method, final_cfg, test_dir) or {}
+    test_value = test_metrics.get(METRIC)
+    summary["test"] = test_metrics or final.get("metrics")
     if test_value is not None:
         summary["status"] = "finished"
     else:

@@ -20,7 +20,7 @@ import traceback
 from pathlib import Path
 from typing import Any
 
-from recbench.config import load_yaml
+from recbench.config import load_benchmark_yaml
 from recbench.pipeline.materialize import materialize
 from recbench.registry import ensure_loaded
 
@@ -78,7 +78,7 @@ def main() -> None:
     parser.add_argument("--datasets", type=str, default="")
     parser.add_argument("--tier", type=str, default="", help="one tier or a comma-separated list, e.g. quick,quick-val")
     args = parser.parse_args()
-    cfg = load_yaml(args.config)
+    cfg = load_benchmark_yaml(args.config)
     names = [n for n in args.datasets.split(",") if n] or list(cfg.get("datasets") or [])
     tiers = [t for t in (args.tier or cfg.get("tier", "smoke")).split(",") if t]
     overrides = cfg.get("tier_overrides") or {}

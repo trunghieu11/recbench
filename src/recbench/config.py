@@ -29,6 +29,23 @@ def load_yaml(path: str | Path) -> dict[str, Any]:
     return data
 
 
+def _merge(base: dict[str, Any], extra: dict[str, Any]) -> dict[str, Any]:
+    out = dict(base)
+    for key, value in extra.items():
+        out[key] = _merge(out[key], value) if isinstance(value, dict) and isinstance(out.get(key), dict) else value
+    return out
+
+
+def load_benchmark_yaml(path: str | Path, repo_root: Path | None = None) -> dict[str, Any]:
+    """A benchmark file. With `extends: <other benchmark file>`, it starts from that file and replaces the keys
+    it sets (nested mappings such as `tuning:` are merged key by key; lists are replaced)."""
+    raw = load_yaml(path)
+    parent = raw.pop("extends", None)
+    if not parent:
+        return raw
+    return _merge(load_benchmark_yaml((repo_root or Path.cwd()) / parent, repo_root), raw)
+
+
 def resolve_run_config(
     benchmark: dict[str, Any],
     *,
@@ -48,6 +65,7 @@ def resolve_run_config(
         "preset": chosen,
         **PRESETS[chosen],
         **(hardware.get("overrides") or {}),
+        **(benchmark.get("overrides") or {}),
         "seed": int(benchmark.get("seed", 42)),
         "resume": bool(benchmark.get("resume", True)),
         "continue_on_error": bool(benchmark.get("continue_on_error", True)),

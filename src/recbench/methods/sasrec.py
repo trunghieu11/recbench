@@ -68,7 +68,7 @@ class SASRec(EmbeddingRecommender):
         needs_torch=True,
         upstream="in-repo PyTorch, following Kang & McAuley 2018 with full cross-entropy (Klenitskiy & Vasilev 2023)",
         cost_band="medium",
-        impl_version="2",  # epochs with early stopping, bf16, loss setting
+        impl_version="3",  # 2: epochs with early stopping, bf16, loss setting; 3: epochs sized by events
     )
 
     def fit(self, data: TrainView, cfg: dict[str, Any]) -> None:
@@ -91,8 +91,11 @@ class SASRec(EmbeddingRecommender):
             hidden = self.net(to_tensor(batch["inputs"], self.device))
             return next_item_loss(hidden, self.net.item.weight, to_tensor(batch["targets"], self.device), mode=mode, n_negatives=n_neg)
 
-        # One epoch = on average one window per user with at least two events.
-        per_epoch = steps_per_epoch(int((data.user_lengths >= 2).sum()), batch_size)
+        # One epoch = enough random windows for every event to be a target about once (each window has seq_len
+        # targets), and at least one window per user with two or more events. Sizing by users alone gave tiny
+        # epochs on datasets with few, long histories (MovieLens quick: 14 batches; Last.fm: 4).
+        n_users = int((data.user_lengths >= 2).sum())
+        per_epoch = max(steps_per_epoch(n_users, batch_size), steps_per_epoch(len(data._items), batch_size * self.seq_len))
         self.fit_info = train_epochs(self.net, windows, per_epoch, loss, cfg, owner=self)
 
     @torch.no_grad()

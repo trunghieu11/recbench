@@ -37,8 +37,14 @@ correlation above 0.99.
 The only difference is on items the user already has. EASE sets the diagonal to 0, while SANSA's diagonal is
 -1, so seen items differ by exactly the user's own interaction. The evaluator masks those items anyway.
 
-On a large catalog, `sansa_density` controls the trade-off. At 0.001, the weights keep about 0.1% of the
-entries a dense matrix would have: a 100,000-item catalog keeps about 10 million weights instead of 10 billion.
+On a large catalog, the number of weights kept controls the trade-off. At a density of 0.001, the weights keep
+about 0.1% of the entries a dense matrix would have: a 100,000-item catalog keeps about 10 million weights
+instead of 10 billion.
+
+Too few weights cost accuracy. On the MovieLens quick tier (32,000 items), SANSA scored NDCG@10 0.096 with about
+32 weights per item, 0.171 with 320, and 0.173 with 960, against 0.190 for EASE. The time grew from 12 to 104 to
+496 seconds on a laptop. The quick tier therefore searches the number of weights **per item**
+(`sansa_weights_per_item`, 20 to 500), which means the same thing on a small and a large catalog.
 
 ## 3. How it works
 
@@ -85,7 +91,8 @@ $$
 | Name in recbench config | What it does | Default | Searched over |
 |---|---|---|---|
 | `sansa_lambda` | L2 regularisation, as EASE's λ | 500 | 1–20000 (log) |
-| `sansa_density` | share of weights kept | 0.001 | 1e-5–0.01 (log) |
+| `sansa_weights_per_item` | weights kept per item (sets the density as this number ÷ the number of items) | not set | 20–500 (log) |
+| `sansa_density` | share of all item pairs kept as weights (used when `sansa_weights_per_item` is not set) | 0.001 | — |
 | `sansa_factorizer` | `cholmod` (exact sparse) or `icf` (incomplete, for huge catalogs) | cholmod | — |
 
 ## 7. In recbench

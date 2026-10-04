@@ -35,6 +35,7 @@ from recbench.tuning.__main__ import load_benchmark
 from recbench.tuning.job import JobSettings, read_summary, run_confirm, run_job
 
 DONE = {"finished", "over_budget", "failed", "missing_split", "skipped"}
+RETRY_ON_RESUME = {"missing_split"}  # the splits may have been prepared since
 
 
 @dataclass
@@ -50,6 +51,7 @@ class Job:
     ended: float | None = None
     result: dict[str, Any] | None = None
     slot: str = ""
+    retry: bool = False  # a failed job re-run with --retry-failed
 
     @property
     def key(self) -> str:
@@ -79,7 +81,10 @@ class Queue:
         queue_cfg = self.benchmark.get("queue") or {}
         self.confirm_cfg = self.benchmark.get("confirm") or {}
         self.datasets = datasets or list(self.benchmark.get("datasets") or [])
-        entries = [e for e in queue_cfg.get("methods") or [] if not methods or e["name"] in methods]
+        all_entries = list(queue_cfg.get("methods") or [])
+        entries = [e for e in all_entries if not methods or e["name"] in methods]
+        self.all_methods = [e["name"] for e in all_entries]  # a dataset is done when ALL of them are, in any session
+        self.selected = {e["name"] for e in entries}
         self.isolate = isolate
         self.retry_failed = retry_failed
         self.deadline = time.time() + deadline_hours * 3600 if deadline_hours else None
@@ -93,7 +98,7 @@ class Queue:
         self.cpu_threads = max(1, min(max_threads, cores // self.cpu_workers))
         self.gpu_slots = [f"gpu{g}" for g in range(self.n_gpus) for _ in range(int(queue_cfg.get("jobs_per_gpu", 3)))]
         self.jobs: list[Job] = []
-        self.resources = {e["name"]: e.get("resource", "cpu") for e in entries}
+        self.resources = {e["name"]: e.get("resource", "cpu") for e in all_entries}
         for d, dataset in enumerate(self.datasets):
             for m, entry in enumerate(entries):
                 self.jobs.append(Job(dataset, entry["name"], "tune", entry.get("resource", "cpu"), (d, 0, m), list(entry.get("after") or [])))
@@ -104,11 +109,13 @@ class Queue:
     # ----- bookkeeping -----
     def _load_done(self, job: Job) -> None:
         tier = self.settings.tier if job.kind == "tune" else str(self.confirm_cfg.get("tier", "full"))
-        summary = read_summary(tier, job.dataset, job.method)
-        if summary and summary.get("status") in DONE and not (self.retry_failed and summary["status"] == "failed"):
-            if job.kind == "confirm" and summary.get("stage") != "confirm":
-                return
-            job.status, job.result = summary["status"], summary
+        summary = read_summary(tier, job.dataset, job.method, "confirm" if job.kind == "confirm" else "tune")
+        if not summary or summary.get("status") not in DONE - RETRY_ON_RESUME:
+            return
+        if self.retry_failed and summary["status"] == "failed":
+            job.retry = True
+            return
+        job.status, job.result = summary["status"], summary
 
     def _deps_done(self, job: Job) -> bool:
         return all(any(j.dataset == job.dataset and j.method == dep and j.kind == "tune" and j.status in DONE for j in self.jobs)
@@ -146,19 +153,45 @@ class Queue:
         jobs = [j for j in self.jobs if j.dataset == dataset and j.kind == kind]
         return bool(jobs) and all(j.status in DONE for j in jobs)
 
+    def _tuning_state(self, dataset: str, method: str) -> tuple[str, dict[str, Any] | None]:
+        """(status, summary) of a method's tuning job: from this session, else from its summary on disk."""
+        job = next((j for j in self.jobs if j.kind == "tune" and j.dataset == dataset and j.method == method), None)
+        if job is not None:
+            return job.status, job.result
+        summary = read_summary(self.settings.tier, dataset, method)
+        return (summary or {}).get("status", "pending"), summary
+
+    def _tuning_done(self, dataset: str) -> bool:
+        """Every configured method has a result on this dataset (a missing split does not count)."""
+        return all(self._tuning_state(dataset, m)[0] in DONE - RETRY_ON_RESUME for m in self.all_methods)
+
+    def _top_methods(self, dataset: str, n: int) -> list[str]:
+        """The dataset's best methods by quick-tier test NDCG@10, over all configured methods (Random excluded)."""
+        scored = []
+        for method in self.all_methods:
+            status, result = self._tuning_state(dataset, method)
+            value = ((result or {}).get("test") or {}).get("ndcg_at_10")
+            if status == "finished" and value is not None and method != "random":
+                scored.append((-float(value), method))
+        return [method for _, method in sorted(scored)[:n]]
+
+    def _queue_confirmations(self, dataset: str) -> None:
+        """Add confirmation jobs for the dataset's current top methods (only those selected in this session)."""
+        top = int(self.confirm_cfg.get("top", 0))
+        existing = {j.method for j in self.jobs if j.dataset == dataset and j.kind == "confirm"}
+        d = self.datasets.index(dataset)
+        for rank, method in enumerate(self._top_methods(dataset, top) if top else []):
+            if method in existing or method not in self.selected:
+                continue
+            confirm = Job(dataset, method, "confirm", self.resources.get(method, "cpu"), (d, 1, rank))
+            self._load_done(confirm)
+            self.jobs.append(confirm)
+
     def _on_job_end(self, job: Job) -> None:
         """Called with the lock held: queue confirmations and write reports when a dataset block completes."""
-        if job.kind == "tune" and self._dataset_done(job.dataset, "tune"):
+        if job.kind == "tune" and self._tuning_done(job.dataset):
             self._report(job.dataset)
-            top = int(self.confirm_cfg.get("top", 0))
-            if top and not any(j.dataset == job.dataset and j.kind == "confirm" for j in self.jobs):
-                ranked = sorted((j for j in self.jobs if j.dataset == job.dataset and j.kind == "tune" and j.status == "finished"
-                                 and (j.result or {}).get("test", {}).get("ndcg_at_10") is not None and j.method != "random"),
-                                key=lambda j: -j.result["test"]["ndcg_at_10"])
-                for rank, winner in enumerate(ranked[:top]):
-                    confirm = Job(job.dataset, winner.method, "confirm", winner.resource, (winner.priority[0], 1, rank))
-                    self._load_done(confirm)
-                    self.jobs.append(confirm)
+            self._queue_confirmations(job.dataset)
         if job.kind == "confirm" and self._dataset_done(job.dataset, "confirm"):
             self._report(job.dataset, confirm=True)
         pending = [j for j in sorted(self.jobs, key=lambda j: j.priority) if j.status == "pending"]
@@ -170,7 +203,8 @@ class Queue:
 
             tier = str(self.confirm_cfg.get("tier", "full")) if confirm else self.settings.tier
             out = repo_root() / "reports" / f"{tier}-tuned"
-            build(tier, out, docs_dir=repo_root() / "docs", tuning="tuned")
+            docs = repo_root() / "docs" if self.benchmark.get("write_docs", True) else None  # off for dry runs
+            build(tier, out, docs_dir=docs, tuning="tuned")
             print(f"[queue] {dataset}: {'confirmation' if confirm else 'quick tier'} done; report in {out}", flush=True)
         except Exception as exc:  # noqa: BLE001 - a report failure must not stop the queue
             print(f"[queue] report for {dataset} failed: {type(exc).__name__}: {exc}", flush=True)
@@ -187,7 +221,8 @@ class Queue:
             return run_confirm(job.dataset, job.method, resolved, self.settings, self.spaces.get(job.method),
                                tier=str(self.confirm_cfg.get("tier", "full")), seeds=list(self.confirm_cfg.get("seeds") or []),
                                child_env=env, isolate=self.isolate)
-        return run_job(job.dataset, job.method, resolved, self.settings, self.spaces.get(job.method), child_env=env, isolate=self.isolate)
+        return run_job(job.dataset, job.method, resolved, self.settings, self.spaces.get(job.method), child_env=env, isolate=self.isolate,
+                       retry=job.retry)
 
     def _worker(self, slot: str) -> None:
         kind = "gpu" if slot.startswith("gpu") else "cpu"
@@ -221,9 +256,8 @@ class Queue:
               f"{len(self.gpu_slots)} GPU slots on {self.n_gpus} GPU(s)", flush=True)
         with self.lock:
             for dataset in self.datasets:  # datasets finished in an earlier session: make sure their confirmations exist
-                if self._dataset_done(dataset, "tune"):
-                    tune_jobs = [j for j in self.jobs if j.dataset == dataset and j.kind == "tune"]
-                    self._on_job_end(tune_jobs[-1])
+                if self._tuning_done(dataset):
+                    self._queue_confirmations(dataset)
             self.save_state()
         threads = [threading.Thread(target=self._worker, args=(slot,), daemon=True) for slot in slots]
         for thread in threads:
@@ -248,6 +282,8 @@ def print_status(config: Path) -> None:
             summary = read_summary(settings.tier, dataset, method)
             key = f"tune:{dataset}:{method}"
             status = "running" if key in running else (summary or {}).get("status", "pending")
+            if status == "running" and key not in running:
+                status = "interrupted"  # started in an earlier session; resumes when the queue runs again
             test = ((summary or {}).get("test") or {}).get("ndcg_at_10") if summary else None
             rows.append((method, status, test, (summary or {}).get("best_val")))
         done = sum(r[1] in DONE for r in rows)

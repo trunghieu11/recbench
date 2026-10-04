@@ -1,4 +1,4 @@
-# 6. Deploy to Cloud Run
+# 7. Deploy to Cloud Run
 
 **Goal:** serve your benchmark's recommendations from a private HTTPS API on Google Cloud, measure its latency,
 and remove everything afterwards.

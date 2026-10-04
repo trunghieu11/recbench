@@ -1,0 +1,21 @@
+# Free dry run of the quick-tier pipeline on a laptop: the same queue and search spaces as quick.yaml, on the
+# small smoke splits, with 2 configurations per job and short training. It checks that every job runs end to
+# end before any rented time is spent. Its numbers mean little.
+#   python -m recbench.pipeline.prepare --config configs/benchmarks/quick-smoke.yaml --tier smoke,smoke-val
+#   python -m recbench.queue run --config configs/benchmarks/quick-smoke.yaml --cpu-workers 3
+#   python -m recbench.queue status --config configs/benchmarks/quick-smoke.yaml
+extends: configs/benchmarks/quick.yaml
+tier: smoke
+hardware: configs/hardware/local-cpu.yaml
+overrides:
+  max_epochs: 3
+eval:
+  max_eval_users: 2000
+tuning:
+  trials: 2
+  search_users: 500
+  cap_minutes: 20
+confirm:
+  top: 2
+  tier: smoke   # confirmation summaries are separate files, so confirming on the same tier is safe here
+  seeds: [42, 43]

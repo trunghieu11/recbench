@@ -3,12 +3,21 @@
 What recbench deliberately does not do yet, why, and how each item could be built. Each item is sized to be a
 separate pull request. Good first projects are marked ★.
 
+## Done since this page was first written
+
+- **Hyperparameter tuning with Optuna:** the [quick-tier bake-off](quick-tier.md) tunes every low-budget method
+  with the same budget on a validation fold, then tests the best setting once.
+- **Two-stage pipeline:** the [LightGBM](../dictionary/algorithms/lgbm-rerank.md) and
+  [DCN-V2](../dictionary/algorithms/dcnv2-rerank.md) re-rankers re-order candidates from EASE, ItemKNN and
+  trending items, and report candidate recall.
+- **Several seeds** for the full-data confirmation of each dataset's top 3 (stochastic methods only). Paired
+  significance tests are still open (below).
+
 ## Evaluation
 
 | Item | Why | Sketch |
 |---|---|---|
 | ★ Multi-seed runs and paired significance tests | one seed hides training randomness ([confidence intervals](../dictionary/metrics/confidence-intervals.md)) | add a `seeds: [42, 43, 44]` key; log one run per seed; a paired test over users and seeds in `results.py` |
-| Hyperparameter tuning with Optuna | untuned defaults can misrank methods ([fair baselines](../dictionary/concepts/fair-baselines-and-tuning.md)) | tune on the validation window (`valid.parquet`) with a fixed trial budget per method, then evaluate the best setting once on test |
 | ★ Pareto and scenario-profile leaderboards | a single metric hides trade-offs (your Q11) | mark methods that no other method beats on accuracy, coverage, and cost at once; profiles weight metrics per scenario ("discovery", "low cost") |
 | Online-style evaluation | offline accuracy is not user response ([offline vs online](../dictionary/concepts/offline-vs-online.md)) | off-policy estimators on logged data, or a simple simulator; A/B routing in the API |
 | Rolling temporal windows | one test week per dataset | repeat the split at several cutoffs and average |
@@ -17,10 +26,9 @@ separate pull request. Good first projects are marked ★.
 
 | Item | Why | Sketch |
 |---|---|---|
-| A real LLM recommender | the text-hash tower is a placeholder ([LLM and generative recsys](../dictionary/concepts/llm-and-generative-recsys.md)) | item text embeddings from an open embedding model, then the same two-tower training; or an LLM reranker over EASE's top 50 |
+| A real LLM recommender | the text-hash tower is a placeholder, and [text-embedding kNN](../dictionary/algorithms/text-knn.md) only uses a pretrained encoder ([LLM and generative recsys](../dictionary/concepts/llm-and-generative-recsys.md)) | the same encoder's vectors in a two-tower model trained on interactions; or an LLM re-ranker over EASE's top 50 |
 | Real image (and audio) embeddings | 15 colour features are a toy | precompute CLIP- or SigLIP-style embeddings for H&M images into the split cache; feed them to the multimodal tower |
 | Faithful TIGER | TIGER-lite is unranked | RQ-VAE on content embeddings, a seq2seq model generating semantic IDs, beam search, collision handling |
-| Two-stage pipeline | real systems retrieve, then rank ([retrieval and ranking](../dictionary/concepts/retrieval-and-ranking.md)) | EASE or iALS retrieves 200 candidates; DIN or DCN-V2 reranks; evaluate the combination as one method |
 | Live Amazon Personalize and Vertex AI runs | only Recombee is benchmarked live | adapters following `src/recbench/methods/recombee.py`, with a request budget and teardown; check costs first |
 
 ## Cost, serving, and operations

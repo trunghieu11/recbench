@@ -72,9 +72,11 @@ The [install guide](start/install.md) explains each line.
 
 - **Protocol v2.** A review of v0.1 found test leakage and other bugs that made its numbers invalid. They are
   fixed and guarded by tests; see the [review log](review/2026-10-02-review.md).
-- **Smoke-tier results** (laptop) are on the [leaderboards](results/leaderboards.md). They check the pipeline;
+- **Smoke-tier results** (laptop) are on the [smoke-tier page](results/leaderboards-smoke.md). They check the pipeline;
   they do not pick winners.
-- **Full-tier results** appear after the full tier runs on a GPU machine ([how](start/full-tier-gpu.md)).
+- **Full-tier results** (untuned v0.2 defaults) are on the [leaderboards](results/leaderboards.md).
+- **The quick-tier bake-off** tunes 23 low-budget methods with equal budgets, dataset by dataset; its results
+  appear on the [quick-tier page](results/quick-tier.md) ([how to run it](start/quick-tier-box.md)).
 - What is simplified or missing: [known limitations](results/known-limitations.md) and the [roadmap](results/roadmap.md).
 
 ## Licence

@@ -27,7 +27,7 @@ from typing import Any
 import numpy as np
 
 from recbench import __version__
-from recbench.config import config_hash, load_yaml, method_config, resolve_run_config
+from recbench.config import config_hash, load_benchmark_yaml, method_config, resolve_run_config
 from recbench.data import SplitError, TrainView
 from recbench.protocol import EVAL_VERSION, PROTOCOL_NOTE, PROTOCOL_VERSION, Unsupported
 from recbench.registry import ensure_loaded
@@ -249,8 +249,10 @@ def run_pair(split_dir: Path, method_name: str, resolved: dict[str, Any], *, iso
         out_path = Path(tmp) / "result.json"
         cfg_path.write_text(json.dumps(resolved))
         command = [sys.executable, "-m", "recbench.runner", "--single", str(split_dir), method_name, str(cfg_path), str(out_path)]
+        module = ensure_loaded().methods[method_name].__module__.rsplit(".", 1)[-1]
         env = {**os.environ, **thread_env(resolved.get("threads")), **(resolved.get("child_env") or {}),
-               "MLFLOW_TRACKING_URI": tracking_uri(), "RECBENCH_ROOT": str(repo_root())}
+               "MLFLOW_TRACKING_URI": tracking_uri(), "RECBENCH_ROOT": str(repo_root()),
+               "RECBENCH_METHOD_MODULES": module}  # the child imports only this method's module (see recbench.methods)
         limit = float(resolved.get("timeout_minutes", 240)) * 60
         proc = subprocess.Popen(command, env=env)
         began = time.time()  # wall clock: keeps counting while a laptop sleeps (time.monotonic does not on macOS)
@@ -301,7 +303,7 @@ def _log_outcome(data: TrainView, method_name: str, run_hash: str, status: str, 
 
 
 def run_matrix(config_path: Path, datasets: list[str], methods: list[str], preset: str | None) -> list[dict[str, Any]]:
-    resolved = resolve_run_config(load_yaml(config_path), preset=preset, repo_root=repo_root())
+    resolved = resolve_run_config(load_benchmark_yaml(config_path, repo_root()), preset=preset, repo_root=repo_root())
     resolved["git_sha"], resolved["git_dirty"] = git_state()
     reg = ensure_loaded()
     results = []

@@ -62,6 +62,7 @@ Each week ends with a checkpoint: if you can do it, move on.
 
 ## After that
 
+- Run the [quick-tier bake-off](quick-tier-box.md) on a rented GPU box and read its [results](../results/quick-tier.md).
 - Run the [full tier on a GPU machine](full-tier-gpu.md) and compare with the smoke results.
 - Benchmark a managed service: [Recombee](../how-to/run-recombee.md).
 - Pick an item from the [roadmap](../results/roadmap.md) and implement it.

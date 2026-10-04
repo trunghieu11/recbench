@@ -96,12 +96,14 @@ $$
 
 ## 6. Hyperparameters
 
-| Name in recbench config | What it does | Default | Typical range | Tip |
+| Name in recbench config | What it does | Default | Searched in the [quick tier](../../results/quick-tier.md) | Tip |
 |---|---|---|---|---|
-| `dim` | number of factors $d$ | preset (32 / 64 / 128) | 16–512 | iALS benefits from large $d$ with strong regularisation |
-| `ials_alpha` | confidence scaling $\alpha$ | 10.0 | 1–100 | higher trusts repeated interactions more |
-| `ials_reg` | regularisation $\lambda$ | 0.01 | 0.001–1 | tune together with `dim` |
-| `ials_iterations` | alternating rounds | 15 | 10–50 | usually converges within 15–30 |
+| `dim` | number of factors $d$ | preset (32 / 64 / 128) | 64, 128, 256, 512 | iALS benefits from large $d$ with strong regularisation (Rendle et al. 2022) |
+| `ials_alpha` | confidence scaling $\alpha$ | 10.0 | 0.3–100 (log scale) | higher trusts repeated interactions more |
+| `ials_reg` | regularisation $\lambda$ | 0.01 | 0.001–100 (log scale) | tune together with `dim`; re-checked at ×0.5, ×1, ×2 (scaled by users) on full data |
+| `ials_iterations` | alternating rounds | 15 | 10, 20 | usually converges within 15–30 |
+| `decay_half_life_days` | recent interactions get more confidence: an interaction $a$ days old is weighted $2^{-a/h}$ | none | none, 30, 90, 365 | |
+| `train_window_days` | train on the last $N$ days only | none | none, 30, 90, 365 | |
 
 ## 7. In recbench
 

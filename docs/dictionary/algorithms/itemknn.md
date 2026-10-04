@@ -105,10 +105,13 @@ is. A user's score for $j$ is how strongly $j$ is connected to everything they a
 
 ## 6. Hyperparameters
 
-| Name in recbench config | What it does | Default | Typical range | Tip |
+| Name in recbench config | What it does | Default | Searched in the [quick tier](../../results/quick-tier.md) | Tip |
 |---|---|---|---|---|
-| `knn_neighbors` | neighbours kept per item ($k$) | 100 | 20–1,000 | more neighbours = smoother scores, more memory |
-| `knn_shrink` | shrinkage $\lambda$ | 10.0 | 0–100 | raise it for noisy, sparse data |
+| `knn_neighbors` | neighbours kept per item ($k$) | 100 | 10–1,000 (log scale) | more neighbours = smoother scores, more memory |
+| `knn_shrink` | shrinkage $\lambda$ | 10.0 | 0, 10, 50, 100, 500 | raise it for noisy, sparse data |
+| `knn_weighting` | down-weights very active users before measuring similarity | none | none, tfidf, bm25 | BM25 often helps on data with a few heavy users (Ferrari Dacrema et al. 2019) |
+| `decay_half_life_days` | an interaction $a$ days old counts $2^{-a/h}$, in the similarities and in the user's profile | none | none, 30, 90, 365 | recent taste matters more on shops than on movies |
+| `train_window_days` | train on the last $N$ days only (each user keeps their last 10 events) | none | none, 30, 90, 365 | the same setting exists for every method |
 
 ## 7. In recbench
 

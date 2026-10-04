@@ -58,6 +58,7 @@ methods:
       dropout: {type: choice, values: [0.1, 0.2, 0.3, 0.5]}
       dim: {type: choice, values: [64, 128]}
       seq_len: {type: choice, values: [50, 100, 200]}
+    fixed: {max_epochs: 200, patience: 10}   # the official code trains 200 epochs; early stopping usually ends sooner
 
   rp3beta:             # Paudel et al. 2016; Ferrari Dacrema et al. 2019 (alpha, beta, neighbours)
     params:
@@ -86,10 +87,12 @@ methods:
       vsknn_last_n: {type: choice, values: [null, 10, 50]}
       vsknn_idf: {type: choice, values: [true, false]}
 
-  sansa:               # Spisak et al. 2023 (lambda as EASE, density of the sparse weights)
+  sansa:               # Spisak et al. 2023 (lambda as EASE; the size of the sparse weights)
     params:
       sansa_lambda: {type: log, low: 1.0, high: 20000.0}
-      sansa_density: {type: log, low: 0.00001, high: 0.01}
+      # weights kept per item: on the MovieLens quick tier, 32 scored 0.096, 320 scored 0.171 and 960 scored 0.173
+      # (EASE: 0.190), at 12 s, 104 s and 496 s on a laptop. Per item, the range suits any catalog size.
+      sansa_weights_per_item: {type: logint, low: 20, high: 500}
       decay_half_life_days: {type: choice, values: [null, 30, 90, 365]}
     confirm: {param: sansa_lambda, factors: [0.5, 1.0, 2.0], scale_with: users}
 
@@ -114,6 +117,7 @@ methods:
       simplex_gamma: {type: float, low: 0.0, high: 1.0}
       lr: {type: log, low: 0.0001, high: 0.01}
       dim: {type: choice, values: [64, 128]}
+    fixed: {max_epochs: 100, patience: 5}    # an epoch is one pass over all interactions
 
   directau:            # Wang et al. 2022 (the authors' grid for gamma and weight decay)
     params:
@@ -122,6 +126,7 @@ methods:
       batch_size: {type: choice, values: [256, 512, 1024, 2048]}
       lr: {type: log, low: 0.0001, high: 0.01}
       dim: {type: choice, values: [64, 128]}
+    fixed: {max_epochs: 100, patience: 5}
 
   ultragcn:            # Mao et al. 2021; RecZoo configs (negatives = negative weight in the paper)
     params:
@@ -131,6 +136,7 @@ methods:
       ultragcn_lambda: {type: log, low: 0.0001, high: 0.01}
       ultragcn_neighbors: {type: choice, values: [5, 10, 20]}
       lr: {type: log, low: 0.0001, high: 0.01}
+    fixed: {max_epochs: 100, patience: 5}    # an epoch is one pass over all interactions
 
   multvae:             # Liang et al. 2018 ([600, 200], dropout 0.5, beta cap 0.2)
     params:
@@ -140,6 +146,7 @@ methods:
       vae_beta_cap: {type: log, low: 0.05, high: 1.0}
       vae_anneal_epochs: {type: choice, values: [5, 10, 20]}
       lr: {type: log, low: 0.0001, high: 0.01}
+    fixed: {max_epochs: 200, patience: 10}   # the paper trains 200 epochs; an epoch is one pass over the users
 
   recvae:              # Shenbin et al. 2020 (gamma 0.005, lr 5e-4, [600, 200])
     params:
@@ -148,6 +155,7 @@ methods:
       vae_latent: {type: choice, values: [64, 128, 200, 256]}
       vae_dropout: {type: float, low: 0.3, high: 0.7}
       lr: {type: log, low: 0.0001, high: 0.005}
+    fixed: {max_epochs: 50, patience: 5}     # the paper's 50 epochs, each 3 encoder passes and 1 decoder pass
 
   gru4rec:             # the official code's search space (paramspaces/) and its tuned RetailRocket defaults
     params:

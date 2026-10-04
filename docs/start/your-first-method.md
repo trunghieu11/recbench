@@ -164,4 +164,4 @@ pytest -q tests/test_methods.py -k category_popular
 **You now know the full path** from an idea to a benchmarked, documented method. The same steps apply to
 complex models; see [add a method](../how-to/add-a-method.md) for the checklist.
 
-**Next:** [the full tier on a GPU machine](full-tier-gpu.md).
+**Next:** [the quick-tier bake-off on a rented GPU](quick-tier-box.md).

@@ -13,6 +13,9 @@ resume: true
 continue_on_error: true
 managed_services: false
 export_bundles: false
+# Reports go to reports/quick-tuned/ as each dataset finishes. Docs fragments are built on the laptop after
+# importing the runs, so the box's git checkout stays clean (runs record git_sha and git_dirty).
+write_docs: false
 
 # Run order: the most studied dataset first, then contrasting regimes, the flagship shop, and the
 # statistically weakest last. Each dataset finishes before the next one starts (idle workers backfill).

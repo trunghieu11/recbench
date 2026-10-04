@@ -19,7 +19,7 @@ small laptop runs are on the [smoke-tier page](leaderboards-smoke.md).
 
     Simple methods with one or two settings (MostPopular, EASE, ItemKNN) are less sensitive to this. Neural
     models depend heavily on their settings, so these tables understate them. Some heavy methods did not
-    finish (see "Did not run" in each section). The [quick-tier bake-off](../dictionary/concepts/fair-baselines-and-tuning.md)
+    finish (see "Did not run" in each section). The [quick-tier bake-off](quick-tier.md)
     re-runs the low-budget methods with equal tuning for every method.
 
 !!! info "How long is the test window?"

@@ -136,19 +136,26 @@ class SANSA(Recommender):
         except ImportError as exc:  # pragma: no cover - optional dependency
             raise Unsupported("the `sansa` package is not installed (pip install 'recbench[sansa]'; needs SuiteSparse)") from exc
         logging.getLogger("sansa").setLevel(logging.WARNING)
+        # macOS: PyTorch's OpenMP runtime and the one Homebrew's SuiteSparse loads abort the process together
+        # once CHOLMOD runs in parallel. Queue and benchmark runs import only this module, so PyTorch is not
+        # loaded (see recbench.methods); in a notebook, do not import PyTorch before fitting SANSA.
         self.bind(data)
         self.seen = data.weighted_matrix(cfg.get("decay_half_life_days")).astype(np.float32).tocsr()
         factorizer = (ICFGramianFactorizerConfig() if cfg.get("sansa_factorizer", "cholmod") == "icf"
                       else CHOLMODGramianFactorizerConfig())
+        # `sansa_weights_per_item` (when set) fixes the number of weights per item, so one search range suits
+        # catalogs of any size; `sansa_density` is the package's own setting, a share of all item pairs.
+        per_item = cfg.get("sansa_weights_per_item")
+        density = min(1.0, float(per_item) / max(self.n_items, 1)) if per_item else float(cfg.get("sansa_density", 1e-3))
         model = SansaModel(SANSAConfig(
             l2=float(cfg.get("sansa_lambda", 500.0)),
-            weight_matrix_density=float(cfg.get("sansa_density", 1e-3)),
+            weight_matrix_density=density,
             gramian_factorizer_config=factorizer,
             lower_triangle_inverter_config=UMRUnitLowerTriangleInverterConfig(),  # the package defaults
         ))
         model.fit(self.seen)
         self.w1, self.w2 = model.weights
-        self.fit_info = {"nonzeros": int(self.w1.nnz + self.w2.nnz)}
+        self.fit_info = {"nonzeros": int(self.w1.nnz + self.w2.nnz), "density": density}
 
     def score_users(self, users: np.ndarray, hist: HistoryBatch) -> np.ndarray:
         out = np.asarray(((self.seen[users] @ self.w1) @ self.w2).todense(), dtype=np.float32)

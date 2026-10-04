@@ -35,12 +35,13 @@ FEATURES = (
 
 
 def tuned_params(data: TrainView, method: str) -> dict[str, Any]:
-    """Best settings the quick tier found for `method` on this dataset ({} when not tuned yet)."""
+    """Best settings found for `method` on this dataset: confirmed on this tier, else tuned on this tier, else
+    tuned on the quick tier ({} when not tuned yet)."""
     from recbench.tuning.job import read_summary
 
     base = data.tier[: -len("-val")] if data.tier.endswith("-val") else data.tier
-    for tier in dict.fromkeys((base, "quick")):
-        summary = read_summary(tier, data.dataset, method)
+    for tier, stage in dict.fromkeys(((base, "confirm"), (base, "tune"), ("quick", "tune"))):
+        summary = read_summary(tier, data.dataset, method, stage)
         if summary and summary.get("best_params"):
             return {k: v for k, v in summary["best_params"].items() if k != "train_window_days"}
     return {}

@@ -1,6 +1,10 @@
-# 5. The full tier on a GPU machine
+# 6. The full tier on a GPU machine
 
 **Goal:** run the benchmark on the complete datasets with larger models on your Ubuntu NVIDIA machine.
+
+!!! tip "Start with the quick tier"
+    To compare methods fairly on a small budget, run the [quick-tier bake-off](quick-tier-box.md) first. This
+    page runs every method once with default settings on the full data, which is how the first results were made.
 **Time:** setup about an hour; the run takes several hours to a day, depending on the GPU.
 **You need:** an NVIDIA GPU with at least 24 GB of memory, 64 GB of RAM (128 GB recommended for the 48 GB
 preset), and about 80 GB of free disk.

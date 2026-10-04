@@ -120,6 +120,8 @@ def dataset_facts(name: str, entry: dict[str, Any], spec: Any, data_dir: Path) -
     stats = []
     for meta_path in sorted((data_dir / "splits" / name).glob("*/meta.json")):
         meta = json.loads(meta_path.read_text())
+        if meta.get("fold"):  # validation folds are described on the quick-tier page
+            continue
         stats.append([meta["tier"], f"{meta['n_users']:,}", f"{meta['n_items']:,}", f"{meta['n_pretest']:,}", f"{meta['n_test']:,}",
                       f"{meta['n_eval_warm']:,}", f"{meta['n_cold_test_users']:,}", f"{meta['repeat_share']:.1%}", meta["test_start"]])
     if stats:
@@ -148,7 +150,10 @@ def build(root: Path | None = None, data_dir: Path | None = None, with_results: 
         try:
             from recbench.results import load_runs
 
-            frames = {tier: load_runs(tier) for tier in ("smoke", "full")}
+            # Untuned runs (default settings) and quick-tier tuned runs are labelled apart; dry runs of the tuning
+            # pipeline on the smoke tier are left out, because their 2-setting searches mean little.
+            frames = {"smoke": load_runs("smoke", tuning="defaults"), "full": load_runs("full", tuning="defaults"),
+                      "quick (tuned)": load_runs("quick", tuning="tuned"), "full (tuned)": load_runs("full", tuning="tuned")}
         except Exception:  # noqa: BLE001 - docs still build without MLflow results
             frames = {}
 

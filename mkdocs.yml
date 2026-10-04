@@ -81,8 +81,9 @@ nav:
       - 2. Your first smoke run: start/first-smoke-run.md
       - 3. Reading the results: start/reading-results.md
       - 4. Your first new method: start/your-first-method.md
-      - 5. The full tier on a GPU machine: start/full-tier-gpu.md
-      - 6. Deploy to Cloud Run: start/deploy-cloud-run.md
+      - 5. The quick-tier bake-off on a rented GPU: start/quick-tier-box.md
+      - 6. The full tier on a GPU machine: start/full-tier-gpu.md
+      - 7. Deploy to Cloud Run: start/deploy-cloud-run.md
   - How-to:
       - Add a method: how-to/add-a-method.md
       - Add a metric: how-to/add-a-metric.md
@@ -191,6 +192,7 @@ nav:
       - Cost control: cloud/cost-control.md
       - Security: cloud/security.md
   - Results:
+      - Quick-tier bake-off: results/quick-tier.md
       - Leaderboards: results/leaderboards.md
       - Smoke-tier leaderboards: results/leaderboards-smoke.md
       - How to read results: results/how-to-read-results.md

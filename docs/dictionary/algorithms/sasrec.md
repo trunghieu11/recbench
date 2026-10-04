@@ -107,14 +107,22 @@ memory budget, recbench switches to sampled softmax with 1,024 shared random neg
 
 ## 6. Hyperparameters
 
-| Name in recbench config | What it does | Default | Typical range | Tip |
+| Name in recbench config | What it does | Default | Searched in the [quick tier](../../results/quick-tier.md) | Tip |
 |---|---|---|---|---|
-| `dim` | embedding and hidden size | preset (32 / 64 / 128) | 32–256 | |
-| `layers` | Transformer layers | preset (2 / 2 / 3) | 1–4 | 2 is a strong default |
-| `heads` | attention heads | preset (2 / 2 / 4) | 1–8 | must divide `dim` |
-| `seq_len` | maximum history length read | preset (50 / 50 / 200) | 50–200 | longer histories for long sessions (music) |
-| `dropout` | dropout rate | 0.2 | 0.1–0.5 | higher for sparse data |
-| `batch_size`, `lr`, `max_steps` | training loop | preset | — | |
+| `dim` | embedding and hidden size | preset (32 / 64 / 128) | 64, 128 | |
+| `layers` | Transformer layers | preset (2 / 2 / 3) | fixed (preset) | 2 is a strong default |
+| `heads` | attention heads | preset (2 / 2 / 4) | fixed (preset) | must divide `dim` |
+| `seq_len` | maximum history length read | preset (50 / 50 / 200) | 50, 100, 200 | longer histories for long sessions (music) |
+| `dropout` | dropout rate | 0.2 | 0.1, 0.2, 0.3, 0.5 | higher for sparse data |
+| `sasrec_loss` | `auto` (full softmax when it fits in memory, else sampled), `sampled`, or `bce` (the original loss) | auto | all three | full softmax usually wins (Klenitskiy & Vasilev 2023) |
+| `n_negatives` | negatives shared by a batch for the sampled softmax | 1,024 | 256, 1,024, 4,096 | more negatives behave more like the full softmax |
+| `lr` | Adam learning rate | 1e-3 | 1e-4–1e-2 (log scale) | |
+| `max_epochs`, `patience` | early stopping on a validation fold | 30, 3 | fixed: 200, 10 | the final run reuses the best epoch count |
+| `batch_size` | windows per step | preset | fixed (preset) | |
+
+One **epoch** is enough random windows for every training event to be a target about once, and at least one
+window per user. Sizing epochs by users alone made them tiny when there are few users with long histories
+(14 batches on the MovieLens quick tier).
 
 ## 7. In recbench
 

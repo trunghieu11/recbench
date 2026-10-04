@@ -76,6 +76,27 @@ def test_queue_runs_all_jobs_and_resumes(workspace, capsys):
     assert "== toy: 3/3 jobs done" in out and "== toy2: 3/3 jobs done" in out
 
 
+def test_confirmations_rank_every_method_even_in_a_filtered_session(workspace):
+    methods = [{"name": "random", "resource": "cpu"}, {"name": "most_popular", "resource": "cpu"}, {"name": "itemknn", "resource": "cpu"}]
+    config = write_config(workspace / "q.yaml", ["toy"], methods, confirm_top=1)
+    jobs = Queue(config, isolate=False, gpus=0, cpu_workers=1).run()
+    tuned = {j.method: j.result["test"]["ndcg_at_10"] for j in jobs if j.kind == "tune" and j.method != "random"}
+    best, weaker = max(tuned, key=tuned.get), min(tuned, key=tuned.get)
+    assert [j.method for j in jobs if j.kind == "confirm"] == [best]
+    # Re-running only the weaker method must not confirm it: the ranking covers every method's summary on disk.
+    filtered = Queue(config, methods=[weaker], isolate=False, gpus=0, cpu_workers=1).run()
+    assert [j for j in filtered if j.kind == "confirm"] == []
+
+
+def test_jobs_without_splits_run_again_on_resume(workspace):
+    methods = [{"name": "random", "resource": "cpu"}]
+    config = write_config(workspace / "q.yaml", ["toy", "later"], methods)
+    jobs = Queue(config, isolate=False, gpus=0, cpu_workers=1).run()
+    assert {(j.dataset, j.status) for j in jobs} == {("toy", "finished"), ("later", "missing_split")}
+    again = Queue(config, isolate=False, gpus=0, cpu_workers=1)
+    assert {(j.dataset, j.status) for j in again.jobs} == {("toy", "finished"), ("later", "pending")}
+
+
 def test_confirmation_rechecks_the_size_setting_on_full_data(tmp_path, monkeypatch):
     write_toy_clean(tmp_path / "clean")
     splits = tmp_path / "data" / "splits" / "toy"
@@ -100,3 +121,20 @@ def test_confirmation_rechecks_the_size_setting_on_full_data(tmp_path, monkeypat
     lambdas = sorted(c["params"]["ease_lambda"] for c in confirmed["checks"])
     assert lambdas[1] == pytest.approx(2 * lambdas[0]) and lambdas[2] == pytest.approx(2 * lambdas[1])
     assert len(confirmed["finals"]) == 1  # EASE is deterministic: one seed is enough
+    from recbench.tuning.job import read_summary
+
+    assert read_summary("full", "toy", "ease", "confirm")["stage"] == "confirm"
+    assert read_summary("smoke", "toy", "ease")["test"] == quick["test"]  # the tuning summary is untouched
+    same_tier = run_confirm("toy", "ease", resolved, settings, spaces["ease"], tier="smoke", seeds=[1], isolate=False)
+    assert same_tier["status"] == "finished" and read_summary("smoke", "toy", "ease")["status"] == "finished"
+
+
+def test_benchmark_files_can_extend_another(tmp_path):
+    from recbench.config import load_benchmark_yaml
+
+    (tmp_path / "base.yaml").write_text(yaml.safe_dump({"tier": "quick", "tuning": {"trials": 10, "cap_minutes": 180},
+                                                        "queue": {"methods": [{"name": "ease"}]}}))
+    (tmp_path / "child.yaml").write_text(yaml.safe_dump({"extends": "base.yaml", "tier": "smoke", "tuning": {"trials": 2}}))
+    merged = load_benchmark_yaml(tmp_path / "child.yaml", tmp_path)
+    assert merged["tier"] == "smoke" and merged["tuning"] == {"trials": 2, "cap_minutes": 180}
+    assert merged["queue"]["methods"] == [{"name": "ease"}] and "extends" not in merged

@@ -60,6 +60,23 @@ def test_job_searches_the_fold_then_tests_once_and_resumes(workspace):
     assert read_summary("full", "toy", "most_popular")["status"] == "finished"
 
 
+def test_retry_starts_a_fresh_attempt_after_failed_trials(workspace):
+    from recbench.tuning.spaces import MethodSpace
+
+    spaces, _ = load_spaces(ROOT / "configs" / "tuning" / "quick.yaml")
+    settings = JobSettings(tier="full", trials=2, search_users=50, cap_minutes=10)
+    good = spaces["most_popular"]
+    broken = MethodSpace("most_popular", params=good.params, fixed={"train_window_days": "not a number"})  # every trial fails
+    assert run_job("toy", "most_popular", dict(RESOLVED), settings, broken, isolate=False)["status"] == "failed"
+    again = run_job("toy", "most_popular", dict(RESOLVED), settings, good, isolate=False)
+    assert again["status"] == "failed" and again["attempt"] == 0  # without retry, the failed trials use up the budget
+    fixed = run_job("toy", "most_popular", dict(RESOLVED), settings, good, isolate=False, retry=True)
+    assert fixed["status"] == "finished" and fixed["attempt"] == 1 and len(fixed["trials"]) == 2
+    resumed = run_job("toy", "most_popular", dict(RESOLVED), settings, good, isolate=False)
+    assert resumed["attempt"] == 1  # later runs keep the new attempt
+    assert resumed["test"]["ndcg_at_10"] == pytest.approx(fixed["test"]["ndcg_at_10"]) and set(fixed["test"]) <= set(resumed["test"])
+
+
 def test_job_without_time_for_one_trial_is_over_budget(workspace):
     spaces, _ = load_spaces(ROOT / "configs" / "tuning" / "quick.yaml")
     settings = JobSettings(tier="full", trials=3, search_users=50, cap_minutes=0.5)

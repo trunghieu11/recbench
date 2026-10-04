@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -10,7 +14,7 @@ import scipy.sparse as sp
 from conftest import FAST_CFG
 from recbench.data import TrainView
 from recbench.methods.baselines import EASE
-from recbench.methods.linear import SANSA, SLIM, PureSVD
+from recbench.methods.linear import SLIM, PureSVD
 from recbench.methods.neighbourhood import RP3beta, VSKNN, rp3beta_similarity, sessions_from_events
 from recbench.pipeline.materialize import materialize
 
@@ -79,20 +83,39 @@ def test_vsknn_recommends_items_from_similar_sessions(tmp_path):
     assert scores[item["i3"]] > 0 and scores[item["i4"]] == 0 and scores[item["i5"]] == 0
 
 
-def test_sansa_ranks_like_exact_ease(toy):
+SANSA_VS_EASE = """
+import sys
+import numpy as np
+from recbench.data import TrainView
+from recbench.methods.baselines import EASE
+from recbench.methods.linear import SANSA
+
+assert "torch" not in sys.modules
+data = TrainView(sys.argv[1])
+exact, approx = EASE(), SANSA()
+exact.fit(data, {"ease_lambda": 50.0, "ease_backend": "numpy"})
+approx.fit(data, {"sansa_lambda": 50.0, "sansa_density": 1.0})
+users = data.warm_users()[:30]
+hist = data.history_batch(users, 10)
+a, b = exact.score_users(users, hist), approx.score_users(users, hist)
+unseen = data.seen[users].toarray() == 0
+unseen[:, 0] = False
+corr = []
+for row in range(len(users)):  # the two differ only on already-seen items (EASE zeroes its diagonal)
+    mask = unseen[row] & np.isfinite(a[row])
+    corr.append(np.corrcoef(a[row][mask], b[row][mask])[0, 1])
+print(min(corr))
+"""
+
+
+def test_sansa_ranks_like_exact_ease(toy_split):
     pytest.importorskip("sansa")
-    data, _ = toy
-    exact, approx = EASE(), SANSA()
-    exact.fit(data, {"ease_lambda": 50.0})
-    approx.fit(data, {"sansa_lambda": 50.0, "sansa_density": 1.0})
-    users = data.warm_users()[:30]
-    hist = data.history_batch(users, 10)
-    a, b = exact.score_users(users, hist), approx.score_users(users, hist)
-    unseen = (data.seen[users].toarray() == 0)
-    unseen[:, 0] = False
-    for row in range(len(users)):  # the two differ only on already-seen items (EASE zeroes its diagonal)
-        mask = unseen[row] & np.isfinite(a[row])
-        assert np.corrcoef(a[row][mask], b[row][mask])[0, 1] > 0.99
+    # In a child process that imports only these modules, as queue runs do: on macOS, SuiteSparse's OpenMP
+    # runtime cannot share a process with PyTorch's (see recbench.methods).
+    env = {**os.environ, "RECBENCH_METHOD_MODULES": "linear"}
+    out = subprocess.run([sys.executable, "-c", SANSA_VS_EASE, str(toy_split)], env=env, capture_output=True, text=True)
+    assert out.returncode == 0, out.stderr[-2000:]
+    assert float(out.stdout.split()[-1]) > 0.99
 
 
 def _dense_norm(x: np.ndarray, a: float) -> np.ndarray:

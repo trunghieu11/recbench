@@ -80,9 +80,10 @@ $$
 
 ## 6. Hyperparameters
 
-| Name in recbench config | What it does | Default | Typical range | Tip |
+| Name in recbench config | What it does | Default | Searched in the [quick tier](../../results/quick-tier.md) | Tip |
 |---|---|---|---|---|
-| `pop_window_days` | length of the "recent" window | 28 | 1–90 | shorter for fast-moving catalogs (news, fashion), longer for slow ones (books, movies) |
+| `pop_window_days` | length of the "recent" window | 28 | 3, 7, 14, 28, 56, 112, 365 | shorter for fast-moving catalogs (news, fashion), longer for slow ones (books, movies) |
+| `pop_half_life_days` | inside the window, an interaction $a$ days old counts $2^{-a/h}$ instead of 1 | none (all count 1) | none, 3, 7, 14, 30 | a smooth alternative to a short window |
 
 ## 7. In recbench
 

@@ -1,7 +1,7 @@
 # The method ladder
 
 recbench compares the methods below (the low-budget ones first enter through the
-[quick tier](../../results/leaderboards.md)). They are arranged as a **ladder**: each rung adds one idea (and usually
+[quick tier](../../results/quick-tier.md)). They are arranged as a **ladder**: each rung adds one idea (and usually
 more cost and complexity) on top of the rung below. Reading the pages in order is the fastest way to
 understand modern recommender systems.
 

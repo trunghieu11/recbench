@@ -49,8 +49,10 @@ SESSION_GAP_US = 30 * 60 * 1_000_000
 TIERS: dict[str, dict[str, Any]] = {
     "smoke": {"target_events": 50_000, "max_user_pretest": 300, "max_user_test": 50, "min_eval_users": 30, "max_eval_users": 10_000},
     "standard": {"target_events": 1_000_000, "max_user_pretest": 1_000, "max_user_test": 200, "min_eval_users": 200, "max_eval_users": 10_000},
-    # The low-budget gate: every method is tuned and compared here first (same sizes as "standard").
-    "quick": {"target_events": 1_000_000, "max_user_pretest": 1_000, "max_user_test": 200, "min_eval_users": 200, "max_eval_users": 10_000},
+    # The low-budget gate: every method is tuned and compared here first. Like "standard", but when users with
+    # test events fill less than 80% of the budget (RetailRocket), the rest goes to other users (fill_to_target).
+    "quick": {"target_events": 1_000_000, "max_user_pretest": 1_000, "max_user_test": 200, "min_eval_users": 200, "max_eval_users": 10_000,
+              "fill_to_target": True},
     # Sized for a managed service's free plan: <= 10K items, ~40K events, 1K eval users.
     "slice": {"target_events": 40_000, "max_user_pretest": 200, "max_user_test": 50, "max_items": 10_000, "min_eval_users": 100, "max_eval_users": 1_000},
     "full": {"min_eval_users": 500, "max_eval_users": 10_000},
@@ -142,7 +144,8 @@ def _sample_users(con: duckdb.DuckDBPyConnection, test_start: int, params: dict[
     budget = np.minimum(shuffled["n_pre"], params["max_user_pretest"]) + np.minimum(shuffled["n_test"], params["max_user_test"])
     warm_eval = ((shuffled["n_pre"] > 0) & (shuffled["n_test"] > 0)).to_numpy()
     take_warm = np.cumsum(budget[warm_eval]) <= 0.8 * target
-    take_other = np.cumsum(budget[~warm_eval]) <= 0.2 * target
+    rest = target - int(budget[warm_eval][take_warm.to_numpy()].sum()) if params.get("fill_to_target") else 0.2 * target
+    take_other = np.cumsum(budget[~warm_eval]) <= rest
     chosen = pd.concat(
         [shuffled.loc[warm_eval, "user_id"][take_warm.to_numpy()], shuffled.loc[~warm_eval, "user_id"][take_other.to_numpy()]]
     )

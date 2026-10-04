@@ -30,8 +30,9 @@ python -m recbench.queue status --config configs/benchmarks/quick-smoke.yaml
 ```
 
 `configs/benchmarks/quick-smoke.yaml` reuses the real queue and search spaces (`extends: quick.yaml`) with 2
-settings per job and at most 3 epochs. It takes about an hour on an M4 Pro. Every job should end `finished`.
-Ignore the scores: smoke splits have only a few hundred users.
+settings per job and at most 3 epochs. It takes about 20 minutes on an M4 Pro. Every job should end `finished`,
+except the two re-rankers on H&M and Last.fm: their smoke splits have too few recent users to train on ("too few
+recent users with a reachable next item"). Ignore the scores: smoke splits have only a few hundred users.
 
 ## Step 1: prepare the splits on the laptop
 

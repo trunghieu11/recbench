@@ -1,0 +1,29 @@
+# Experiments for GF-CF (lab 7: docs/labs/07-gfcf.md). Each experiment starts from the bake-off's search
+# space for gfcf in configs/tuning/quick.yaml (what the baseline searched) and changes it:
+#   params:   settings added to the search, or searched differently (same format as configs/tuning/quick.yaml)
+#   remove:   settings no longer searched (the method's default applies)
+#   fixed:    settings held at one value
+#   trials:   settings to try (default 10, the baseline's budget: keep it, so the comparison stays fair)
+#   note:     what you tried and why (shown on the scoreboard)
+#   promoted: true once you promote it (docs/handbook/promote.md)
+# Run one:    python -m recbench.lab run --method gfcf --experiment linear-only
+# Compare:    python -m recbench.compare gfcf gfcf:linear-only
+experiments:
+  baseline: {}   # the bake-off's search space, unchanged (python -m recbench.lab baseline computed it)
+
+  # Level 3, no code needed: what does the SVD part (the ideal low-pass filter) add?
+  linear-only:
+    note: Only the linear filter (alpha = 0)
+    fixed: {gfcf_alpha: 0.0}
+
+  # Level 3, after a small code change: prune the item-item filter (faster scoring; maybe less noise).
+  # pruned:
+  #   note: Keep each item's k largest weights in the linear filter
+  #   params:
+  #     gfcf_prune: {type: choice, values: [50, 200, 1000]}
+
+  # Level 4, after you write the variant: a smooth low-pass filter from the singular values.
+  # smooth:
+  #   note: Weight singular direction k by (sigma_k / sigma_1)^gamma instead of 1
+  #   params:
+  #     gfcf_sv_power: {type: float, low: 0.0, high: 2.0}

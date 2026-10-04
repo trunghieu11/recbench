@@ -1,0 +1,32 @@
+# Experiments for ItemKNN (lab 1: docs/labs/01-itemknn.md). Each experiment starts from the bake-off's search
+# space for itemknn in configs/tuning/quick.yaml (what the baseline searched) and changes it:
+#   params:   settings added to the search, or searched differently (same format as configs/tuning/quick.yaml)
+#   remove:   settings no longer searched (the method's default applies)
+#   fixed:    settings held at one value
+#   trials:   settings to try (default 10, the baseline's budget: keep it, so the comparison stays fair)
+#   note:     what you tried and why (shown on the scoreboard)
+#   promoted: true once you promote it (docs/handbook/promote.md)
+# Run one:    python -m recbench.lab run --method itemknn --experiment no-time-knobs
+# Compare:    python -m recbench.compare itemknn itemknn:no-time-knobs
+experiments:
+  baseline: {}   # the bake-off's search space, unchanged (python -m recbench.lab baseline computed it)
+
+  # Level 3, no code needed: how much do the recency settings add?
+  no-time-knobs:
+    note: Without recency weighting or a training window, is ItemKNN worse?
+    remove: [decay_half_life_days, train_window_days]
+
+  # Level 3, no code needed: the training window also trims each user's profile (all but the last 10 events
+  # outside the window). Keep more of every user's recent history.
+  # keep-more-history:
+  #   note: The window trims the profile used for scoring; keep each user's last 50 or 200 events
+  #   params:
+  #     train_window_keep_last: {type: choice, values: [10, 50, 200]}
+
+  # Level 4, after you write the variant (Lab 1, Level 4): asymmetric cosine and a locality exponent (Aiolli 2013).
+  # asymmetric:
+  #   note: Asymmetric cosine with alpha and locality q (Aiolli 2013)
+  #   params:
+  #     knn_similarity: {type: choice, values: [asymmetric]}
+  #     knn_alpha: {type: float, low: 0.1, high: 0.9}
+  #     knn_locality: {type: choice, values: [1, 2, 3]}

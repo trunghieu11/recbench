@@ -1,0 +1,29 @@
+# Experiments for PureSVD (lab 6: docs/labs/06-puresvd.md). Each experiment starts from the bake-off's search
+# space for puresvd in configs/tuning/quick.yaml (what the baseline searched) and changes it:
+#   params:   settings added to the search, or searched differently (same format as configs/tuning/quick.yaml)
+#   remove:   settings no longer searched (the method's default applies)
+#   fixed:    settings held at one value
+#   trials:   settings to try (default 10, the baseline's budget: keep it, so the comparison stays fair)
+#   note:     what you tried and why (shown on the scoreboard)
+#   promoted: true once you promote it (docs/handbook/promote.md)
+# Run one:    python -m recbench.lab run --method puresvd --experiment no-time-knobs
+# Compare:    python -m recbench.compare puresvd puresvd:no-time-knobs
+experiments:
+  baseline: {}   # the bake-off's search space, unchanged (python -m recbench.lab baseline computed it)
+
+  # Level 3, no code needed: how much do the recency settings add?
+  no-time-knobs:
+    note: Without recency weighting or a training window
+    remove: [decay_half_life_days, train_window_days]
+
+  # Level 3, after a small code change: normalise each user's row by their activity.
+  # user-norm:
+  #   note: Divide each user's row by (number of items)^gamma before the SVD
+  #   params:
+  #     svd_user_norm: {type: float, low: 0.0, high: 1.0}
+
+  # Level 4, after you write the variant: EigenRec's popularity scaling (Nikolakopoulos et al. 2019).
+  # eigenrec:
+  #   note: Scale item columns by popularity^d before the SVD
+  #   params:
+  #     svd_pop_exponent: {type: float, low: -0.5, high: 0.5}

@@ -1,0 +1,29 @@
+# Experiments for RP3beta (lab 2: docs/labs/02-rp3beta.md). Each experiment starts from the bake-off's search
+# space for rp3beta in configs/tuning/quick.yaml (what the baseline searched) and changes it:
+#   params:   settings added to the search, or searched differently (same format as configs/tuning/quick.yaml)
+#   remove:   settings no longer searched (the method's default applies)
+#   fixed:    settings held at one value
+#   trials:   settings to try (default 10, the baseline's budget: keep it, so the comparison stays fair)
+#   note:     what you tried and why (shown on the scoreboard)
+#   promoted: true once you promote it (docs/handbook/promote.md)
+# Run one:    python -m recbench.lab run --method rp3beta --experiment no-popularity-penalty
+# Compare:    python -m recbench.compare rp3beta rp3beta:no-popularity-penalty
+experiments:
+  baseline: {}   # the bake-off's search space, unchanged (python -m recbench.lab baseline computed it)
+
+  # Level 3, no code needed: what does the popularity penalty (beta) add? beta = 0 is P3alpha.
+  no-popularity-penalty:
+    note: P3alpha (beta = 0) against RP3beta
+    fixed: {rp3_beta: 0.0}
+
+  # Level 3, after a small code change: walk along interaction counts instead of 0/1.
+  # counts:
+  #   note: P(j | u) from interaction counts instead of 0/1
+  #   params:
+  #     rp3_counts: {type: choice, values: [true]}
+
+  # Level 4, after you write the variant: re-normalise each item's weights after keeping the top-k.
+  # normalised:
+  #   note: Row-normalised similarity after top-k (Ferrari Dacrema et al.'s reference code)
+  #   params:
+  #     rp3_normalize: {type: choice, values: [true]}

@@ -1,0 +1,30 @@
+# Experiments for SLIM (lab 4: docs/labs/04-slim.md). Each experiment starts from the bake-off's search
+# space for slim in configs/tuning/quick.yaml (what the baseline searched) and changes it:
+#   params:   settings added to the search, or searched differently (same format as configs/tuning/quick.yaml)
+#   remove:   settings no longer searched (the method's default applies)
+#   fixed:    settings held at one value
+#   trials:   settings to try (default 10, the baseline's budget: keep it, so the comparison stays fair)
+#   note:     what you tried and why (shown on the scoreboard)
+#   promoted: true once you promote it (docs/handbook/promote.md)
+# Run one:    python -m recbench.lab run --method slim --experiment more-neighbours
+# Compare:    python -m recbench.compare slim slim:more-neighbours
+experiments:
+  baseline: {}   # the bake-off's search space, unchanged (python -m recbench.lab baseline computed it)
+
+  # Level 3, no code needed: does pre-selecting only 50-200 candidate neighbours per item hold SLIM back?
+  more-neighbours:
+    note: Search 200-800 candidate neighbours instead of 50-200
+    params:
+      slim_neighbors: {type: choice, values: [200, 400, 800]}
+
+  # Level 3, after a small code change: leave out very rare items.
+  # min-count:
+  #   note: Items with fewer than n interactions get no weights
+  #   params:
+  #     slim_min_count: {type: choice, values: [1, 3, 5, 10]}
+
+  # Level 4, after you write the variant: allow negative weights (Steck 2019).
+  # negative-weights:
+  #   note: SLIM without the non-negativity constraint
+  #   params:
+  #     slim_positive: {type: choice, values: [false]}

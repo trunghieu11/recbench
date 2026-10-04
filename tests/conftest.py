@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 import pytest
@@ -68,3 +69,53 @@ def copy_split(tmp_path_factory) -> Path:
     write_copy_task(root / "clean")
     return materialize(root / "clean", root / "split", dataset="copy", tier="full",
                        repeat_policies=("allow_repeats",), tier_overrides={"min_eval_users": 1})
+
+
+# ----- the improvement lab (tests/test_lab.py, tests/test_compare.py) -------------------------------------------------
+
+REPO = Path(__file__).resolve().parents[1]
+TOY_LAB = """
+workspace: lab
+tier: full
+preset: quick
+hardware: configs/hardware/local-cpu.yaml
+seed: 42
+resume: true
+continue_on_error: true
+export_bundles: false
+write_docs: false
+track_code: true
+overrides: {ease_backend: numpy, dim: 16, threads: 1}
+eval: {save_topk: true}
+datasets: [toy]
+tuning: {spaces: configs/tuning/quick.yaml, trials: 2, search_users: 500, cap_minutes: 10, final_seeds: [42, 43]}
+confirm: {top: 0}
+queue:
+  cpu_workers: 1
+  methods: [{name: most_popular}, {name: itemknn}, {name: bpr_mf}]
+"""
+
+
+@pytest.fixture()
+def lab(tmp_path, monkeypatch):
+    """A lab on the toy data: test split and validation fold, the real search spaces and experiment files, a small
+    lab.yaml (2 settings per job), and everything in-process."""
+    from recbench.lab import runs
+    from recbench.paths import WORKSPACE_ENV
+
+    write_toy_clean(tmp_path / "clean")
+    splits = tmp_path / "data" / "splits" / "toy"
+    materialize(tmp_path / "clean", splits / "full", dataset="toy", tier="full", tier_overrides={"min_eval_users": 1})
+    materialize(tmp_path / "clean", splits / "full-val", dataset="toy", tier="full", tier_overrides={"min_eval_users": 1}, fold="valid")
+    shutil.copytree(REPO / "configs", tmp_path / "configs")
+    shutil.copytree(REPO / "labs", tmp_path / "labs")
+    shutil.copytree(REPO / "dictionary", tmp_path / "dictionary")  # the method catalog, for the overall comparison
+    (tmp_path / "configs" / "benchmarks" / "lab.yaml").write_text(TOY_LAB)
+    monkeypatch.setenv("DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("RECBENCH_ROOT", str(tmp_path))
+    monkeypatch.delenv("MLFLOW_TRACKING_URI", raising=False)
+    monkeypatch.setenv(WORKSPACE_ENV, "")  # restored after the test, whatever the code under test sets
+    monkeypatch.setattr(runs, "ISOLATE", False)
+    runs.lab_config.cache_clear()
+    yield tmp_path
+    runs.lab_config.cache_clear()

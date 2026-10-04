@@ -1,0 +1,30 @@
+# Experiments for EASE (lab 3: docs/labs/03-ease.md). Each experiment starts from the bake-off's search
+# space for ease in configs/tuning/quick.yaml (what the baseline searched) and changes it:
+#   params:   settings added to the search, or searched differently (same format as configs/tuning/quick.yaml)
+#   remove:   settings no longer searched (the method's default applies)
+#   fixed:    settings held at one value
+#   trials:   settings to try (default 10, the baseline's budget: keep it, so the comparison stays fair)
+#   note:     what you tried and why (shown on the scoreboard)
+#   promoted: true once you promote it (docs/handbook/promote.md)
+# Run one:    python -m recbench.lab run --method ease --experiment no-time-knobs
+# Compare:    python -m recbench.compare ease ease:no-time-knobs
+experiments:
+  baseline: {}   # the bake-off's search space, unchanged (python -m recbench.lab baseline computed it)
+
+  # Level 3, no code needed: is lambda all you need?
+  no-time-knobs:
+    note: Lambda only, without recency weighting or a training window
+    remove: [decay_half_life_days, train_window_days]
+
+  # Level 3, after a small code change: which items the item cap keeps (this laptop keeps 20,000).
+  # keep-alltime-popular:
+  #   note: Keep the all-time most popular items under the cap instead of the recently popular
+  #   params:
+  #     ease_keep: {type: choice, values: [recent, alltime]}
+
+  # Level 4, after you write the variant: EDLAE, a per-item penalty (Steck 2020).
+  # edlae:
+  #   note: EDLAE penalty lambda + p / (1 - p) * G_ii (Steck 2020)
+  #   params:
+  #     ease_variant: {type: choice, values: [edlae]}
+  #     ease_dropout: {type: float, low: 0.05, high: 0.75}

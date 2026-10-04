@@ -1,0 +1,31 @@
+# Experiments for BPR-MF (lab 9: docs/labs/09-bpr-mf.md). Each experiment starts from the bake-off's search
+# space for bpr_mf in configs/tuning/quick.yaml (what the baseline searched) and changes it:
+#   params:   settings added to the search, or searched differently (same format as configs/tuning/quick.yaml)
+#   remove:   settings no longer searched (the method's default applies)
+#   fixed:    settings held at one value
+#   trials:   settings to try (default 10, the baseline's budget: keep it, so the comparison stays fair)
+#   note:     what you tried and why (shown on the scoreboard)
+#   promoted: true once you promote it (docs/handbook/promote.md)
+# Run one:    python -m recbench.lab run --method bpr_mf --experiment more-iterations
+# Compare:    python -m recbench.compare bpr_mf bpr_mf:more-iterations
+experiments:
+  baseline: {}   # the bake-off's search space, unchanged (python -m recbench.lab baseline computed it)
+
+  # Level 3, no code needed: is BPR-MF under-trained?
+  more-iterations:
+    note: Search 200-800 passes over the data instead of 50-200
+    params:
+      bpr_iterations: {type: choice, values: [200, 400, 800]}
+
+  # Level 3, after a small code change: leave out very rare items.
+  # min-count:
+  #   note: Items with fewer than n interactions are left out of training
+  #   params:
+  #     bpr_min_count: {type: choice, values: [1, 3, 5, 10]}
+
+  # Level 4, after you write the variant: your own BPR, with popularity-based negatives (Rendle & Freudenthaler 2014).
+  # popular-negatives:
+  #   note: numba BPR; negatives sampled in proportion to popularity^beta
+  #   params:
+  #     bpr_backend: {type: choice, values: [numba]}
+  #     bpr_neg_power: {type: float, low: 0.0, high: 1.0}

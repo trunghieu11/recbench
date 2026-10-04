@@ -1,0 +1,30 @@
+# Experiments for the LightGBM re-ranker (lab 11: docs/labs/11-lgbm-rerank.md). Each experiment starts from the bake-off's search
+# space for lgbm_rerank in configs/tuning/quick.yaml (what the baseline searched) and changes it:
+#   params:   settings added to the search, or searched differently (same format as configs/tuning/quick.yaml)
+#   remove:   settings no longer searched (the method's default applies)
+#   fixed:    settings held at one value
+#   trials:   settings to try (default 10, the baseline's budget: keep it, so the comparison stays fair)
+#   note:     what you tried and why (shown on the scoreboard)
+#   promoted: true once you promote it (docs/handbook/promote.md)
+# Run one:    python -m recbench.lab run --method lgbm_rerank --experiment more-train-users
+# Compare:    python -m recbench.compare lgbm_rerank lgbm_rerank:more-train-users
+experiments:
+  baseline: {}   # the bake-off's search space, unchanged (python -m recbench.lab baseline computed it)
+
+  # Level 3, no code needed: does the ranker learn more from more users?
+  more-train-users:
+    note: Train the ranker on up to 50,000 users instead of 20,000
+    params:
+      rerank_train_users: {type: choice, values: [20000, 50000]}
+
+  # Level 3, after a small code change: fewer negatives per user (negative downsampling).
+  # downsample:
+  #   note: Keep at most n non-chosen candidates per user for training
+  #   params:
+  #     rerank_neg_per_user: {type: choice, values: [20, 50, 100]}
+
+  # Level 4, after you write the variant: your best improved method as a third candidate generator and feature.
+  # third-generator:
+  #   note: Add RP3beta (tuned in the lab) as a third generator and feature
+  #   params:
+  #     rerank_third: {type: choice, values: [rp3beta]}

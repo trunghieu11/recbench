@@ -1,8 +1,9 @@
 """Two-stage recommendation: cheap candidate generators, then a learned re-ranker (LightGBM or DCN-V2).
 
 Stage 1, retrieval: EASE, ItemKNN and recent popularity each propose items, and their union (up to
-`rerank_candidates`, default 200) becomes the candidate list. The generators use the settings the quick
-tier tuned for them on this dataset (runs/tuning/<tier>/<dataset>/<method>.json), or their defaults.
+`rerank_candidates`, default 200) becomes the candidate list. The generators use the settings the bake-off
+chose for them on this dataset (runs/tuning/<tier>/<dataset>/<method>.json, or its confirmation on full data),
+or their defaults. A tuning job pins them in the re-ranker's config, so they are part of every run's identity.
 
 Stage 2, ranking: a model scores every (user, candidate) pair from features. These are the generators'
 scores and ranks, item popularity and trend, item age, user activity, category affinity, co-visitation with
@@ -36,15 +37,12 @@ FEATURES = (
 
 def tuned_params(data: TrainView, method: str) -> dict[str, Any]:
     """Best settings found for `method` on this dataset: confirmed on this tier, else tuned on this tier, else
-    tuned on the quick tier ({} when not tuned yet)."""
-    from recbench.tuning.job import read_summary
+    tuned on the quick tier ({} when not tuned yet). Tuning jobs pin them in the config (`rerank_ease`,
+    `rerank_itemknn`) when they start, scaled to the data size, so this lookup only fills what a job did not pin
+    (for example a direct fit in a notebook)."""
+    from recbench.tuning.job import generator_settings
 
-    base = data.tier[: -len("-val")] if data.tier.endswith("-val") else data.tier
-    for tier, stage in dict.fromkeys(((base, "confirm"), (base, "tune"), ("quick", "tune"))):
-        summary = read_summary(tier, data.dataset, method, stage)
-        if summary and summary.get("best_params"):
-            return {k: v for k, v in summary["best_params"].items() if k != "train_window_days"}
-    return {}
+    return generator_settings(data.tier, data.dataset, method)
 
 
 def text_vectors(data: TrainView, model_name: str, device: str) -> np.ndarray:

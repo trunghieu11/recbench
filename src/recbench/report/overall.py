@@ -291,17 +291,24 @@ def status_matrix(status: pd.DataFrame, methods: list[str], datasets: list[str],
     if not status.empty:
         for _, r in status.iterrows():
             latest[(r["method"], r["dataset"])] = (r["status"], str(r.get("reason") or ""))
-    rows = []
+    rows, cut_short = [], False
     for m in methods:
         row = [_link(m)]
         for d in datasets:
             summary = summaries.get((m, d))
             st, why = (summary.get("status"), summary.get("reason") or "") if summary else latest.get((m, d), ("—", ""))
             label = {"finished": "✓", "timeout": "over budget", "over_budget": "over budget"}.get(st, st)
+            if st == "finished" and summary and summary.get("search_stopped") == "time":
+                tried = sum(1 for t in summary.get("trials", []) if t.get("state") == "COMPLETE")
+                label, cut_short = f"✓ ({tried} of {summary.get('trials_budget')} settings)", True
             why = html.escape(why[:60]).replace("|", "/")  # a pipe would split the table cell
             row.append(label + (f" ({why})" if st not in ("finished", "—") and why else ""))
         rows.append(row)
-    return _table(["Method"] + datasets, rows) + "\n✓ finished; — not attempted.\n"
+    note = "\n✓ finished; — not attempted."
+    if cut_short:
+        note += (" (n of 10 settings): the job's time cap ended the search early, so its test run used the best of the "
+                 "n settings that finished.")
+    return _table(["Method"] + datasets, rows) + note + "\n"
 
 
 def scorecard(catalog: dict[str, Any], registry: Any, queue_cfg: dict[str, Any]) -> str:

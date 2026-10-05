@@ -8,8 +8,9 @@ Instead, copy the other folder anywhere and import it:
     rsync -a gpu-box:recommendation_benchmark/runs/mlflow/ runs/mlflow-gpu/
     python -m recbench.import_runs runs/mlflow-gpu
 
-Each run is re-created here with the same tags, params, metrics, times, and artifact files, plus the tag
-imported_from=<original run id>. Importing again skips runs already imported and runs still in progress.
+Each run is re-created here with the same tags, params, metrics (learning curves with every epoch), times, and
+artifact files, plus the tag imported_from=<original run id>. Importing again skips runs already imported and runs
+still in progress.
 """
 
 from __future__ import annotations
@@ -61,7 +62,12 @@ def import_runs(source: str | Path) -> dict[str, int]:
         new_id = dst.create_run(dst_exp, start_time=info.start_time, tags={**tags, "imported_from": info.run_id},
                                 run_name=info.run_name).info.run_id
         params = [Param(k, v) for k, v in run.data.params.items()]
-        metrics = [Metric(k, v, info.end_time or info.start_time, 0) for k, v in run.data.metrics.items()]
+        metrics = []
+        for key, value in run.data.metrics.items():
+            if key.startswith("curve/"):  # a learning curve: every epoch, not only the last one
+                metrics += src.get_metric_history(info.run_id, key)
+            else:
+                metrics.append(Metric(key, value, info.end_time or info.start_time, 0))
         for start in range(0, len(params), PARAMS_PER_BATCH):
             dst.log_batch(new_id, params=params[start : start + PARAMS_PER_BATCH])
         for start in range(0, len(metrics), METRICS_PER_BATCH):

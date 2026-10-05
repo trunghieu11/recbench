@@ -10,15 +10,16 @@ HOST="${1:?usage: fetch_lab_results.sh <ssh-host> [remote repository path]}"
 REMOTE="${2:-recbench}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
+source "$ROOT/scripts/_common.sh"
 mkdir -p runs/lab-box runs/lab/tuning reports/lab-box
 
-rsync -a "$HOST:$REMOTE/runs/lab/mlflow/" runs/lab-box/mlflow/                 # imported below, never copied over
+store="$(fetch_mlflow_store "$HOST" "$REMOTE/runs/lab/mlflow" runs/lab-box/mlflow)"  # one folder per box; imported below
 rsync -a --exclude journal.log "$HOST:$REMOTE/runs/lab/tuning/" runs/lab/tuning/ # job summaries replace older ones
 rsync -a "$HOST:$REMOTE/runs/lab/logs/" runs/lab-box/logs/ 2>/dev/null || true
 rsync -a "$HOST:$REMOTE/reports/lab/" reports/lab-box/ 2>/dev/null || true
 
 # shellcheck disable=SC1091
 source .venv/bin/activate
-python -m recbench.import_runs runs/lab-box/mlflow --workspace lab
+if [[ -n "$store" ]]; then python -m recbench.import_runs "$store" --workspace lab; fi
 python -m recbench.lab scoreboard --docs | tail -n 3
 echo "Lab results imported: python -m recbench.lab status, and docs/generated/lab/ for the scoreboard pages."

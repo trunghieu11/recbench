@@ -79,17 +79,20 @@ def _write_summary(summary: dict[str, Any]) -> Path:
     return path
 
 
-def prepare_rerun(tier: str, dataset: str, method: str, *, label: str | None = None) -> bool:
+def prepare_rerun(tier: str, dataset: str, method: str, stage: str = "tune", *, label: str | None = None) -> bool:
     """Make a finished job run again from scratch (after a promotion, or a changed lab experiment): its summary moves
     to archive/ and a stub with the next attempt number takes its place, so the job starts a fresh study and stays
-    resumable. Returns False when there was no finished job to re-run."""
-    path = summary_path(tier, dataset, method, label=label)
+    resumable. A confirmation's summary is only archived: the queue confirms the method again if it is still among
+    the dataset's top methods. Returns False when there was no finished job to re-run."""
+    path = summary_path(tier, dataset, method, stage, label=label)
     old = json.loads(path.read_text()) if path.exists() else None
     if not old or old.get("status") in (None, "pending", "running"):
         return False
     archive = path.parent / "archive"
     archive.mkdir(exist_ok=True)
     path.replace(archive / f"{path.stem}.{time.strftime('%Y%m%dT%H%M%S')}.json")
+    if stage == "confirm":
+        return True
     stub = {"tier": tier, "dataset": dataset, "method": method, "label": label, "status": "pending",
             "attempt": int(old.get("attempt", 0)) + 1, "rerun_of": old.get("ended")}
     _write_summary(stub)
@@ -140,6 +143,60 @@ def _base_cfg(resolved: dict[str, Any], method: str, tuned_keys: set[str]) -> di
     own = dict((resolved.get("method_params") or {}).get(method) or {})
     cfg["method_params"] = {**(resolved.get("method_params") or {}), method: {k: v for k, v in own.items() if k not in tuned_keys}}
     return cfg
+
+
+RERANKERS = ("lgbm_rerank", "dcnv2_rerank")
+GENERATORS = {"rerank_ease": "ease", "rerank_itemknn": "itemknn"}  # a re-ranker's setting -> the generator it configures
+
+
+def size_scale(dataset: str, small_tier: str, big_tier: str) -> float:
+    """How many times more users `big_tier`'s validation fold has than `small_tier`'s: the factor by which a setting
+    that balances the amount of data (EASE's λ) grows from one to the other (1.0 when a fold is missing)."""
+    from recbench.data import TrainView
+
+    root = data_root() / "splits" / dataset
+    small, big = root / f"{small_tier}-val", root / f"{big_tier}-val"
+    if not ((small / "meta.json").exists() and (big / "meta.json").exists()):
+        return 1.0
+    return TrainView(big).n_users / max(TrainView(small).n_users, 1)
+
+
+def scaled_for_size(params: dict[str, Any], space: MethodSpace | None, scale: float) -> dict[str, Any]:
+    """`params` with the space's size-sensitive setting (`confirm: {param, scale_with: users}`) multiplied by
+    `scale`: the centre value a confirmation would start from."""
+    spec = (space.confirm if space else {}) or {}
+    name = spec.get("param")
+    if spec.get("scale_with") != "users" or name not in params or not isinstance(params[name], (int, float)):
+        return params
+    return {**params, name: float(params[name]) * scale}
+
+
+def generator_settings(tier: str, dataset: str, method: str, space: MethodSpace | None = None) -> dict[str, Any]:
+    """The settings a re-ranker gives its candidate generator `method` on a split of `tier`: confirmed on that tier,
+    else tuned on it, else tuned on the quick tier ({} when not tuned yet). Settings from the smaller quick tier get
+    their size-sensitive setting scaled up as a confirmation would (given the generator's `space`). The generator's
+    training window is left out: the re-ranker decides which data it trains on."""
+    base = tier[: -len("-val")] if tier.endswith("-val") else tier
+    for t, stage in dict.fromkeys(((base, "confirm"), (base, "tune"), ("quick", "tune"))):
+        summary = read_summary(t, dataset, method, stage)
+        if summary and summary.get("best_params"):
+            params = {k: v for k, v in summary["best_params"].items() if k != "train_window_days"}
+            return scaled_for_size(params, space, size_scale(dataset, t, base)) if t != base else params
+    return {}
+
+
+def pin_generators(cfg: dict[str, Any], method: str, tier: str, dataset: str,
+                   spaces: dict[str, MethodSpace] | None = None) -> dict[str, Any]:
+    """Write a re-ranker's generator settings into its config (settings already there win). They are then fixed for
+    the whole job, whatever finishes meanwhile, and part of every run's identity: when EASE or ItemKNN is tuned
+    again, the re-ranker runs again instead of reusing results built on the old candidates. `spaces` (all methods'
+    search spaces) lets quick-tier settings be scaled to a bigger tier. Returns the pinned settings ({} for other
+    methods)."""
+    if method not in RERANKERS:
+        return {}
+    for key, generator in GENERATORS.items():
+        cfg[key] = {**generator_settings(tier, dataset, generator, (spaces or {}).get(generator)), **(cfg.get(key) or {})}
+    return {key: cfg[key] for key in GENERATORS}
 
 
 def run_job(
@@ -195,6 +252,9 @@ def run_job(
     base.update({"tuning": "tuned", "export_bundles": False, "resume": True})
     if child_env:
         base["child_env"] = dict(child_env)
+    generators = pin_generators(base, method, settings.tier, dataset)
+    if generators:
+        summary["generators"] = generators
     summary["space"] = {"params": space.params, "fixed": space.fixed}
     summary["impl_version"] = method_version(method, base)
     name = method + (f"@{label}" if label and label != BASELINE else "")
@@ -327,9 +387,11 @@ def run_confirm(
     seeds: list[int] | None = None,
     child_env: dict[str, str] | None = None,
     isolate: bool = True,
+    spaces: dict[str, MethodSpace] | None = None,
 ) -> dict[str, Any]:
     """Re-check a quick-tier winner on full data: a few values of its size-sensitive setting on the full
-    validation fold, then the final test run (one per seed for methods whose training is random)."""
+    validation fold, then the final test run (one per seed for methods whose training is random). `spaces` (all
+    methods' search spaces) scales a re-ranker's quick-tier generator settings to the full data."""
     from recbench.data import TrainView
 
     began = time.time()
@@ -356,6 +418,9 @@ def run_confirm(
     base.update({"tuning": "tuned", "export_bundles": False, "resume": True, "max_eval_users": settings.search_users})
     if child_env:
         base["child_env"] = dict(child_env)
+    generators = pin_generators(base, method, tier, dataset, spaces)
+    if generators:
+        summary["generators"] = generators
     checks = []
     for params in confirm_values(space, quick["best_params"], scale):
         remaining = deadline - time.time()

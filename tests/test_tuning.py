@@ -93,3 +93,33 @@ def test_job_without_time_for_one_trial_is_over_budget(workspace):
 def test_missing_splits_are_reported(workspace):
     summary = run_job("nope", "ease", dict(RESOLVED), JobSettings(tier="full"), None, isolate=False)
     assert summary["status"] == "missing_split"
+
+
+def test_a_reranker_job_pins_its_generators_settings(tmp_path, monkeypatch):
+    from recbench.tuning.job import _write_summary, pin_generators
+
+    monkeypatch.setenv("RECBENCH_ROOT", str(tmp_path))
+    _write_summary({"tier": "quick", "dataset": "d", "method": "ease", "status": "finished",
+                    "best_params": {"ease_lambda": 100.0, "train_window_days": 90}})
+    _write_summary({"tier": "quick", "dataset": "d", "method": "itemknn", "status": "finished", "best_params": {"knn_neighbors": 50}})
+    cfg = {"rerank_itemknn": {"knn_neighbors": 20}}  # a setting given explicitly wins
+    pinned = pin_generators(cfg, "lgbm_rerank", "full", "d")
+    assert pinned == {"rerank_ease": {"ease_lambda": 100.0}, "rerank_itemknn": {"knn_neighbors": 20}}  # no training window
+    _write_summary({"tier": "full", "dataset": "d", "method": "ease", "stage": "confirm", "status": "finished",
+                    "best_params": {"ease_lambda": 400.0}})
+    assert pin_generators({}, "lgbm_rerank", "full", "d")["rerank_ease"] == {"ease_lambda": 400.0}  # confirmed on full
+    assert pin_generators({}, "lgbm_rerank", "quick", "d")["rerank_ease"] == {"ease_lambda": 100.0}  # the quick tier's own
+    assert pin_generators({}, "ease", "full", "d") == {}  # other methods are left alone
+
+
+def test_quick_tier_generator_settings_are_scaled_to_the_full_data(tmp_path, monkeypatch):
+    from recbench.tuning import job
+    from recbench.tuning.spaces import MethodSpace
+
+    monkeypatch.setenv("RECBENCH_ROOT", str(tmp_path))
+    monkeypatch.setattr(job, "size_scale", lambda dataset, small, big: 20.0)  # the full fold has 20x the users
+    job._write_summary({"tier": "quick", "dataset": "d", "method": "ease", "status": "finished", "best_params": {"ease_lambda": 100.0}})
+    spaces = {"ease": MethodSpace("ease", confirm={"param": "ease_lambda", "scale_with": "users"}), "itemknn": MethodSpace("itemknn")}
+    # No confirmation of EASE on full data: its quick-tier λ grows with the data, as a confirmation would start from.
+    assert job.pin_generators({}, "lgbm_rerank", "full", "d", spaces)["rerank_ease"] == {"ease_lambda": 2000.0}
+    assert job.pin_generators({}, "lgbm_rerank", "quick", "d", spaces)["rerank_ease"] == {"ease_lambda": 100.0}  # same tier

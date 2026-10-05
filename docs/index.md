@@ -82,8 +82,15 @@ The [install guide](start/install.md) explains each line.
 - **Smoke-tier results** (laptop) are on the [smoke-tier page](results/leaderboards-smoke.md). They check the pipeline;
   they do not pick winners.
 - **Full-tier results** (untuned v0.2 defaults) are on the [leaderboards](results/leaderboards.md).
-- **The quick-tier bake-off** tunes 23 low-budget methods with equal budgets, dataset by dataset; its results
-  appear on the [quick-tier page](results/quick-tier.md) ([how to run it](start/quick-tier-box.md)).
+- **The quick-tier bake-off** (first run 2026-10-04) tuned 23 low-budget methods with equal budgets on all five
+  datasets and confirmed each dataset's top 3 on full data.
+    - EASE has the best mean rank.
+    - The LightGBM re-ranker is the only method that clearly beats it, on H&M.
+    - No neural model placed higher than 8th on any dataset.
+
+  See the [quick-tier page](results/quick-tier.md) and the [overall comparison](results/overall-comparison.md)
+  ([how to run it](start/quick-tier-box.md)). A short [follow-up session](start/box-5-follow-up.md) closes what
+  the first run left open.
 - What is simplified or missing: [known limitations](results/known-limitations.md) and the [roadmap](results/roadmap.md).
 
 ## Licence

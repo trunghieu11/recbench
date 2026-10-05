@@ -44,7 +44,8 @@ would count as done and nothing would re-run.
 - **Train neural models in epochs** with `src/recbench/methods/_torch.py::train_epochs` (Adam, bf16 on CUDA) or
   `src/recbench/methods/_torch.py::early_stopping_loop` for a custom loop, and pass `owner=self`. They then honour
   `epochs` (a fixed count), `max_epochs`, `patience` and the tuning job's time limit (`fit_deadline`), stop early on
-  a validation fold, and put `best_epoch` in `fit_info`, which the tuning job reuses for the single test run.
+  a validation fold, and put `best_epoch` in `fit_info`, which the tuning job reuses for the single test run. In
+  that run, if the loss blows up, they keep the weights of the lowest-loss epoch.
   (`max_steps` is the older step-based path, used only by the held-back models.)
 - For sequence models, reuse `src/recbench/methods/seq_trainer.py::sequence_windows` and
   `src/recbench/methods/seq_trainer.py::next_item_loss`. For pairwise models, use

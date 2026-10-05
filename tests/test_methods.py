@@ -19,6 +19,9 @@ LOCAL_METHODS = sorted(n for n, cls in ensure_loaded().methods.items() if not cl
 
 @pytest.mark.parametrize("name", LOCAL_METHODS)
 def test_every_method_fits_and_evaluates(toy, name):
+    if name == "sansa" and sys.platform == "darwin":
+        pytest.skip("SuiteSparse cannot share a process with PyTorch on macOS; test_sansa_ranks_like_exact_ease "
+                    "fits SANSA in a child process instead")
     view, split = toy
     method = ensure_loaded().create_method(name)
     method.fit(view, dict(FAST_CFG))

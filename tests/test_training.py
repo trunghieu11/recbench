@@ -75,3 +75,27 @@ def test_runner_logs_learning_curves_on_a_fold(toy_fold, tmp_path, monkeypatch):
     assert run["tags.stage"] == "search" and run["tags.tier"] == "full-val"
     history = mlflow.MlflowClient(uri).get_metric_history(run["run_id"], "curve/val_ndcg_at_10")
     assert len(history) == outcome["fit"]["epochs_run"]
+
+
+def test_a_blown_up_final_run_restores_its_best_weights():
+    """With a fixed epoch count nothing watches validation. A loss that jumps (training diverged) restores the
+    lowest-loss epoch's weights and stops, as SASRec's final run on RetailRocket needed in the first bake-off."""
+    from recbench.methods._torch import early_stopping_loop
+
+    model = torch.nn.Linear(1, 1)
+
+    def runner(losses):
+        def run_epoch(epoch):
+            with torch.no_grad():
+                model.weight.fill_(float(epoch))  # the weights remember the epoch that wrote them
+            return losses[epoch - 1]
+        return run_epoch
+
+    info = early_stopping_loop(model, runner([5.0, 4.0, 3.0, 9.0, 10.0]), {"epochs": 5})
+    assert (info["stopped"], info["epochs_run"], info["best_epoch"]) == ("diverged", 4, 3)
+    assert model.weight.item() == 3.0
+    info = early_stopping_loop(model, runner([2.0, float("nan"), 1.0]), {"epochs": 3})
+    assert (info["stopped"], info["best_epoch"], model.weight.item()) == ("diverged", 1, 1.0)
+    # Negative losses (DirectAU's) and small wobbles are normal training, not a blow-up.
+    info = early_stopping_loop(model, runner([-1.0, -2.0, -1.9, -2.5]), {"epochs": 4})
+    assert (info["stopped"], info["epochs_run"], model.weight.item()) == ("max_epochs", 4, 4.0)

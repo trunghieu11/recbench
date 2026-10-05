@@ -20,7 +20,7 @@ It copies, then rebuilds:
 
 | What | From the box | To the laptop |
 |---|---|---|
-| every run (settings, metrics, files) | `runs/mlflow/` | `runs/mlflow-box/`, then **imported** into your `runs/mlflow` |
+| every run (settings, metrics, files) | `runs/mlflow/` | `runs/mlflow-box-<experiment id>/` (the first box's: `runs/mlflow-box/`), then **imported** into your `runs/mlflow` |
 | job summaries: every trial, the best settings, timings | `runs/tuning/quick/`, `runs/tuning/full/` | `runs/tuning/` |
 | the queue's state and the logs | `runs/queue/`, `runs/logs/` | `runs/queue-box/`, `runs/logs-box/` |
 | reports written on the box | `reports/` | `reports/box/` |
@@ -62,11 +62,14 @@ Then it rebuilds `reports/quick-tuned/`, `reports/full-tuned/` and the docs frag
     manifest names its method, the data cutoff ("lists reflect events before …") and the MLflow run that made it.
 
 If a confirmed method has no bundle (its confirmation finished in an earlier session, before bundles were
-exported), make one **on the box, before destroying it**, then fetch again:
+exported), make the missing ones **on the box, before destroying it**, then fetch again:
 
 ```bash
-python -m recbench.export --dataset movielens-25m --method ease --from-confirm
+./scripts/export_bundles_box.sh            # every confirmed method without a bundle
+python -m recbench.export --dataset movielens-25m --method ease --from-confirm   # or one at a time
 ```
+
+Box already gone? A [follow-up session](box-5-follow-up.md) writes them later.
 
 !!! tip "Before you destroy it: the improvement lab"
     If you follow the [labs](../labs/index.md), use the box once more for their baseline: `./scripts/run_lab_box.sh`

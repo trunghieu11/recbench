@@ -52,25 +52,35 @@ All of the above, plus:
 
 ## Re-run its bake-off job
 
-The bake-off's results come from a fixed search space and code. After a promotion, the method's job must run again:
+The bake-off's results come from a fixed search space and code. After a promotion, the method's job must run again,
+on a rented box like the bake-off itself. The box has the bake-off's machine profile, which matters for EASE: its
+item cap is 30,000 on the box and 20,000 on a laptop. It also keeps training off your laptop.
 
-```bash
-python -m recbench.queue run --config configs/benchmarks/quick.yaml --methods ease --rerun --hardware configs/hardware/local-cpu.yaml --cpu-workers 2
-```
+1. **Push** your merged `main`, so the box can clone it.
+2. **Rent and set up** a box ([5b](../start/box-2-rent-and-set-up.md)).
+3. **Copy the data and the job summaries** from the laptop. Without the summaries, the queue would tune every method
+   again:
+
+    ```bash
+    ./scripts/upload_splits.sh vast-gpu && ./scripts/upload_results.sh vast-gpu
+    ```
+
+4. **Re-run the method**, on the box inside tmux:
+
+    ```bash
+    ./scripts/run_quick_box.sh --methods ease --rerun
+    ```
+
+5. **Fetch the results** on the laptop with `./scripts/fetch_results.sh vast-gpu`. It also rebuilds the
+   bake-off's reports and docs pages.
 
 - `--rerun` moves the method's finished summaries to `archive/` and starts fresh studies. It needs `--methods`, so
   a whole bake-off is never re-run by accident. If the command is interrupted, resume it *without* `--rerun`.
-- `--hardware configs/hardware/local-cpu.yaml` runs it on this laptop. Fine for the CPU methods: their accuracy does
-  not depend on the machine, only their training times do, and the report records the hardware. EASE is the
-  exception: this laptop caps it at 20,000 items and the box at 30,000. Re-run EASE on the next rented box instead.
-- If the bake-off has not run yet, skip this step: it will use the promoted code when it runs.
-
-Then rebuild the bake-off's reports and docs:
-
-```bash
-python -m recbench.report.build --tier quick --tuning tuned --out reports/quick-tuned --docs
-python -m recbench.dictionary.build
-python -m recbench.report.overall --docs --out reports/overall
-```
+- It also archives the method's full-data confirmations. Where the re-run method is still among a dataset's top 3
+  by validation, the queue confirms it again on the full splits.
+- Promoting EASE or ItemKNN changes the LightGBM and DCN-V2 re-rankers too, since their candidates come from these
+  two. Re-run them in the same command: `--methods ease,lgbm_rerank,dcnv2_rerank`. The queue runs the re-rankers
+  after EASE, with its new settings.
+- Several promotions can share one box session: `--methods itemknn,ease,lgbm_rerank,dcnv2_rerank`.
 
 Commit everything in the lab's pull request (see the checklist in the PR template).

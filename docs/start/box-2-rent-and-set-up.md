@@ -15,7 +15,7 @@ In the vast.ai console, open the page that lists machines to rent and set these 
 |---|---|---|
 | GPU | 1 × 48 GB (RTX A6000, A40, L40S), or 2 × 24 GB | three GPU jobs share each GPU; EASE and Turbo-CF keep item × item matrices in GPU memory |
 | CPU cores | 32 or more | 12 methods run on the CPU; each CPU worker gets 16–32 threads |
-| RAM | 128 GB (64 GB at least) | a confirmation job loads up to 31 million events |
+| RAM | 128 GB or more | a confirmation job loads up to 31 million events, and in the first bake-off the LightGBM re-ranker alone needed up to 62 GB |
 | Disk | 100 GB, set **before** you create the instance | the disk size cannot be changed afterwards |
 | CUDA (driver) | 12.8 or higher | recent PyTorch builds need a recent driver |
 | Reliability | 98% or higher | unreliable hosts disappear more often |

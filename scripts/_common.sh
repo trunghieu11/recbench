@@ -65,3 +65,19 @@ quick_datasets() {
   local config="${1:-$ROOT/configs/benchmarks/quick.yaml}"
   sed -n 's/^datasets: *\[\(.*\)\].*/\1/p' "$config" | tr -d ' ' | tr ',' ' '
 }
+
+# Copy a box's MLflow file store to the laptop, into a folder of its own: <prefix>-<experiment id>. Each store has
+# its own "recbench" experiment id, and two stores copied into one folder would hold two experiments with the same
+# name, of which MLflow reads only one. A copy made before this rule (<prefix>/<experiment id>) keeps its folder.
+# Prints the folder, to import with recbench.import_runs (never use it as a store); prints nothing without a store.
+fetch_mlflow_store() {
+  local host="$1" remote="$2" prefix="$3" experiment dest
+  ssh "$host" "test -d '$remote'" || return 0
+  experiment="$(ssh "$host" "cd '$remote' && grep -lx 'name: recbench' */meta.yaml 2>/dev/null | head -1 | cut -d/ -f1" || true)"
+  [[ -n "$experiment" ]] || return 0
+  dest="$prefix-$experiment"
+  [[ -d "$prefix/$experiment" ]] && dest="$prefix"
+  mkdir -p "$dest"
+  rsync -a "$host:$remote/" "$dest/"
+  echo "$dest"
+}

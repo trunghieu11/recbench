@@ -73,19 +73,34 @@ flowchart TD
   left as the hard timeout. Finished trials live in an Optuna journal, so an interrupted job resumes. With
   `retry=True`, a failed job starts a fresh attempt.
 - **The final run** uses the best trial's settings and its best epoch count (`epochs`), so the test split is used
-  exactly once per job. With `tuning.final_seeds` (the lab), a method whose training is random runs that one
+  exactly once per job. Nothing watches a validation score during it, so the epoch loop guards against a blow-up
+  itself. If an epoch's loss is not finite, or is more than 50% worse than the best epoch's, it restores the
+  lowest-loss weights and stops: `stopped` is `diverged` in `fit_info`. SASRec's final run on RetailRocket in the
+  first bake-off collapsed this way. With `tuning.final_seeds` (the lab), a method whose training is random runs that one
   setting once per seed, and the summary averages them; `final_runs` records each run's identity, which is how
   `python -m recbench.compare` finds the per-user results.
 - **Labels and re-runs.** A lab experiment is a job with a `label` (summary `<method>@<label>.json`, its own study)
   and a `fingerprint` of its definition and code. `src/recbench/tuning/job.py::prepare_rerun` archives a finished
   summary and leaves a stub with the next attempt number, so the job runs again with a fresh study:
-  `python -m recbench.queue run ... --rerun` and `python -m recbench.lab run ... --rerun` use it.
+  `python -m recbench.queue run ... --rerun` and `python -m recbench.lab run ... --rerun` use it. The queue's
+  `--rerun` also archives the method's confirmations. No stub is left for them: the queue confirms the method
+  again only if it is still among the dataset's top methods.
 - **A confirmation** (`src/recbench/tuning/job.py::run_confirm`) re-checks the setting that depends on data size on
   `full-val`, then runs the final test on `full` once per seed. Its first final run exports the serving bundle.
+- **A re-ranker's generators.** `src/recbench/tuning/job.py::pin_generators` writes EASE's and ItemKNN's chosen
+  settings into a re-ranker's config when its job starts (`rerank_ease`, `rerank_itemknn`).
+    - **Which settings:** those confirmed on the job's tier, else those tuned on it, else the quick tier's.
+      Quick-tier settings used on full data get their size-sensitive setting (EASE's λ) multiplied by the ratio of
+      users, as a confirmation would (`src/recbench/tuning/job.py::scaled_for_size`).
+    - **Why pin them:** they stay fixed for the whole job, are recorded in its summary (`generators`), and are part
+      of every run's identity. When EASE or ItemKNN is tuned again, the re-ranker runs again instead of reusing
+      results built on the old candidates.
+    - **Exports:** `python -m recbench.export` uses the recorded settings.
 - **The queue** (`src/recbench/queue.py::Queue`) orders jobs dataset by dataset, gives CPU jobs to CPU workers with
   a thread cap and GPU jobs to GPU slots (`CUDA_VISIBLE_DEVICES`), starts the next dataset early only when a worker
-  would otherwise idle, waits for `after:` dependencies (the re-rankers wait for EASE and ItemKNN), queues the
-  confirmations, and writes its state and status page. Everything resumes from the summaries on disk.
+  would otherwise idle, waits for `after:` dependencies (the re-rankers wait for EASE's and ItemKNN's tuning, and
+  their confirmations wait for those methods' confirmations on the same dataset), queues the confirmations, and
+  writes its state and status page. Everything resumes from the summaries on disk.
 
 ## The evaluator, step by step
 

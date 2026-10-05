@@ -55,7 +55,8 @@ score the new candidate lists.
 
 1. **Training window:** the split's validation window [valid start, test cutoff).
 2. **Past generators:** fit EASE, ItemKNN and recent popularity on events before the validation start, with
-   the settings the quick tier tuned for EASE and ItemKNN on this dataset.
+   the settings the bake-off chose for EASE and ItemKNN on this dataset (on full data, their confirmed settings,
+   if they were confirmed).
 3. **Training table:** for recent users, propose candidates; the label is 1 if the user took the item in the
    window; compute the features as of the validation start. Users whose items were not in their candidates are
    dropped, because they teach the ranker nothing.
@@ -117,6 +118,9 @@ The trees are fitted to these "lambda" gradients, so mistakes near the top of th
   `src/recbench/methods/rerank.py::Generators` and features in `src/recbench/methods/rerank.py::FeatureBuilder`.
 - The evaluator reports **`candidate_recall`**: the share of each user's test items present in their candidate
   list, which is the ceiling for any re-ranker.
+- A tuning or confirmation job pins the generators' settings in the re-ranker's config when it starts
+  (`src/recbench/tuning/job.py::pin_generators`), scaled to the size of the data. They are then the same for every
+  run of the job, and part of each run's identity.
 - `tests/test_new_methods.py` checks that every training label comes from the window before the test cutoff
   (no leakage) and that it beats Random on toy data.
 
@@ -143,6 +147,15 @@ The trees are fitted to these "lambda" gradients, so mistakes near the top of th
 - **PyTorch next to LightGBM on macOS.** Their OpenMP runtimes crash together. With `rerank_text`, recbench
   therefore encodes missing item text vectors in a separate process
   (`src/recbench/methods/rerank.py::text_vectors`).
+- **Memory.** It needed 27 to 43 GB of RAM on most quick-tier datasets (about 1 million events) and up to 62 GB
+  on full RetailRocket. Plan for a big machine.
+- **Generators that change under it.** Its candidates come from EASE's and ItemKNN's chosen settings, which
+  recbench pins in its config when its job starts. Re-run it whenever either of them is tuned again.
+- **Generators tuned on less data.** EASE's λ grows with the number of users. In the first bake-off, the re-ranker's
+  full-data confirmation on MovieLens used EASE's quick-tier λ (340) where EASE's own confirmation chose 7,775.
+  recbench now scales quick-tier generator settings to the data they are used on.
+- **One seed is not enough.** It samples the users it learns from, so seeds differ: three seeds on full Steam
+  scored 0.0509, 0.0561 and 0.0581.
 - **Too few recent users to learn from.** The training labels come from one validation window. On small data,
   few users take a candidate item there, and the method stops with "too few recent users with a reachable next
   item" (`unsupported`) rather than learning from noise.

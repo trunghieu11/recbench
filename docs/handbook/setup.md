@@ -109,6 +109,11 @@ QUICK_ONLY=1 ./scripts/upload_splits.sh vast-gpu
 python -m recbench.lab status
 ```
 
+!!! warning "Memory"
+    The LightGBM re-ranker's lab jobs need 30 to 45 GB of RAM each on four of the five datasets. On a box with
+    128 GB, run `LAB_WORKERS=3 ./scripts/run_lab_box.sh`, so that only a few jobs run at once. With 256 GB, the
+    default is fine.
+
 [Renting a box](../start/box-1-before-you-rent.md) explains `vast-gpu`, SSH and tmux. The lab uses one machine profile
 everywhere (`configs/hardware/lab-cpu.yaml`: CPUs only, EASE kept to 20,000 items), so results from the box and from
 the laptop can be compared. `fetch_lab_results.sh` imports the box's runs into the laptop's lab workspace and

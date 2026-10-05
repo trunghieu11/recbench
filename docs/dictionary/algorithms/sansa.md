@@ -131,6 +131,10 @@ $$
 - **A density that is too low:** too few weights survive, and accuracy drops sharply. On MovieLens' validation
   fold the package's default density (about 28 weights per item) scored 0.096 NDCG@10, against 0.171 with about
   277. That is why recbench searches `sansa_weights_per_item` (20 to 500).
+- **One slow setting can use up a tuning job.** A SANSA fit cannot stop early. In the first bake-off, the setting
+  with all history and 249 weights per item ran for 85 minutes on RetailRocket and 140 on H&M before the 3-hour
+  cap stopped it. SANSA was therefore judged there on its first two settings, which were its weakest on every
+  other dataset.
 - **Comparing SANSA to a capped EASE without saying so.** The difference may come from the extra items, not
   the method.
 - **Running it in a process that has loaded PyTorch, on macOS.** SuiteSparse and PyTorch then bring two OpenMP

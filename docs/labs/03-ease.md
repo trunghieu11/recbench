@@ -3,9 +3,12 @@
 !!! abstract "In plain words"
     EASE learns, for every pair of items, how much having one predicts the other, so that each item's column is
     rebuilt as well as possible from the other items. There is no training loop: the answer is one matrix inverse.
-    It is a very strong simple method, the best untuned method on four of the five full-data datasets. This week you
-    will open its weight matrix, see what λ really does, deal with its one big weakness (the item cap), and
-    implement **EDLAE**, a 2020 refinement by EASE's own author.
+    It is a very strong simple method. In the first bake-off it had the best mean rank of all 23 methods: it was
+    first, or tied with the first, on four of the five datasets. This week you will:
+    - open its weight matrix;
+    - see what λ really does;
+    - deal with its one big weakness, the item cap;
+    - implement **EDLAE**, a 2020 refinement by EASE's own author.
 
 ## Your starting point
 

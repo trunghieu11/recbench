@@ -6,7 +6,7 @@
     you return the box so you stop paying. Expect about 30 minutes of setup, 1.5 to 2.5 hours per dataset, and
     $5 to $12 in total.
 
-This step has four short parts. Do them in order.
+This step has four short parts. Do them in order. A fifth part, for a later session, finishes what a run left open.
 
 | Part | What you do | Where | Time | Cost |
 |---|---|---|---|---|
@@ -14,6 +14,7 @@ This step has four short parts. Do them in order.
 | [5b. Rent and set up](box-2-rent-and-set-up.md) | choose a machine, connect, install everything | laptop + box | ~30 min | ~$0.30 |
 | [5c. Run and monitor](box-3-run-and-monitor.md) | copy the data, start the queue, watch it | box (watched from the laptop) | 1.5–2.5 h per dataset | ~$1–2 per dataset |
 | [5d. Finish](box-4-finish.md) | bring the results home, check them, destroy the box | laptop | ~20 min | — |
+| [5e. A follow-up session](box-5-follow-up.md) | later: re-run single jobs, finish confirmations, write bundles | laptop + box | 5–6 h | a few dollars |
 
 ```mermaid
 flowchart LR

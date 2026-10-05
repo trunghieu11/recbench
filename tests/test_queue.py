@@ -89,6 +89,40 @@ def test_confirmations_rank_every_method_even_in_a_filtered_session(workspace):
     assert [j for j in filtered if j.kind == "confirm"] == []
 
 
+def test_a_reranker_confirmation_waits_for_its_generators_confirmations(workspace):
+    methods = [{"name": "ease", "resource": "cpu"}, {"name": "itemknn", "resource": "cpu"},
+               {"name": "lgbm_rerank", "resource": "cpu", "after": ["ease", "itemknn"]}]
+    queue = Queue(write_config(workspace / "q.yaml", ["toy"], methods, confirm_top=2), isolate=False, gpus=0, cpu_workers=2)
+    for job in queue.jobs:
+        job.status = "finished"
+    queue._top_methods = lambda dataset, n: ["lgbm_rerank", "ease"]  # ItemKNN is not among the confirmed
+    queue._queue_confirmations("toy")
+    first = queue._next_job("cpu")
+    assert (first.kind, first.method) == ("confirm", "ease")  # the re-ranker ranks higher, but waits for EASE's
+    first.status = "running"
+    assert queue._next_job("cpu") is None
+    first.status = "finished"
+    assert queue._next_job("cpu").method == "lgbm_rerank"  # and not for ItemKNN, whose tuned settings are final
+
+
+def test_reconfirm_repeats_only_the_confirmations(workspace):
+    from recbench.tuning.job import read_summary
+
+    methods = [{"name": "most_popular", "resource": "cpu"}, {"name": "itemknn", "resource": "cpu"}]
+    config = write_config(workspace / "q.yaml", ["toy"], methods, confirm_top=1)
+    first = Queue(config, isolate=False, gpus=0, cpu_workers=1).run()
+    confirmed = [j.method for j in first if j.kind == "confirm"]
+    tuned = read_summary("full", "toy", confirmed[0])["ended"]
+    checked = read_summary("full", "toy", confirmed[0], "confirm")["started"]
+    again = Queue(config, methods=confirmed, isolate=False, gpus=0, cpu_workers=1, reconfirm=True)
+    assert [(j.kind, j.status) for j in again.jobs] == [("tune", "finished")]  # the tuning is kept
+    jobs = again.run()
+    assert [(j.kind, j.method, j.status) for j in jobs if j.kind == "confirm"] == [("confirm", confirmed[0], "finished")]
+    assert read_summary("full", "toy", confirmed[0])["ended"] == tuned  # the tuning summary is untouched
+    assert read_summary("full", "toy", confirmed[0], "confirm")["started"] > checked  # the confirmation ran again
+    assert list((workspace / "runs" / "tuning" / "full" / "toy" / "archive").glob(f"{confirmed[0]}.confirm.*.json"))
+
+
 def test_interrupted_confirmation_resumes_even_with_stop_after_dataset(workspace):
     from recbench.tuning.job import _write_summary, read_summary
 

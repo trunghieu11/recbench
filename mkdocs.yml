@@ -87,6 +87,7 @@ nav:
           - 5b. Rent and set up: start/box-2-rent-and-set-up.md
           - 5c. Run and monitor: start/box-3-run-and-monitor.md
           - 5d. Finish: start/box-4-finish.md
+          - 5e. A follow-up session: start/box-5-follow-up.md
       - 6. The full tier on a GPU machine: start/full-tier-gpu.md
       - 7. Deploy to Cloud Run: start/deploy-cloud-run.md
   - Developer handbook:

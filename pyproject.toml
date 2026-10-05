@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "recbench"
-version = "0.2.0"
+version = "0.3.0"
 description = "Registry-driven recommendation benchmark and recommender-systems dictionary."
 readme = "README.md"
 license = "MIT"

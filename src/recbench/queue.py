@@ -10,7 +10,8 @@ How jobs are scheduled:
 - Jobs are ordered by (dataset position, method position). A free worker always takes the first job it can
   run, so every job of a dataset comes before the next dataset's jobs. A worker starts the next dataset
   early ("backfill") only when the current one has nothing it can run, for example while the re-rankers
-  wait for their candidate generators (`after:` in the config).
+  wait for their candidate generators (`after:` in the config). A re-ranker's confirmation likewise waits for
+  its generators' confirmations on the same dataset, so it always reads their final settings.
 - CPU jobs run on CPU workers, each with a thread cap. GPU jobs run in GPU slots (`jobs_per_gpu` per GPU),
   with CUDA_VISIBLE_DEVICES set per job. Without CUDA, GPU jobs run on CPU workers.
 - No job starts after --deadline-hours. --stop-after-dataset never starts a job of a later dataset.
@@ -20,7 +21,9 @@ How jobs are scheduled:
 - When a dataset's tuning jobs are all done, its report is written. If `confirm` is set, its top methods
   are queued for the full-data check right away, ahead of the next dataset.
 Everything resumes: a finished job (its summary in runs/tuning/) is not run again. After a promotion,
-`--rerun --methods <m>` runs those methods' finished jobs again (their summaries are archived first).
+`--rerun --methods <m>` runs those methods' finished jobs again (their summaries are archived first), and confirms
+them again on full data where they are still among the dataset's top methods. `--reconfirm --methods <m>` repeats
+only the confirmations, for example after a change to how confirmations work.
 A config with `workspace: lab` keeps all of this under runs/lab/ and reports/lab/ (see recbench.paths).
 """
 
@@ -89,7 +92,7 @@ class Queue:
     def __init__(self, config: Path, *, datasets: list[str] | None = None, methods: list[str] | None = None,
                  hardware: str | None = None, deadline_hours: float | None = None, stop_after_dataset: bool = False,
                  retry_failed: bool = False, isolate: bool = True, gpus: int | None = None, cpu_workers: int | None = None,
-                 price_per_hour: float | None = None, rerun: bool = False):
+                 price_per_hour: float | None = None, rerun: bool = False, reconfirm: bool = False):
         self.benchmark, self.resolved, self.spaces, self.settings = load_benchmark(config, hardware)
         self.price_per_hour = price_per_hour
         self.session_started = time.time()
@@ -115,12 +118,15 @@ class Queue:
         self.gpu_slots = [f"gpu{g}" for g in range(self.n_gpus) for _ in range(int(queue_cfg.get("jobs_per_gpu", 3)))]
         self.jobs: list[Job] = []
         self.resources = {e["name"]: e.get("resource", "cpu") for e in all_entries}
+        self.after = {e["name"]: list(e.get("after") or []) for e in all_entries}
         for d, dataset in enumerate(self.datasets):
             for m, entry in enumerate(entries):
-                self.jobs.append(Job(dataset, entry["name"], "tune", entry.get("resource", "cpu"), (d, 0, m), list(entry.get("after") or [])))
+                self.jobs.append(Job(dataset, entry["name"], "tune", entry.get("resource", "cpu"), (d, 0, m), self.after[entry["name"]]))
         for job in self.jobs:
-            if rerun:  # a promotion: archive the finished summary, so this job runs again with a fresh study
-                prepare_rerun(self.settings.tier, job.dataset, job.method)
+            if rerun:  # a promotion: archive the finished summaries, so this job runs again with a fresh study, and
+                prepare_rerun(self.settings.tier, job.dataset, job.method)  # is confirmed again if still a top method
+            if (rerun or reconfirm) and int(self.confirm_cfg.get("top", 0)):
+                prepare_rerun(str(self.confirm_cfg.get("tier", "full")), job.dataset, job.method, "confirm")
             self._load_done(job)  # resume: finished jobs keep their summary
         self.active_dataset: str | None = None
         self._refresh_active()
@@ -142,8 +148,12 @@ class Queue:
         self.active_dataset = pending[0].dataset if pending else self.active_dataset
 
     def _deps_done(self, job: Job) -> bool:
-        return all(any(j.dataset == job.dataset and j.method == dep and j.kind == "tune" and j.status in DONE for j in self.jobs)
-                   or not any(j.dataset == job.dataset and j.method == dep for j in self.jobs) for dep in job.after)
+        """A job waits for its `after:` methods' jobs of the same kind on the same dataset. A re-ranker reads its
+        generators' settings when it fits: confirmed ones if their confirmation has finished, else the tuned ones.
+        Waiting for those confirmations makes the choice the same in every run, whatever the timing."""
+        same = [j for j in self.jobs if j.dataset == job.dataset and j.kind == job.kind]
+        return all(any(j.method == dep and j.status in DONE for j in same) or not any(j.method == dep for j in same)
+                   for dep in job.after)
 
     def _allowed(self, job: Job) -> bool:
         if self.deadline and time.time() >= self.deadline:
@@ -220,7 +230,7 @@ class Queue:
         for rank, method in enumerate(self._top_methods(dataset, top) if top else []):
             if method in existing or method not in self.selected:
                 continue
-            confirm = Job(dataset, method, "confirm", self.resources.get(method, "cpu"), (d, 1, rank))
+            confirm = Job(dataset, method, "confirm", self.resources.get(method, "cpu"), (d, 1, rank), self.after.get(method, []))
             self._load_done(confirm)
             self.jobs.append(confirm)
 
@@ -263,7 +273,7 @@ class Queue:
         if job.kind == "confirm":
             return run_confirm(job.dataset, job.method, resolved, self.settings, self.spaces.get(job.method),
                                tier=str(self.confirm_cfg.get("tier", "full")), seeds=list(self.confirm_cfg.get("seeds") or []),
-                               child_env=env, isolate=self.isolate)
+                               child_env=env, isolate=self.isolate, spaces=self.spaces)
         return run_job(job.dataset, job.method, resolved, self.settings, self.spaces.get(job.method), child_env=env, isolate=self.isolate,
                        retry=job.retry)
 
@@ -345,6 +355,8 @@ def main() -> None:
     run.add_argument("--price-per-hour", type=float, default=None, help="the box's $/hour, to show the session's cost so far")
     run.add_argument("--rerun", action="store_true",
                      help="run the selected methods' finished jobs again with a fresh study (after a promotion); needs --methods")
+    run.add_argument("--reconfirm", action="store_true",
+                     help="confirm the selected methods on full data again, where they are top methods; keeps their tuning; needs --methods")
     status = sub.add_parser("status")
     status.add_argument("--config", type=Path, required=True)
     status.add_argument("--state", type=Path, default=None, help="another machine's copied state file, e.g. runs/queue-box/quick.json")
@@ -353,13 +365,13 @@ def main() -> None:
     if args.command == "status":
         print_status(args.config, state_file=args.state, html=args.html)
         return
-    if args.rerun and not args.methods:
-        parser.error("--rerun needs --methods, so that a whole bake-off is never re-run by accident")
+    if (args.rerun or args.reconfirm) and not args.methods:
+        parser.error("--rerun and --reconfirm need --methods, so that a whole bake-off is never re-run by accident")
     queue = Queue(args.config, datasets=[d for d in args.datasets.split(",") if d] or None,
                   methods=[m for m in args.methods.split(",") if m] or None, hardware=args.hardware,
                   deadline_hours=args.deadline_hours, stop_after_dataset=args.stop_after_dataset,
                   retry_failed=args.retry_failed, cpu_workers=args.cpu_workers, price_per_hour=args.price_per_hour,
-                  rerun=args.rerun)
+                  rerun=args.rerun, reconfirm=args.reconfirm)
     queue.run()
     print_status(args.config)
 

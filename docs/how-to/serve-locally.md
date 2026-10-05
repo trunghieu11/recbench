@@ -24,7 +24,7 @@ Useful environment variables: `RECBENCH_TIER` (default `smoke`), `RECBENCH_BUNDL
 
 ```bash
 curl localhost:8080/health
-# {"ok": true, "version": "0.2.0", "tier": "smoke", "bundles": 70}    (HTTP 503 and "ok": false when there are none)
+# {"ok": true, "version": "0.3.0", "tier": "smoke", "bundles": 70}    (HTTP 503 and "ok": false when there are none)
 
 curl localhost:8080/methods
 # [{"dataset": "hm", "tier": "smoke", "method": "bpr_mf"}, ...]

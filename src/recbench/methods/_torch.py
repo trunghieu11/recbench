@@ -109,6 +109,9 @@ def steps_per_epoch(n_examples: int, batch_size: int) -> int:
     return max(1, math.ceil(n_examples / max(batch_size, 1)))
 
 
+DIVERGENCE = 0.5  # an epoch loss this much worse than the best one (relative to its size) counts as a blow-up
+
+
 def early_stopping_loop(
     model: torch.nn.Module,
     run_epoch: Callable[[int], float],
@@ -123,6 +126,10 @@ def early_stopping_loop(
       only on validation folds), score the model after every epoch, keep the best weights, and stop after
       cfg['patience'] (default 3) epochs without improvement.
     - cfg['fit_deadline'] (unix time): stop before an epoch that would end after it.
+    - With no validation to watch (a fixed epoch count, as in the final run), training can still blow up: a too
+      high learning rate makes the loss jump and the model collapse. If an epoch's loss is not finite, or is more than
+      DIVERGENCE (50%) worse than the best epoch's, the weights of the lowest-loss epoch are restored and training
+      stops ("diverged"). SASRec's final run on RetailRocket in the first bake-off collapsed this way.
     The per-epoch curve is stored on owner.fit_curve for MLflow.
     """
     fixed = cfg.get("epochs")
@@ -133,6 +140,7 @@ def early_stopping_loop(
     began = time.perf_counter()
     curve: list[dict[str, float]] = []
     best_val, best_epoch, best_state, waited, stopped = -1.0, 0, None, 0, "max_epochs"
+    best_loss, loss_epoch, loss_state = math.inf, 0, None  # the divergence guard, used when nothing watches validation
     for epoch in range(1, max_epochs + 1):
         if deadline and curve and time.time() + curve[-1]["seconds"] > deadline:
             stopped = "deadline"
@@ -151,6 +159,13 @@ def early_stopping_loop(
             else:
                 waited += 1
         curve.append(point)
+        if monitor is None:
+            if not math.isfinite(loss) or (math.isfinite(best_loss) and loss > best_loss + DIVERGENCE * abs(best_loss)):
+                best_state, best_epoch, stopped = loss_state, loss_epoch, "diverged"
+                break
+            if loss < best_loss:
+                best_loss, loss_epoch = loss, epoch
+                loss_state = {k: v.detach().clone() for k, v in model.state_dict().items()}
         if monitor is not None and waited >= patience:
             stopped = "early_stopping"
             break

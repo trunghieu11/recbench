@@ -8,7 +8,7 @@ import xml.etree.ElementTree as ET
 import pandas as pd
 import pytest
 
-from recbench.report.overall import critical_difference, pareto_front, render_matrix, results_matrix, svg_scatter, cost_table
+from recbench.report.overall import cost_table, critical_difference, pareto_front, render_matrix, results_matrix, status_matrix, svg_scatter
 
 
 def _run(method: str, dataset: str, ndcg: float, half_width: float = 0.001, train: float = 10.0) -> dict:
@@ -51,6 +51,15 @@ def test_critical_difference_matches_demsar():
 def test_pareto_front_keeps_only_undominated_methods():
     points = {"fast_ok": (0.7, 1.0), "slow_best": (0.9, 100.0), "slow_worse": (0.6, 50.0), "same_but_slower": (0.7, 2.0)}
     assert pareto_front(points) == {"fast_ok", "slow_best"}
+
+
+def test_status_marks_a_search_the_time_cap_cut_short():
+    trials = [{"state": "COMPLETE"}, {"state": "COMPLETE"}, {"state": "FAIL", "status": "timeout"}]
+    summaries = {("A", "movielens-25m"): {"status": "finished", "search_stopped": "time", "trials_budget": 10, "trials": trials},
+                 ("B", "movielens-25m"): {"status": "finished", "search_stopped": "budget", "trials_budget": 10, "trials": trials * 4}}
+    text = status_matrix(pd.DataFrame(), ["A", "B"], ["movielens-25m"], summaries)
+    assert "✓ (2 of 10 settings)" in text and "time cap ended the search early" in text
+    assert text.count("✓ (") == 1  # B used its whole budget: a plain ✓
 
 
 def test_chart_is_well_formed_svg(frame):

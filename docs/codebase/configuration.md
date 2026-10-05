@@ -49,7 +49,9 @@ Quick-tier files (`quick.yaml`, `quick-smoke.yaml`) add four sections, read by `
 Queue command-line options (`python -m recbench.queue run`): `--datasets`, `--methods`, `--hardware`,
 `--deadline-hours`, `--stop-after-dataset`, `--retry-failed`, `--cpu-workers`, `--price-per-hour` (shown as the
 session's cost by `status` and on the status page `reports/queue/<tier>.html`), and `--rerun` (with `--methods`: run
-those methods' finished jobs again with fresh studies, after a [promotion](../handbook/promote.md)). `python -m recbench.queue status`
+those methods' finished jobs again with fresh studies, and confirm them again where they are still top methods,
+after a [promotion](../handbook/promote.md)), and `--reconfirm` (with `--methods`: repeat only those methods'
+full-data confirmations, keeping their tuning). `python -m recbench.queue status`
 takes `--state` (another machine's copied state file) and `--html` (write the page there too).
 
 ### Search spaces (`configs/tuning/quick.yaml`)

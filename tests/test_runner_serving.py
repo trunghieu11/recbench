@@ -62,6 +62,10 @@ def test_runs_from_another_machine_are_imported_once(toy_split, tracking, tmp_pa
     other = tmp_path / "gpu-mlruns"
     monkeypatch.setenv("MLFLOW_TRACKING_URI", other.as_uri())
     assert run_pair(toy_split, "most_popular", RESOLVED, isolate=False)["status"] == "finished"
+    source = mlflow.MlflowClient(other.as_uri())
+    run_id = source.search_runs([source.get_experiment_by_name("recbench").experiment_id])[0].info.run_id
+    for epoch, loss in enumerate([0.9, 0.5, 0.4], start=1):  # a learning curve, as the epoch-trained methods log it
+        source.log_metric(run_id, "curve/loss", loss, step=epoch)
     monkeypatch.setenv("MLFLOW_TRACKING_URI", tracking)
     assert run_pair(toy_split, "random", RESOLVED, isolate=False)["status"] == "finished"
     assert import_runs(other)["imported"] == 1
@@ -71,6 +75,8 @@ def test_runs_from_another_machine_are_imported_once(toy_split, tracking, tmp_pa
     imported = frame[frame["tags.method"] == "most_popular"].iloc[0]
     assert imported["metrics.ndcg_at_10"] >= 0 and imported["params.seed"] == "42"
     assert mlflow.MlflowClient(tracking).list_artifacts(imported["run_id"])
+    curve = mlflow.MlflowClient(tracking).get_metric_history(imported["run_id"], "curve/loss")
+    assert [(m.step, m.value) for m in curve] == [(1, 0.9), (2, 0.5), (3, 0.4)]  # every epoch, not only the last
 
 
 @pytest.mark.slow

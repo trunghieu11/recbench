@@ -11,6 +11,9 @@ identity), after a code change, or to serve a method that was not confirmed. It 
 2. its quick-tier tuning summary (runs/tuning/<quick tier>/<dataset>/<method>.json), else
 3. the method's defaults.
 
+A re-ranker also needs its candidate generators' settings: those its confirmation pinned (recorded in the summary),
+else the ones the bake-off chose for EASE and ItemKNN on this dataset.
+
 It fits the method on data/splits/<dataset>/<tier> exactly as a benchmark run does (same training window, same
 epoch count) and writes data/bundles/<dataset>/<tier>/<method>/. Nothing is evaluated or logged to MLflow.
 """
@@ -26,19 +29,20 @@ from recbench.config import method_config
 from recbench.data import TrainView
 from recbench.registry import ensure_loaded
 from recbench.runner import _seed_everything, data_root, run_hash_for
-from recbench.tuning.job import _base_cfg, read_summary
+from recbench.tuning.job import _base_cfg, pin_generators, read_summary
 
 
-def chosen_settings(dataset: str, method: str, *, tier: str, quick_tier: str, from_confirm: bool) -> tuple[dict[str, Any], int | None, str]:
-    """(settings, epoch count or None, where they came from)."""
+def chosen_settings(dataset: str, method: str, *, tier: str, quick_tier: str,
+                    from_confirm: bool) -> tuple[dict[str, Any], int | None, str, dict[str, Any]]:
+    """(settings, epoch count or None, where they came from, the generator settings a confirmation pinned or {})."""
     if from_confirm:
         confirm = read_summary(tier, dataset, method, "confirm")
         if confirm and confirm.get("best_params"):
-            return dict(confirm["best_params"]), confirm.get("best_epoch"), f"confirmation on {tier}"
+            return dict(confirm["best_params"]), confirm.get("best_epoch"), f"confirmation on {tier}", dict(confirm.get("generators") or {})
     tuned = read_summary(quick_tier, dataset, method)
     if tuned and tuned.get("best_params"):
-        return dict(tuned["best_params"]), tuned.get("best_epoch"), f"{quick_tier}-tier tuning"
-    return {}, None, "defaults"
+        return dict(tuned["best_params"]), tuned.get("best_epoch"), f"{quick_tier}-tier tuning", {}
+    return {}, None, "defaults", {}
 
 
 def export(dataset: str, method: str, *, config: Path, tier: str = "full", from_confirm: bool = True,
@@ -46,9 +50,10 @@ def export(dataset: str, method: str, *, config: Path, tier: str = "full", from_
     from recbench.serving.bundle import export_bundle
     from recbench.tuning.__main__ import load_benchmark
 
-    _, resolved, _, settings = load_benchmark(config, hardware)
-    params, epochs, source = chosen_settings(dataset, method, tier=tier, quick_tier=settings.tier, from_confirm=from_confirm)
-    run_cfg = {**_base_cfg(resolved, method, set(params)), **params, "tuning": "tuned" if params else "defaults", "stage": "export"}
+    _, resolved, spaces, settings = load_benchmark(config, hardware)
+    params, epochs, source, generators = chosen_settings(dataset, method, tier=tier, quick_tier=settings.tier, from_confirm=from_confirm)
+    run_cfg = {**_base_cfg(resolved, method, set(params)), **params, **generators, "tuning": "tuned" if params else "defaults", "stage": "export"}
+    generators = pin_generators(run_cfg, method, tier, dataset, spaces)  # fills in what an older summary did not record
     if epochs:
         run_cfg["epochs"] = int(epochs)
     data = TrainView(data_root() / "splits" / dataset / tier)
@@ -59,6 +64,8 @@ def export(dataset: str, method: str, *, config: Path, tier: str = "full", from_
     out = data_root() / "bundles" / dataset / tier / method
     extra = {"config_hash": run_hash_for(run_cfg, method, data.split_hash), "stage": "export", "settings_from": source,
              "settings": {k: v for k, v in params.items() if isinstance(v, (int, float, str, bool)) or v is None}}
+    if generators:
+        extra["generators"] = generators
     return export_bundle(model, data, out, k=int(cfg.get("bundle_k", 100)), max_users=int(cfg.get("bundle_users", 20_000)), extra=extra)
 
 

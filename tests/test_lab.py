@@ -146,6 +146,10 @@ def test_prepare_rerun_archives_and_starts_a_fresh_attempt(lab):
     stub = read_summary("full", "toy", "itemknn")
     assert stub["status"] == "pending" and stub["attempt"] == 3
     assert len(list((path.parent / "archive").glob("itemknn.*.json"))) == 1
+    confirm = summary_path("full", "toy", "itemknn", "confirm")
+    confirm.write_text(json.dumps({"tier": "full", "dataset": "toy", "method": "itemknn", "stage": "confirm", "status": "finished"}))
+    assert prepare_rerun("full", "toy", "itemknn", "confirm") is True
+    assert not confirm.exists()  # archived without a stub: the queue confirms it again only if it is still a top method
 
 
 # ----- one setting on the validation fold -------------------------------------------------------------------------------

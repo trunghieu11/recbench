@@ -66,7 +66,7 @@ model (all-MiniLM-L6-v2, about 90 MB), so `pytest -q -m "not slow"` stays offlin
 |---|---|
 | `test_runner_logs_applicable_metrics_and_resumes` | inapplicable metrics; stale resume (changed settings must re-run) |
 | `test_unsupported_methods_are_recorded_not_failed` | skips counted as failures |
-| `test_runs_from_another_machine_are_imported_once` | GPU-machine results lost or duplicated when combined with the laptop's |
+| `test_runs_from_another_machine_are_imported_once` | GPU-machine results lost or duplicated when combined with the laptop's, or learning curves cut to their last point |
 | `test_child_process_records_peak_memory` (slow) | the child-process path and per-method memory |
 | `test_bundle_matches_the_evaluator_and_falls_back_for_unknown_users` | serving different lists than were evaluated |
 | `test_api_serves_bundles` | API routing and 404s |
@@ -93,6 +93,7 @@ model (all-MiniLM-L6-v2, about 90 MB), so `pytest -q -m "not slow"` stays offlin
 | `test_monitor_refuses_a_real_test_split` | early stopping that looks at test data |
 | `test_sasrec_stops_early_on_the_fold_and_keeps_its_best_epoch`, `test_fixed_epochs_never_look_at_validation`, `test_runner_logs_learning_curves_on_a_fold` | wrong early stopping, or a final run that peeks at validation |
 | `test_next_item_loss_modes`, `test_per_user_arrays_carry_user_ids` | broken loss options; per-user results that cannot be joined back |
+| `test_a_blown_up_final_run_restores_its_best_weights` | a final run whose loss blows up and leaves a collapsed model (SASRec on RetailRocket in the first bake-off) |
 | `test_restrict_keeps_the_window_plus_each_users_latest_events`, `test_weighted_matrix_decays_with_age`, `test_before_is_a_past_view_and_views_compose` | wrong training windows and recency decay |
 
 ### Tuning and the queue (`tests/test_tuning.py`, `tests/test_queue.py`)
@@ -105,6 +106,8 @@ model (all-MiniLM-L6-v2, about 90 MB), so `pytest -q -m "not slow"` stays offlin
 | `test_jobs_run_dataset_by_dataset_and_backfill_only_when_blocked`, `test_queue_runs_all_jobs_and_resumes` | wrong order, idle workers, lost resumes |
 | `test_confirmations_rank_every_method_even_in_a_filtered_session`, `test_interrupted_confirmation_resumes_even_with_stop_after_dataset`, `test_confirmation_rechecks_the_size_setting_on_full_data` | confirming the wrong methods, stranded confirmations, missing bundles |
 | `test_status_shows_liveness_cost_confirmations_and_writes_a_page`, `test_jobs_without_splits_run_again_on_resume`, `test_benchmark_files_can_extend_another` | a misleading status, lost jobs, broken config inheritance |
+| `test_a_reranker_job_pins_its_generators_settings`, `test_a_reranker_confirmation_waits_for_its_generators_confirmations`, `test_quick_tier_generator_settings_are_scaled_to_the_full_data` | re-rankers whose candidates depend on which job happened to finish first, whose old results survive a change to EASE or ItemKNN, or whose EASE keeps a quick-tier λ on full data |
+| `test_reconfirm_repeats_only_the_confirmations` | `--reconfirm` touching the tuning, or not running the confirmations again |
 
 ### The overall comparison (`tests/test_overall.py`)
 
@@ -112,6 +115,7 @@ model (all-MiniLM-L6-v2, about 90 MB), so `pytest -q -m "not slow"` stays offlin
 |---|---|
 | `test_matrix_ranks_ties_and_summaries` | wrong ranks, ties or mean ranks across datasets |
 | `test_critical_difference_matches_demsar`, `test_pareto_front_keeps_only_undominated_methods`, `test_chart_is_well_formed_svg` | wrong statistics, front or chart |
+| `test_status_marks_a_search_the_time_cap_cut_short` | a ✓ that hides a search the time cap ended after a few settings |
 
 ### Recombee (`tests/test_recombee.py`)
 

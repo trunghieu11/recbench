@@ -160,6 +160,10 @@ window per user. Sizing epochs by users alone made them tiny when there are few 
   [review log](../../review/2026-10-02-review.md)).
 - **Binary cross-entropy with one negative** under-trains SASRec badly. Full or sampled softmax is much stronger.
 - **Training on test items.** Windows must come from pre-test history only.
+- **A final run that blows up.** The final run trains for a fixed number of epochs, and nothing watches validation
+  during it. In the first bake-off, SASRec's final run on RetailRocket became unstable at epoch 21: the learning
+  rate was too high, the loss jumped from 5.8 to 9.9, and test NDCG@10 fell to 0.0014 (it was 0.0200 on
+  validation). recbench's epoch loop now restores the lowest-loss weights when that happens (`stopped: diverged`).
 
 ## 11. Check your understanding
 

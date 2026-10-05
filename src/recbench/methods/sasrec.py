@@ -69,7 +69,7 @@ class SASRec(EmbeddingRecommender):
         needs_torch=True,
         upstream="in-repo PyTorch, following Kang & McAuley 2018 with full cross-entropy (Klenitskiy & Vasilev 2023)",
         cost_band="medium",
-        impl_version="3",  # 2: epochs with early stopping, bf16, loss setting; 3: epochs sized by events
+        impl_version="4",  # 2: epochs with early stopping, bf16, loss setting; 3: epochs sized by events; 4: a final run that blows up keeps its best weights
     )
 
     def fit(self, data: TrainView, cfg: dict[str, Any]) -> None:

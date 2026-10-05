@@ -4,11 +4,11 @@
 
 | Dataset | Test NDCG@10 | Validation | Best settings found | Train time | Floor (MostPopular) | Bake-off (box) |
 |---|---|---|---|---|---|---|
-| movielens-25m | 0.1703 [0.1611, 0.1797] | 0.2026 | train_window_days=90, vsknn_idf=False, vsknn_k=500, vsknn_last_n=50, vsknn_sample=1000, vsknn_weighting=same | 0.0 s | 0.1737 | – |
-| lastfm | 0.0388 [0.0326, 0.0456] | 0.0830 | train_window_days=365, vsknn_idf=False, vsknn_k=500, vsknn_last_n=10, vsknn_sample=1000, vsknn_weighting=linear | 0.0 s | 0.0238 | – |
-| hm | not run | – | – | – | – | – |
-| steam | not run | – | – | – | – | – |
-| retailrocket | not run | – | – | – | – | – |
+| movielens-25m | 0.1703 [0.1611, 0.1797] | 0.2026 | train_window_days=90, vsknn_idf=False, vsknn_k=500, vsknn_last_n=50, vsknn_sample=1000, vsknn_weighting=same | 0.0 s | 0.1737 | 0.1705 |
+| lastfm | 0.0388 [0.0326, 0.0456] | 0.0830 | train_window_days=365, vsknn_idf=False, vsknn_k=500, vsknn_last_n=10, vsknn_sample=1000, vsknn_weighting=linear | 0.0 s | 0.0238 | 0.0386 |
+| hm | not run | – | – | – | – | 0.0105 |
+| steam | not run | – | – | – | – | 0.0309 |
+| retailrocket | not run | – | – | – | – | 0.0199 |
 
 **Your experiments.** Paired difference to the baseline in test NDCG@10 over the same users.
 

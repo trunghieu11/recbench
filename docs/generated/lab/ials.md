@@ -4,11 +4,11 @@
 
 | Dataset | Test NDCG@10 | Validation | Best settings found | Train time | Floor (MostPopular) | Bake-off (box) |
 |---|---|---|---|---|---|---|
-| movielens-25m | 0.1576 [0.1487, 0.1666] (3 seeds) | 0.1969 | decay_half_life_days=90, dim=64, ials_alpha=1.42, ials_iterations=20, ials_reg=0.00647, train_window_days=90 | 1.2 s | 0.1737 | – |
-| lastfm | 0.0558 [0.0478, 0.0639] (3 seeds) | 0.0750 | decay_half_life_days=90, dim=64, ials_alpha=0.937, ials_iterations=20, ials_reg=0.00277, train_window_days=90 | 2.7 s | 0.0238 | – |
-| hm | not run | – | – | – | – | – |
-| steam | not run | – | – | – | – | – |
-| retailrocket | not run | – | – | – | – | – |
+| movielens-25m | 0.1576 [0.1487, 0.1666] (3 seeds) | 0.1969 | decay_half_life_days=90, dim=64, ials_alpha=1.42, ials_iterations=20, ials_reg=0.00647, train_window_days=90 | 1.2 s | 0.1737 | 0.1881 |
+| lastfm | 0.0558 [0.0478, 0.0639] (3 seeds) | 0.0750 | decay_half_life_days=90, dim=64, ials_alpha=0.937, ials_iterations=20, ials_reg=0.00277, train_window_days=90 | 2.7 s | 0.0238 | 0.0558 |
+| hm | not run | – | – | – | – | 0.0132 |
+| steam | not run | – | – | – | – | 0.0315 |
+| retailrocket | not run | – | – | – | – | 0.0233 |
 
 **Your experiments.** Paired difference to the baseline in test NDCG@10 over the same users.
 

@@ -20,7 +20,9 @@ small laptop runs are on the [smoke-tier page](leaderboards-smoke.md).
     Simple methods with one or two settings (MostPopular, EASE, ItemKNN) are less sensitive to this. Neural
     models depend heavily on their settings, so these tables understate them. Some heavy methods did not
     finish (see "Did not run" in each section). The [quick-tier bake-off](quick-tier.md)
-    re-runs the low-budget methods with equal tuning for every method.
+    re-runs the low-budget methods with equal tuning for every method. EASE, ItemKNN and iALS are the methods it
+    confirmed on full data that also ran here. After tuning they scored 12% to 118% higher, and the simple methods
+    still came out on top.
 
 !!! info "How long is the test window?"
     For H&M, the test window is the last 7 days. For the other datasets, the cutoff is placed so that the last 10% of

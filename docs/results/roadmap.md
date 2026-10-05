@@ -12,6 +12,20 @@ separate pull request. Good first projects are marked ★.
   trending items, and report candidate recall.
 - **Several seeds** for the full-data confirmation of each dataset's top 3 (stochastic methods only). Paired
   significance tests are still open (below).
+- **The first quick-tier bake-off** (2026-10-04): all 115 jobs and 15 full-data confirmations, on one rented box in
+  15 hours. The results are on the [quick-tier page](quick-tier.md).
+- **The improvement labs** for the 11 light methods, with a paired comparison tool (`python -m recbench.compare`)
+  and a developer handbook.
+
+## Next: close the first bake-off
+
+A [follow-up session](../start/box-5-follow-up.md) of 5 to 6 hours on a rented box:
+
+- re-run SASRec, whose final run on RetailRocket collapsed (the training loop now guards against it);
+- confirm the LightGBM re-ranker again, with its EASE generator's λ scaled to the full data;
+- confirm Last.fm's top 3 by validation score (SANSA and the LightGBM re-ranker are missing);
+- write the 15 missing serving bundles (`scripts/export_bundles_box.sh`);
+- run the labs' baseline.
 
 ## Evaluation
 
@@ -21,11 +35,14 @@ separate pull request. Good first projects are marked ★.
 | ★ Scenario-profile leaderboards | the [overall comparison](overall-comparison.md) now has an accuracy-vs-cost Pareto front, but one metric still hides other trade-offs | add coverage to the Pareto front; profiles weight metrics per scenario ("discovery", "low cost") |
 | Online-style evaluation | offline accuracy is not user response ([offline vs online](../dictionary/concepts/offline-vs-online.md)) | off-policy estimators on logged data, or a simple simulator; A/B routing in the API |
 | Rolling temporal windows | one test window per dataset (the last 10% of events; H&M: 7 days) | repeat the split at several cutoffs and average |
+| ★ A time limit per setting | in the first bake-off, one slow SANSA setting used up most of a job's 3 hours, so SANSA was judged on 2 of its 10 settings on H&M and RetailRocket ([known limitations](known-limitations.md)) | `tuning/job.py`: give each trial a hard timeout of about twice its fair share, and record a trial that hits it as timed out; the search then moves on |
+| GRU4Rec within its time share | the authors' code ignores `fit_deadline`, and its first setting took an hour on RetailRocket and Steam | stop its epoch loop at the deadline in `methods/gru4rec.py`, keeping the epochs done, as `_torch.train_epochs` does |
 
 ## Methods
 
 | Item | Why | Sketch |
 |---|---|---|
+| Leaner re-rankers | the LightGBM re-ranker needed up to 62 GB of RAM on full RetailRocket, more than a laptop and many boxes have | first measure where the memory goes (the generators' full-catalog scores, the text vectors, the training table), then build the table in chunks of users |
 | A real LLM recommender | the text-hash tower is a placeholder, and [text-embedding kNN](../dictionary/algorithms/text-knn.md) only uses a pretrained encoder ([LLM and generative recsys](../dictionary/concepts/llm-and-generative-recsys.md)) | the same encoder's vectors in a two-tower model trained on interactions; or an LLM re-ranker over EASE's top 50 |
 | Real image (and audio) embeddings | 15 colour features are a toy | precompute CLIP- or SigLIP-style embeddings for H&M images into the split cache; feed them to the multimodal tower |
 | Faithful TIGER | TIGER-lite is unranked | RQ-VAE on content embeddings, a seq2seq model generating semantic IDs, beam search, collision handling |

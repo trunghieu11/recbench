@@ -4,11 +4,11 @@
 
 | Dataset | Test NDCG@10 | Validation | Best settings found | Train time | Floor (MostPopular) | Bake-off (box) |
 |---|---|---|---|---|---|---|
-| movielens-25m | 0.1968 [0.1869, 0.2068] | 0.2363 | decay_half_life_days=90, sansa_lambda=91.5, sansa_weights_per_item=249, train_window_days=null | 2.2 min | 0.1737 | – |
-| lastfm | unfinished | – | – | – | 0.0238 | – |
-| hm | not run | – | – | – | – | – |
-| steam | not run | – | – | – | – | – |
-| retailrocket | not run | – | – | – | – | – |
+| movielens-25m | 0.1968 [0.1869, 0.2068] | 0.2363 | decay_half_life_days=90, sansa_lambda=91.5, sansa_weights_per_item=249, train_window_days=null | 2.2 min | 0.1737 | 0.1968 |
+| lastfm | unfinished | – | – | – | 0.0238 | 0.0565 |
+| hm | not run | – | – | – | – | 0.0108 |
+| steam | not run | – | – | – | – | 0.0529 |
+| retailrocket | not run | – | – | – | – | 0.0183 |
 
 **Your experiments.** Paired difference to the baseline in test NDCG@10 over the same users.
 

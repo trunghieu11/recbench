@@ -4,11 +4,11 @@
 
 | Dataset | Test NDCG@10 | Validation | Best settings found | Train time | Floor (MostPopular) | Bake-off (box) |
 |---|---|---|---|---|---|---|
-| movielens-25m | failed | – | – | – | 0.1737 | – |
-| lastfm | unfinished | – | – | – | 0.0238 | – |
-| hm | not run | – | – | – | – | – |
-| steam | not run | – | – | – | – | – |
-| retailrocket | not run | – | – | – | – | – |
+| movielens-25m | failed | – | – | – | 0.1737 | 0.2044 |
+| lastfm | unfinished | – | – | – | 0.0238 | 0.0494 |
+| hm | not run | – | – | – | – | 0.0166 |
+| steam | not run | – | – | – | – | 0.0605 |
+| retailrocket | not run | – | – | – | – | 0.0223 |
 
 **Your experiments.** Paired difference to the baseline in test NDCG@10 over the same users.
 

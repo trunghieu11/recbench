@@ -28,9 +28,10 @@ tuning:
   cap_minutes: 180
 
 queue:
-  jobs_per_gpu: 3          # small quick-tier models share a GPU
+  jobs_per_gpu: 4          # small quick-tier models share a GPU
   max_threads_per_job: 32  # OpenBLAS limit on many-core boxes
-  # Job order inside each dataset block. resource: cpu | gpu; after: jobs of the same dataset to wait for.
+  # Job order inside each dataset block. resource: cpu | gpu; after: jobs of the same dataset to wait for (the
+  # tuning waits for their tuning; a confirmation waits for their confirmations, if they are confirmed too).
   methods:
     # 1. anchors (seconds)
     - {name: random, resource: cpu}

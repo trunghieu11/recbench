@@ -33,8 +33,8 @@ The page uses five ideas:
 - **Relative score.** A method's NDCG@10 divided by the best NDCG@10 on that dataset, averaged. 1.0 means "the best
   on every dataset it ran on"; 0.5 means "half as good as the best, on average".
 - **Critical difference (CD).** With few datasets, small differences in mean rank are luck. The Nemenyi test
-  (Demšar 2006) gives the gap two mean ranks must exceed to count as a real difference. With 9 methods on 5
-  datasets it is about 5.4 ranks, so only very large gaps are significant.
+  (Demšar 2006) gives the gap two mean ranks must exceed to count as a real difference. With the bake-off's 23
+  methods on 5 datasets it is 15.5 ranks, so only very large gaps are significant.
 
 !!! example "A worked example"
     Three methods on two datasets:
@@ -154,17 +154,40 @@ The reason matters: "over budget" is a result about cost; "failed" is a problem 
 
 ## Commentary
 
-!!! note "2026-10-04: untuned full results only"
-    Only the untuned v0.2 run covers the full data so far.
+!!! note "2026-10-05: the first quick-tier bake-off and its full-data confirmations"
+    **Who is good everywhere.** EASE has the best mean rank (2.2) and is first or tied with the first on four
+    datasets. The LightGBM re-ranker comes second (3.6) and has the best relative score (0.93), meaning it is
+    the closest to the best method on average. SANSA, ItemKNN, RP3beta and iALS follow (5.8 to 7.4). All of
+    these are neighbourhood, linear or matrix-factorisation models, or built on them. The best neural models
+    are in the middle of the table: the DCN-V2 re-ranker (11.6), which re-orders EASE's and ItemKNN's candidates,
+    and MultVAE (12.2).
 
-    - **EASE** wins four of five datasets and has the best mean rank (1.6), with MostPopular winning Steam.
-    - **The critical difference is about 5.4**, so the only gap that is clearly significant is EASE against
-      Random.
-    - **On cost**, EASE, ItemKNN and MostPopular form the Pareto front (with Random, trivially, as the fastest).
-      The neural models took about 5–50 times longer to train than EASE, without being more accurate.
+    **What is significant.** With 23 methods and 5 datasets, the critical difference is 15.5 ranks. EASE is
+    significantly better than GRU4Rec, text kNN and Random only. The middle of the table is not ordered by the
+    data. The stronger evidence is per dataset: on full H&M, the re-ranker beats EASE with no overlap of the 95%
+    intervals (0.0283 against 0.0213). Everywhere else the confirmed top 3 are tied.
 
-    Untuned neural models are understated, though, which is why the [quick-tier bake-off](quick-tier.md) tunes
-    every method with the same budget. This commentary is revised when its results arrive.
+    **Cost.** The quick tier's Pareto front is V-SKNN, Turbo-CF, PureSVD, EASE and the re-ranker (and Random,
+    trivially).
+    - EASE gives 91% of the best accuracy on average after 9 seconds of training.
+    - The re-ranker adds 2 points of relative score, for 4.5 minutes of training and up to 43 GB of memory.
+    - The neural models took 1.4 to 8 minutes to train, and were less accurate than EASE on every dataset.
+
+    **Before and after tuning.** Compare the "Full, untuned v0.2" tab with "Full, confirmed".
+    - EASE gained 12% to 118%.
+    - The best result per dataset rose by 10% (Steam) to 190% (H&M).
+    - Most of that comes from the time-aware settings: most jobs chose to train on recent data only, or to
+      down-weight old interactions.
+
+    **Not final yet.**
+    - SASRec's final run on RetailRocket collapsed (a bug, now fixed).
+    - On MovieLens and RetailRocket, the re-ranker's full-data confirmation took its candidates from an EASE
+      whose λ was not scaled to the full data.
+    - Last.fm's confirmations were chosen by test score.
+    - SANSA was judged with one of its weakest settings on H&M and RetailRocket.
+
+    The [quick-tier page](quick-tier.md#open-items-from-the-first-run) has the details, and a
+    [follow-up session](../start/box-5-follow-up.md) re-runs what is affected.
 
 ## What this page cannot tell you
 

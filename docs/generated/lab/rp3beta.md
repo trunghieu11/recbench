@@ -4,11 +4,11 @@
 
 | Dataset | Test NDCG@10 | Validation | Best settings found | Train time | Floor (MostPopular) | Bake-off (box) |
 |---|---|---|---|---|---|---|
-| movielens-25m | 0.2005 [0.1900, 0.2107] | 0.2279 | decay_half_life_days=90, rp3_alpha=0.612, rp3_beta=0.304, rp3_neighbors=154, train_window_days=null | 3.2 s | 0.1737 | – |
-| lastfm | 0.0504 [0.0425, 0.0588] | 0.1092 | decay_half_life_days=90, rp3_alpha=0.612, rp3_beta=0.304, rp3_neighbors=154, train_window_days=null | 1.4 s | 0.0238 | – |
-| hm | not run | – | – | – | – | – |
-| steam | not run | – | – | – | – | – |
-| retailrocket | not run | – | – | – | – | – |
+| movielens-25m | 0.2005 [0.1900, 0.2107] | 0.2279 | decay_half_life_days=90, rp3_alpha=0.612, rp3_beta=0.304, rp3_neighbors=154, train_window_days=null | 3.2 s | 0.1737 | 0.2005 |
+| lastfm | 0.0504 [0.0425, 0.0588] | 0.1092 | decay_half_life_days=90, rp3_alpha=0.612, rp3_beta=0.304, rp3_neighbors=154, train_window_days=null | 1.4 s | 0.0238 | 0.0504 |
+| hm | not run | – | – | – | – | 0.0084 |
+| steam | not run | – | – | – | – | 0.0519 |
+| retailrocket | not run | – | – | – | – | 0.0209 |
 
 **Your experiments.** Paired difference to the baseline in test NDCG@10 over the same users.
 

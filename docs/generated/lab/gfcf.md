@@ -4,11 +4,11 @@
 
 | Dataset | Test NDCG@10 | Validation | Best settings found | Train time | Floor (MostPopular) | Bake-off (box) |
 |---|---|---|---|---|---|---|
-| movielens-25m | 0.1920 [0.1823, 0.2024] | 0.2226 | decay_half_life_days=90, gfcf_alpha=0.978, gfcf_k=256, train_window_days=null | 3.8 s | 0.1737 | – |
-| lastfm | 0.0560 [0.0481, 0.0654] | 0.1231 | decay_half_life_days=365, gfcf_alpha=0.0627, gfcf_k=64, train_window_days=null | 1.3 s | 0.0238 | – |
-| hm | not run | – | – | – | – | – |
-| steam | not run | – | – | – | – | – |
-| retailrocket | not run | – | – | – | – | – |
+| movielens-25m | 0.1920 [0.1823, 0.2024] | 0.2226 | decay_half_life_days=90, gfcf_alpha=0.978, gfcf_k=256, train_window_days=null | 3.8 s | 0.1737 | 0.1920 |
+| lastfm | 0.0560 [0.0481, 0.0654] | 0.1231 | decay_half_life_days=365, gfcf_alpha=0.0627, gfcf_k=64, train_window_days=null | 1.3 s | 0.0238 | 0.0560 |
+| hm | not run | – | – | – | – | 0.0058 |
+| steam | not run | – | – | – | – | 0.0490 |
+| retailrocket | not run | – | – | – | – | 0.0151 |
 
 **Your experiments.** Paired difference to the baseline in test NDCG@10 over the same users.
 

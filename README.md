@@ -4,10 +4,26 @@ A recommender-systems benchmark that doubles as a **dictionary**: methods from a
 and a managed service, 5 public datasets, an honest evaluation protocol, a fair tuned bake-off, a serving API with
 monitoring, and documentation that explains every algorithm from scratch.
 
-> **Status (2026-10-04):** protocol v2 (a review of v0.1 found test-label leakage; fixed and guarded by tests, see
-> [the review log](docs/review/2026-10-02-review.md)). The untuned v0.2 full-tier results are published. The
-> **quick-tier bake-off**, which tunes every low-budget method with the same budget dataset by dataset, is built
-> and dry-run; its results come next.
+> **Status (2026-10-05):** protocol v2 (a review of v0.1 found test-label leakage; fixed and guarded by tests, see
+> [the review log](docs/review/2026-10-02-review.md)). The first **quick-tier bake-off** has run: 23 low-budget
+> methods tuned with the same budget on all five datasets, and each dataset's top 3 confirmed on the full data.
+> A short follow-up session comes next: a SASRec re-run, new confirmations for the LightGBM re-ranker and for
+> Last.fm, and the serving bundles.
+
+## Results so far
+
+Best on the full data, by test NDCG@10. A tie (≈) means overlapping 95% confidence intervals.
+
+| Dataset | Winner |
+|---|---|
+| MovieLens-25M | EASE 0.225 ≈ LightGBM re-ranker ≈ PureSVD |
+| RetailRocket | RP3beta 0.028 ≈ iALS ≈ LightGBM re-ranker |
+| Steam | EASE 0.058 ≈ SANSA ≈ LightGBM re-ranker |
+| H&M | LightGBM re-ranker 0.028, clearly ahead of EASE (0.021) |
+| Last.fm | EASE 0.106 ≈ PureSVD ≈ SLIM |
+
+Across the five datasets, EASE has the best mean rank, and no neural model placed higher than 8th on any dataset
+under the same tuning budget. The findings and their caveats are in `docs/results/quick-tier.md`.
 
 ## What is inside
 
